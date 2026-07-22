@@ -153,12 +153,14 @@ git commit -m "chore: scaffold Next.js + vitest harness with formatVnd util"
 Run: `createdb leafshoes_development`
 Expected: tạo DB thành công. Nếu đã tồn tại thì bỏ qua (kiểm tra: `psql -lqt | cut -d '|' -f1 | grep -qw leafshoes_development && echo exists`).
 
-- [ ] **Step 2: Cài & init Prisma**
+> **Prisma 7** (bản `npm i` kéo về). Dùng đúng pattern Prisma 7: generator mới `prisma-client` (xuất ra thư mục), cấu hình URL qua `prisma.config.ts`, chạy runtime bằng driver adapter `@prisma/adapter-pg`. (Đã verify qua docs Prisma + Better Auth.)
+
+- [ ] **Step 2: Cài Prisma 7 + adapter + init**
 
 Run:
 ```bash
-npm i -D prisma
-npm i @prisma/client
+npm i -D prisma dotenv
+npm i @prisma/client @prisma/adapter-pg
 npx prisma init --datasource-provider postgresql
 ```
 
@@ -173,25 +175,58 @@ Và `.env.example` (không chứa giá trị thật):
 DATABASE_URL="postgresql://USER@localhost:5432/leafshoes_development?schema=public"
 ```
 
-- [ ] **Step 4: Tạo Prisma singleton `src/lib/prisma.ts`**
+- [ ] **Step 4: Cấu hình `prisma/schema.prisma` (generator mới, datasource không url)**
+
+```prisma
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+```
+
+- [ ] **Step 5: Tạo `prisma.config.ts` (URL cho CLI/migrate đọc từ env)**
 
 ```ts
-import { PrismaClient } from "@prisma/client";
+import "dotenv/config";
+import { defineConfig } from "prisma/config";
+
+export default defineConfig({
+  schema: "prisma/schema.prisma",
+  migrations: { path: "prisma/migrations" },
+  datasource: { url: process.env["DATABASE_URL"] },
+});
+```
+
+- [ ] **Step 6: Gitignore client sinh ra + sinh client**
+
+```bash
+grep -q "src/generated" .gitignore || echo "/src/generated/" >> .gitignore
+npx prisma generate
+```
+Expected: client sinh vào `src/generated/prisma`. Ghi lại đường dẫn import chính xác từ output (VD `@/generated/prisma/client`).
+
+- [ ] **Step 7: Tạo Prisma singleton `src/lib/prisma.ts` (driver adapter)**
+
+```ts
+import { PrismaClient } from "@/generated/prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
+
 export const prisma =
-  globalForPrisma.prisma ?? new PrismaClient();
+  globalForPrisma.prisma ?? new PrismaClient({ adapter });
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 ```
+> Nếu đường dẫn import từ generator khác (VD `@/generated/prisma`), sửa theo output thực tế của Step 6.
 
-- [ ] **Step 5: Sinh Prisma client**
-
-Run: `npx prisma generate`
-Expected: "Generated Prisma Client".
-
-- [ ] **Step 6: Viết test kết nối**
+- [ ] **Step 8: Viết test kết nối**
 
 Create `src/lib/prisma.test.ts`:
 ```ts
@@ -209,18 +244,23 @@ describe("kết nối Postgres", () => {
 });
 ```
 
-- [ ] **Step 7: Chạy test → XANH (Postgres local đang chạy)**
+- [ ] **Step 9: Chạy test → XANH (Postgres local đang chạy)**
 
 Run: `npm run test`
 Expected: PASS. Nếu fail vì kết nối, kiểm tra `pg_isready` và `DATABASE_URL`.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 10: Xác nhận CLI đọc được URL (wiring `prisma.config.ts`)**
+
+Run: `npx prisma migrate status`
+Expected: kết nối được DB (báo "No migration found" / "up to date" là OK — chưa có model tới Task 3). Nếu lỗi kết nối → sai `prisma.config.ts`/`.env`.
+
+- [ ] **Step 11: Commit**
 
 ```bash
 # create-next-app đã gitignore .env* — xác nhận .env không bị commit
 grep -q "^.env" .gitignore || echo ".env" >> .gitignore
 git add -A
-git commit -m "feat: add prisma client singleton on local postgres"
+git commit -m "feat: add prisma 7 client (driver adapter) on local postgres"
 ```
 
 ---
