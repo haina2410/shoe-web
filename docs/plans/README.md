@@ -15,7 +15,7 @@ Spec nguồn: [../README.md](../README.md) và các file `01`–`06`.
 
 | Ngày | Lát cắt | Test gate (bằng chứng "xong") | Plan chi tiết |
 |---|---|---|---|
-| **1** | Nền tảng: scaffold Next.js+TS, Tailwind+shadcn, Postgres(Docker)+Prisma, Better Auth+RBAC, Vitest+Playwright, design tokens | `npm test` xanh (có test thật), `npm run build` ok, `prisma migrate` ok, Playwright smoke trang chủ pass | [2026-07-22-day1-foundation.md](2026-07-22-day1-foundation.md) |
+| **1** | Nền tảng: scaffold Next.js+TS, Tailwind+shadcn, Postgres(local)+Prisma, Better Auth+RBAC, Vitest+Playwright, design tokens | `npm test` xanh (có test thật), `npm run build` ok, `prisma migrate` ok, Playwright smoke trang chủ pass | [2026-07-22-day1-foundation.md](2026-07-22-day1-foundation.md) |
 | **2** | Data model đầy đủ + seed + RBAC guard | Unit test schema/seed; test middleware chặn non-admin; `prisma migrate` + seed chạy | *viết khi bắt đầu Ngày 2* |
 | **3** | Admin CRUD sản phẩm/biến thể/tồn kho + upload ảnh | Unit test server actions CRUD; E2E admin tạo sản phẩm + biến thể | *cuốn chiếu* |
 | **4** | Storefront: danh mục, lọc, search, chi tiết | Unit test bộ lọc/search; E2E duyệt danh mục → mở chi tiết | *cuốn chiếu* |

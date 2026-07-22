@@ -4,7 +4,7 @@
 
 **Goal:** Dựng bộ khung leafshoes chạy được với test harness thật (Vitest + Playwright), Postgres qua Docker + Prisma, Better Auth + RBAC (OWNER/STAFF), và design tokens/layout gốc.
 
-**Architecture:** Một Next.js App Router (TypeScript) monolith. Postgres chạy qua Docker Compose, truy cập bằng Prisma singleton. Better Auth dùng Prisma adapter + plugin `admin` cho RBAC. UI nền shadcn/ui + Tailwind với tokens thương hiệu leafshoes.
+**Architecture:** Một Next.js App Router (TypeScript) monolith. Dev dùng **Postgres local (Homebrew)**; production dùng Docker Compose (Ngày 10). Truy cập DB bằng Prisma singleton. Better Auth dùng Prisma adapter + plugin `admin` cho RBAC. UI nền shadcn/ui + Tailwind với tokens thương hiệu leafshoes.
 
 **Tech Stack:** Next.js (App Router), TypeScript, Tailwind, shadcn/ui, Prisma, PostgreSQL, Better Auth, Vitest, @testing-library/react, Playwright.
 
@@ -134,43 +134,26 @@ git commit -m "chore: scaffold Next.js + vitest harness with formatVnd util"
 
 ---
 
-### Task 2: Postgres (Docker) + Prisma + kiểm tra kết nối
+### Task 2: Postgres (local dev) + Prisma + kiểm tra kết nối
+
+> **Local dev dùng Postgres cài sẵn trên máy** (Homebrew PostgreSQL 17, đang chạy port 5432, user `nam`, không mật khẩu, xác thực trust local). **KHÔNG tạo `docker-compose.yml` ở Ngày 1** — Postgres cho production sẽ chạy bằng Docker Compose ở **Ngày 10**.
 
 **Files:**
-- Create: `docker-compose.yml`
 - Create: `prisma/schema.prisma` (qua `prisma init`)
 - Create: `src/lib/prisma.ts`
-- Create/Modify: `.env` (DATABASE_URL)
+- Create/Modify: `.env` (DATABASE_URL trỏ Postgres local — không commit)
+- Create/Modify: `.env.example` (mẫu, commit được)
 - Test: `src/lib/prisma.test.ts`
 
 **Interfaces:**
 - Produces: `prisma` — PrismaClient singleton export từ `@/lib/prisma`.
 
-- [ ] **Step 1: Tạo `docker-compose.yml`**
+- [ ] **Step 1: Tạo database local**
 
-```yaml
-services:
-  db:
-    image: postgres:16
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: leafshoes
-      POSTGRES_PASSWORD: leafshoes
-      POSTGRES_DB: leafshoes
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-volumes:
-  pgdata:
-```
+Run: `createdb leafshoes_development`
+Expected: tạo DB thành công. Nếu đã tồn tại thì bỏ qua (kiểm tra: `psql -lqt | cut -d '|' -f1 | grep -qw leafshoes_development && echo exists`).
 
-- [ ] **Step 2: Khởi động DB**
-
-Run: `docker compose up -d db`
-Expected: container `db` chạy (kiểm tra `docker compose ps`).
-
-- [ ] **Step 3: Cài & init Prisma**
+- [ ] **Step 2: Cài & init Prisma**
 
 Run:
 ```bash
@@ -179,13 +162,18 @@ npm i @prisma/client
 npx prisma init --datasource-provider postgresql
 ```
 
-- [ ] **Step 4: Đặt `DATABASE_URL` trong `.env`**
+- [ ] **Step 3: Đặt `DATABASE_URL` trong `.env` (Postgres local)**
 
+`.env`:
 ```
-DATABASE_URL="postgresql://leafshoes:leafshoes@localhost:5432/leafshoes?schema=public"
+DATABASE_URL="postgresql://nam@localhost:5432/leafshoes_development?schema=public"
+```
+Và `.env.example` (không chứa giá trị thật):
+```
+DATABASE_URL="postgresql://USER@localhost:5432/leafshoes_development?schema=public"
 ```
 
-- [ ] **Step 5: Tạo Prisma singleton `src/lib/prisma.ts`**
+- [ ] **Step 4: Tạo Prisma singleton `src/lib/prisma.ts`**
 
 ```ts
 import { PrismaClient } from "@prisma/client";
@@ -198,12 +186,12 @@ export const prisma =
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 ```
 
-- [ ] **Step 6: Sinh Prisma client**
+- [ ] **Step 5: Sinh Prisma client**
 
 Run: `npx prisma generate`
 Expected: "Generated Prisma Client".
 
-- [ ] **Step 7: Viết test kết nối (đỏ trước khi client sinh xong / DB tắt)**
+- [ ] **Step 6: Viết test kết nối**
 
 Create `src/lib/prisma.test.ts`:
 ```ts
@@ -221,17 +209,18 @@ describe("kết nối Postgres", () => {
 });
 ```
 
-- [ ] **Step 8: Chạy test → XANH (DB đang chạy)**
+- [ ] **Step 7: Chạy test → XANH (Postgres local đang chạy)**
 
 Run: `npm run test`
-Expected: PASS. Nếu fail vì kết nối, kiểm tra `docker compose ps` và `DATABASE_URL`.
+Expected: PASS. Nếu fail vì kết nối, kiểm tra `pg_isready` và `DATABASE_URL`.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-echo ".env" >> .gitignore
+# create-next-app đã gitignore .env* — xác nhận .env không bị commit
+grep -q "^.env" .gitignore || echo ".env" >> .gitignore
 git add -A
-git commit -m "feat: add postgres via docker compose + prisma client singleton"
+git commit -m "feat: add prisma client singleton on local postgres"
 ```
 
 ---
@@ -600,7 +589,7 @@ git commit -m "test: add playwright smoke e2e for home page"
 
 - [ ] `npm run test` → tất cả unit test xanh (money, prisma, permissions, site-header).
 - [ ] `npm run build` → build thành công.
-- [ ] `docker compose ps` → `db` chạy; `npx prisma migrate status` → up to date.
+- [ ] `pg_isready` → Postgres local chạy; `npx prisma migrate status` → up to date.
 - [ ] `npm run test:e2e` → smoke trang chủ pass.
 
 ## Self-review (đã rà)

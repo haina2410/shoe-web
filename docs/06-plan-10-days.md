@@ -20,8 +20,8 @@ Nền tảng(1) → Data+RBAC(2) → Admin CRUD(3) ─┐
 ## Ngày 1 — Nền tảng
 
 - **Mục tiêu:** khung chạy được + test harness thật.
-- **Bàn giao:** scaffold Next.js+TS; Vitest+Playwright; Postgres (Docker)+Prisma; Better Auth + RBAC (OWNER/STAFF); design tokens + font Be Vietnam Pro + header/footer.
-- **Module/file chính:** `src/lib/money.ts`, `src/lib/prisma.ts`, `src/lib/permissions.ts`, `src/lib/auth.ts`, `src/app/api/auth/[...all]/route.ts`, `src/app/layout.tsx`, `docker-compose.yml`.
+- **Bàn giao:** scaffold Next.js+TS; Vitest+Playwright; **Postgres local (Homebrew)** + Prisma; Better Auth + RBAC (OWNER/STAFF); design tokens + font Be Vietnam Pro + header/footer. *(Docker chỉ dùng cho production — Ngày 10.)*
+- **Module/file chính:** `src/lib/money.ts`, `src/lib/prisma.ts`, `src/lib/permissions.ts`, `src/lib/auth.ts`, `src/app/api/auth/[...all]/route.ts`, `src/app/layout.tsx`.
 - **Trọng tâm test:** unit `formatVnd`; kết nối Prisma; định nghĩa role; render header; smoke E2E trang chủ.
 - **Phụ thuộc:** không. | **Rủi ro:** import adapter Better Auth có thể đổi (theo output CLI).
 - **Plan chi tiết:** [plans/2026-07-22-day1-foundation.md](plans/2026-07-22-day1-foundation.md).
