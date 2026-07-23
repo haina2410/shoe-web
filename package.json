@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "db:seed": "prisma db seed",
     "test:watch": "vitest",
     "test:e2e": "playwright test"
   },
@@ -42,6 +43,7 @@
     "jsdom": "^29.1.1",
     "prisma": "^7.9.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.1",
     "typescript": "^5",
     "vitest": "^4.1.10"
   }
