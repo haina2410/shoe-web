@@ -212,16 +212,24 @@ type AdminSeedUser = {
  * Idempotent: bỏ qua nếu email đã tồn tại (không throw, không tạo trùng).
  */
 async function seedAdminUsers(prisma: Db) {
+  const ownerPassword = process.env.SEED_OWNER_PASSWORD;
+  const staffPassword = process.env.SEED_STAFF_PASSWORD;
+  if (!ownerPassword || !staffPassword) {
+    throw new Error(
+      "Thiếu SEED_OWNER_PASSWORD / SEED_STAFF_PASSWORD trong .env"
+    );
+  }
+
   const users: AdminSeedUser[] = [
     {
       email: process.env.SEED_OWNER_EMAIL || "owner@leafshoes.local",
-      password: process.env.SEED_OWNER_PASSWORD || "leafshoes-dev-owner",
+      password: ownerPassword,
       name: "Chủ cửa hàng",
       role: "owner",
     },
     {
       email: process.env.SEED_STAFF_EMAIL || "staff@leafshoes.local",
-      password: process.env.SEED_STAFF_PASSWORD || "leafshoes-dev-staff",
+      password: staffPassword,
       name: "Nhân viên",
       role: "staff",
     },
