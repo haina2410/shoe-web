@@ -47,6 +47,9 @@ next-env.d.ts
 # generated prisma client
 /src/generated/
 
+# ảnh sản phẩm upload cục bộ (dev) — không commit
+/uploads
+
 # playwright
 /test-results/
 /playwright-report/
