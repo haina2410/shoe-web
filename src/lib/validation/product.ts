@@ -43,3 +43,23 @@ export const updateVariantStockSchema = z.object({
 });
 
 export type UpdateVariantStockInput = z.infer<typeof updateVariantStockSchema>;
+
+/**
+ * Schema biến thể dùng khi CẬP NHẬT sản phẩm — giống `variantInputSchema` nhưng
+ * thêm `id` optional: có `id` → biến thể đã tồn tại (khớp bản ghi hiện có);
+ * không có `id` → biến thể mới. Dùng làm input cho chiến lược đồng bộ biến thể
+ * trong `updateProductCore` (xem `src/server/products.ts`).
+ */
+export const variantSyncInputSchema = variantInputSchema.extend({
+  id: z.string().min(1).optional(),
+});
+
+export type VariantSyncInput = z.infer<typeof variantSyncInputSchema>;
+
+/** Schema cập nhật sản phẩm kèm danh sách biến thể (đồng bộ theo `variantSyncInputSchema`). */
+export const updateProductInputSchema = z.object({
+  product: productInputSchema,
+  variants: z.array(variantSyncInputSchema).min(1),
+});
+
+export type UpdateProductInput = z.infer<typeof updateProductInputSchema>;
