@@ -2,6 +2,7 @@ import "dotenv/config";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { SHIPPING_ZONES, PROVINCE_ZONES } from "./data/provinces";
+import { auth } from "../src/lib/auth";
 
 type Db = PrismaClient;
 
@@ -191,11 +192,62 @@ export async function seed(prisma: Db) {
   }
 }
 
+type AdminSeedUser = {
+  email: string;
+  password: string;
+  name: string;
+  role: "owner" | "staff";
+};
+
+/**
+ * Seed 2 tài khoản quản trị mặc định cho môi trường dev (owner + staff).
+ *
+ * KHÔNG nằm trong `seed(prisma)` testable: `seed.test.ts` gọi `seed(testPrisma)`
+ * trỏ vào DB test, nhưng `auth.api.createUser` luôn đi qua `auth` toàn cục →
+ * `prisma` toàn cục (`DATABASE_URL` dev) — nếu gộp vào đây, chạy test sẽ vô
+ * tình tạo user trên DB dev. Vì vậy hàm này chỉ được gọi từ CLI entry bên
+ * dưới (chạy trên DB dev qua `npx prisma db seed`), không được test tự động
+ * gọi tới.
+ *
+ * Idempotent: bỏ qua nếu email đã tồn tại (không throw, không tạo trùng).
+ */
+async function seedAdminUsers(prisma: Db) {
+  const users: AdminSeedUser[] = [
+    {
+      email: process.env.SEED_OWNER_EMAIL || "owner@leafshoes.local",
+      password: process.env.SEED_OWNER_PASSWORD || "leafshoes-dev-owner",
+      name: "Chủ cửa hàng",
+      role: "owner",
+    },
+    {
+      email: process.env.SEED_STAFF_EMAIL || "staff@leafshoes.local",
+      password: process.env.SEED_STAFF_PASSWORD || "leafshoes-dev-staff",
+      name: "Nhân viên",
+      role: "staff",
+    },
+  ];
+
+  for (const u of users) {
+    const existing = await prisma.user.findUnique({
+      where: { email: u.email },
+    });
+    if (existing) {
+      console.log(`[seed:admin] Bỏ qua (đã tồn tại): role=${u.role}`);
+      continue;
+    }
+    await auth.api.createUser({
+      body: { email: u.email, password: u.password, name: u.name, role: u.role },
+    });
+    console.log(`[seed:admin] Đã tạo tài khoản mới: role=${u.role}`);
+  }
+}
+
 if (process.argv[1] && process.argv[1].includes("seed")) {
   const prisma = new PrismaClient({
     adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }),
   });
   seed(prisma)
+    .then(() => seedAdminUsers(prisma))
     .then(() => prisma.$disconnect())
     .catch((e) => {
       console.error(e);
