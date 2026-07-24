@@ -18,8 +18,8 @@ Spec nguồn: [../README.md](../README.md) và các file `01`–`06`.
 | **1** | Nền tảng: scaffold Next.js+TS, Tailwind+shadcn, Postgres(local)+Prisma, Better Auth+RBAC, Vitest+Playwright, design tokens | `npm test` xanh (có test thật), `npm run build` ok, `prisma migrate` ok, Playwright smoke trang chủ pass | [2026-07-22-day1-foundation.md](2026-07-22-day1-foundation.md) |
 | **2** | Data model đầy đủ + seed + RBAC guard | Unit `can()`; integration seed (đếm bản ghi, idempotent); E2E `/admin` redirect non-auth; `prisma migrate` + seed chạy | [2026-07-23-day2-data-model.md](2026-07-23-day2-data-model.md) |
 | **3** | Admin CRUD sản phẩm/biến thể/tồn kho + upload ảnh | Unit slug/zod/upload; integration product CRUD (DB thật); authz staff-denied; E2E đăng nhập owner → tạo sản phẩm + biến thể → thấy trong list | [2026-07-24-day3-admin-crud.md](2026-07-24-day3-admin-crud.md) |
-| **4** | Storefront: danh mục, lọc, search, chi tiết | Unit test bộ lọc/search; E2E duyệt danh mục → mở chi tiết | *cuốn chiếu* |
-| **5** | Giỏ hàng + checkout + phí ship theo vùng + sinh VietQR | Unit test tính subtotal/ship/total + sinh orderCode; E2E đặt hàng → thấy QR | *cuốn chiếu* |
+| **4** | Storefront: danh mục, lọc, search, chi tiết | Unit test bộ lọc/search; E2E duyệt danh mục → mở chi tiết | [2026-07-25-day4-storefront.md](2026-07-25-day4-storefront.md) |
+| **5** | Giỏ hàng + checkout + phí ship (phẳng 30k) + sinh VietQR | Unit test tính subtotal/ship/total + sinh orderCode; E2E đặt hàng → thấy QR | [2026-07-26-day5-cart-checkout.md](2026-07-26-day5-cart-checkout.md) |
 | **6** | pg-boss worker + React Email + email xác nhận đặt hàng | Unit test handler job; test render email; đặt hàng → email gửi (mock) | *cuốn chiếu* |
 | **7** | Webhook SePay + đối soát + idempotency + xác nhận tay + cron hết hạn | Unit test khớp/lệch/lặp webhook; test trừ kho; E2E webhook → PAID | *cuốn chiếu* |
 | **8** | Admin quản lý đơn (list/detail/đổi trạng thái) + giao dịch chưa khớp | Unit test chuyển trạng thái hợp lệ; E2E admin xác nhận + fulfill đơn | *cuốn chiếu* |
