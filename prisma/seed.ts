@@ -3,6 +3,7 @@ import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { SHIPPING_ZONES, PROVINCE_ZONES } from "./data/provinces";
 import { auth } from "../src/lib/auth";
+import { normalizeText } from "../src/lib/normalize";
 
 type Db = PrismaClient;
 
@@ -146,6 +147,7 @@ export async function seed(prisma: Db) {
       where: { slug: p.slug },
       update: {
         name: p.name,
+        nameNormalized: normalizeText(p.name),
         description: p.description,
         basePrice: p.basePrice,
         categoryId,
@@ -153,6 +155,7 @@ export async function seed(prisma: Db) {
       },
       create: {
         name: p.name,
+        nameNormalized: normalizeText(p.name),
         slug: p.slug,
         description: p.description,
         basePrice: p.basePrice,

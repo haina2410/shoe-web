@@ -1,5 +1,6 @@
 import type { PrismaClient, Product, Variant } from "@/generated/prisma/client";
 import { slugify, uniqueSlug } from "@/lib/slug";
+import { normalizeText } from "@/lib/normalize";
 import type {
   CreateProductInput,
   UpdateProductInput,
@@ -54,6 +55,7 @@ export async function createProductCore(
     return tx.product.create({
       data: {
         name: input.product.name,
+        nameNormalized: normalizeText(input.product.name),
         description: input.product.description,
         categoryId: input.product.categoryId,
         basePrice: input.product.basePrice,
@@ -135,6 +137,7 @@ export async function updateProductCore(
       where: { id },
       data: {
         name: input.product.name,
+        nameNormalized: normalizeText(input.product.name),
         description: input.product.description,
         categoryId: input.product.categoryId,
         basePrice: input.product.basePrice,

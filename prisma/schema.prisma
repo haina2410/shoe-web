@@ -98,18 +98,23 @@ enum ProductStatus {
 }
 
 model Product {
-  id          String         @id @default(cuid())
-  name        String
-  slug        String         @unique
-  description String?
-  categoryId  String
-  category    Category       @relation(fields: [categoryId], references: [id])
-  basePrice   Int            // VND, số nguyên
-  status      ProductStatus  @default(DRAFT)
-  images      ProductImage[]
-  variants    Variant[]
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  id              String         @id @default(cuid())
+  name            String
+  slug            String         @unique
+  // Bản không dấu của `name` (qua `normalizeText`), phục vụ tìm kiếm
+  // "contains" không phân biệt dấu tiếng Việt. Cố ý KHÔNG có btree index:
+  // `LIKE %x%` không tận dụng được btree; nếu cần tăng tốc sẽ dùng pg_trgm
+  // (xem plan Ngày 9).
+  nameNormalized  String         @default("")
+  description     String?
+  categoryId      String
+  category        Category       @relation(fields: [categoryId], references: [id])
+  basePrice       Int            // VND, số nguyên
+  status          ProductStatus  @default(DRAFT)
+  images          ProductImage[]
+  variants        Variant[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
   @@index([categoryId])
   @@index([status])
   @@map("product")

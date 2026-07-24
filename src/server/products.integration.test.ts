@@ -6,6 +6,7 @@ import {
   deleteProductCore,
   updateVariantStockCore,
 } from "@/server/products";
+import { normalizeText } from "@/lib/normalize";
 import type {
   CreateProductInput,
   UpdateProductInput,
@@ -61,6 +62,7 @@ describe("createProductCore", () => {
     });
     expect(persisted).not.toBeNull();
     expect(persisted?.variants).toHaveLength(2);
+    expect(persisted?.nameNormalized).toBe(normalizeText(input.product.name));
   });
 
   it("tạo sản phẩm kèm 2 ảnh → persist đúng url/position theo thứ tự", async () => {
@@ -245,6 +247,7 @@ describe("updateProductCore", () => {
     const updated = await updateProductCore(testPrisma, product.id, update);
 
     expect(updated.name).toBe("Giày Sục Nữ Bản Mới");
+    expect(updated.nameNormalized).toBe(normalizeText("Giày Sục Nữ Bản Mới"));
     expect(updated.basePrice).toBe(300000);
     expect(updated.variants).toHaveLength(2);
 
