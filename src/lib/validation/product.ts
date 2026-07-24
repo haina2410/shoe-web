@@ -28,10 +28,23 @@ export const productInputSchema = z.object({
 
 export type ProductInput = z.infer<typeof productInputSchema>;
 
-/** Schema tạo sản phẩm mới kèm ít nhất 1 biến thể. */
+/**
+ * Schema input cho một ảnh sản phẩm — `url` là đường dẫn trả về từ
+ * `POST /api/admin/upload` (xem `src/lib/upload.ts`), `position` xác định thứ
+ * tự hiển thị (0 = ảnh đầu tiên/ảnh đại diện).
+ */
+export const productImageInputSchema = z.object({
+  url: z.string().min(1),
+  position: z.number().int().min(0),
+});
+
+export type ProductImageInput = z.infer<typeof productImageInputSchema>;
+
+/** Schema tạo sản phẩm mới kèm ít nhất 1 biến thể (+ ảnh, tuỳ chọn). */
 export const createProductInputSchema = z.object({
   product: productInputSchema,
   variants: z.array(variantInputSchema).min(1),
+  images: z.array(productImageInputSchema).optional().default([]),
 });
 
 export type CreateProductInput = z.infer<typeof createProductInputSchema>;
@@ -60,6 +73,7 @@ export type VariantSyncInput = z.infer<typeof variantSyncInputSchema>;
 export const updateProductInputSchema = z.object({
   product: productInputSchema,
   variants: z.array(variantSyncInputSchema).min(1),
+  images: z.array(productImageInputSchema).optional().default([]),
 });
 
 export type UpdateProductInput = z.infer<typeof updateProductInputSchema>;

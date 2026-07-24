@@ -32,6 +32,7 @@ function baseCreateInput(
       { size: "40", color: "Đen", sku: "SKU-A-40-DEN", priceOverride: null, stock: 10 },
       { size: "41", color: "Trắng", sku: "SKU-A-41-TRA", priceOverride: 260000, stock: 5 },
     ],
+    images: [],
   };
 }
 
@@ -62,6 +63,27 @@ describe("createProductCore", () => {
     expect(persisted?.variants).toHaveLength(2);
   });
 
+  it("tạo sản phẩm kèm 2 ảnh → persist đúng url/position theo thứ tự", async () => {
+    const category = await makeCategory();
+    const input: CreateProductInput = {
+      ...baseCreateInput({}, category.id),
+      images: [
+        { url: "/api/uploads/products/a.jpg", position: 0 },
+        { url: "/api/uploads/products/b.jpg", position: 1 },
+      ],
+    };
+
+    const product = await createProductCore(testPrisma, input);
+
+    const images = await testPrisma.productImage.findMany({
+      where: { productId: product.id },
+      orderBy: { position: "asc" },
+    });
+    expect(images).toHaveLength(2);
+    expect(images[0]).toMatchObject({ url: "/api/uploads/products/a.jpg", position: 0 });
+    expect(images[1]).toMatchObject({ url: "/api/uploads/products/b.jpg", position: 1 });
+  });
+
   it("2 sản phẩm trùng tên → slug thứ 2 có hậu tố -2", async () => {
     const category = await makeCategory();
 
@@ -77,6 +99,7 @@ describe("createProductCore", () => {
       variants: [
         { size: "42", color: "Đen", sku: "SKU-B-42-DEN", priceOverride: null, stock: 3 },
       ],
+      images: [],
     });
 
     expect(p1.slug).toBe("giay-suc-nu");
@@ -98,6 +121,7 @@ describe("createProductCore", () => {
         { size: "40", color: "Đen", sku: "DUP-SKU", priceOverride: null, stock: 1 },
         { size: "41", color: "Trắng", sku: "DUP-SKU", priceOverride: null, stock: 2 },
       ],
+      images: [],
     };
 
     await expect(createProductCore(testPrisma, input)).rejects.toThrow();
@@ -128,6 +152,7 @@ describe("createProductCore", () => {
           stock: 1,
         },
       ],
+      images: [],
     };
 
     await expect(createProductCore(testPrisma, input)).rejects.toThrow();
@@ -214,6 +239,7 @@ describe("updateProductCore", () => {
           stock: 8,
         },
       ],
+      images: [],
     };
 
     const updated = await updateProductCore(testPrisma, product.id, update);
@@ -231,5 +257,47 @@ describe("updateProductCore", () => {
     // biến thể bị bỏ khỏi input (dropVariant) đã bị xoá
     const dropped = await testPrisma.variant.findUnique({ where: { id: dropVariant.id } });
     expect(dropped).toBeNull();
+  });
+
+  it("cập nhật ảnh → thay thế toàn bộ danh sách ảnh cũ bằng danh sách mới", async () => {
+    const category = await makeCategory();
+    const product = await createProductCore(testPrisma, {
+      ...baseCreateInput({}, category.id),
+      images: [{ url: "/api/uploads/products/old.jpg", position: 0 }],
+    });
+
+    const update: UpdateProductInput = {
+      product: {
+        name: product.name,
+        description: product.description ?? undefined,
+        categoryId: category.id,
+        basePrice: product.basePrice,
+        status: "ACTIVE",
+      },
+      variants: product.variants.map((v) => ({
+        id: v.id,
+        size: v.size,
+        color: v.color,
+        sku: v.sku,
+        priceOverride: v.priceOverride,
+        stock: v.stock,
+      })),
+      images: [
+        { url: "/api/uploads/products/new-1.jpg", position: 0 },
+        { url: "/api/uploads/products/new-2.jpg", position: 1 },
+      ],
+    };
+
+    await updateProductCore(testPrisma, product.id, update);
+
+    const images = await testPrisma.productImage.findMany({
+      where: { productId: product.id },
+      orderBy: { position: "asc" },
+    });
+    expect(images).toHaveLength(2);
+    expect(images.map((i) => i.url)).toEqual([
+      "/api/uploads/products/new-1.jpg",
+      "/api/uploads/products/new-2.jpg",
+    ]);
   });
 });
