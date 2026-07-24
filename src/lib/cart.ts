@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
@@ -5,23 +6,36 @@ import { persist } from "zustand/middleware";
  * `src/lib/cart.ts` — giỏ hàng client-side (Zustand + `persist`/localStorage,
  * key `"leafshoes-cart"`).
  *
- * **Chống hydration mismatch (Next.js App Router):** đã tra cứu docs chính
- * thức pmndrs/zustand qua `ctx7` — `reference/integrations/persisting-store-data.md`,
- * mục "Usage in Next.js". Mặc định `persist` dùng `createJSONStorage(() =>
- * window.localStorage)`; hàm này BẮT LỖI khi `window`/`localStorage` không
- * tồn tại (server) và trả về storage rỗng — nên trên server, store luôn
- * dùng state khởi tạo (`items: []`). Trên client, `persist` rehydrate ĐỒNG BỘ
- * (localStorage là storage đồng bộ) ngay khi module này được import — TRƯỚC
- * cả khi component đầu tiên render. Nếu một component đọc `items` ngay lập
- * tức, HTML server-render (rỗng) và lần render đầu tiên trên client (đã có
- * dữ liệu cũ) sẽ lệch nhau → cảnh báo "Hydration failed…".
+ * **Chống hydration mismatch (Next.js App Router) — fix review Day 5 Task 4
+ * (CRITICAL):** đã tra cứu docs chính thức pmndrs/zustand qua `ctx7` —
+ * `reference/integrations/persisting-store-data.md`, mục "Usage in
+ * Next.js" — và vendored Next.js docs
+ * (`node_modules/next/dist/docs/01-app/02-guides/preventing-flash-before-hydration.md`).
  *
- * Giải pháp đúng theo docs (mục "Check Store Hydration Status with
- * onRehydrateStorage"): thêm cờ `hasHydrated`, set `true` trong callback
- * `onRehydrateStorage` (chạy sau khi rehydrate xong, chỉ ở client). Mọi UI
- * đọc `items` (vd. `/cart`) PHẢI chờ `hasHydrated === true` rồi mới render
- * nội dung thật; trước đó hiển thị trạng thái rỗng/placeholder ổn định — khớp
- * cả server lẫn client, không có mismatch dù store thực ra đã có dữ liệu.
+ * Mặc định (không có `skipHydration`), `persist` rehydrate ĐỒNG BỘ
+ * (localStorage là storage đồng bộ) NGAY KHI module này được `import` — tức
+ * là TRƯỚC CẢ lần render đầu tiên của component trên client (React chưa kịp
+ * hydrate). Hệ quả: HTML server-render dùng state khởi tạo (`items: []`,
+ * `hasHydrated: false`), nhưng lần render đầu tiên trên client đã đọc được
+ * `hasHydrated: true` + dữ liệu cũ từ localStorage → cấu trúc DOM lệch nhau
+ * ngay từ render đầu tiên → hydration mismatch mỗi lần load `/cart`, không
+ * phải chỉ "flash" mà là lỗi thật.
+ *
+ * Fix: `skipHydration: true` — `persist` KHÔNG tự đọc localStorage lúc module
+ * eval nữa. Store luôn khởi tạo `items: []`, `hasHydrated: false` trên cả
+ * server lẫn lần render đầu tiên trên client (giống hệt nhau — không mismatch).
+ * Rehydrate được trigger thủ công từ `useEffect` (chạy sau lần render đầu,
+ * chỉ ở client) qua hook `useCartHydrated()` bên dưới — tương tự kỹ thuật
+ * "đọc giá trị client-only sau mount rồi render lại" mà docs Next.js mô tả
+ * cho các trường hợp không dùng được inline-script (ở đây không hợp vì
+ * localStorage được ghi bởi chính app, không phải theme/locale set trước khi
+ * app tồn tại).
+ *
+ * `hasHydrated` vẫn được set `true` trong `onRehydrateStorage` (chạy sau khi
+ * `persist.rehydrate()` hoàn tất). Mọi UI đọc `items` (vd. `/cart`, và sau
+ * này `/checkout`) PHẢI dùng `useCartHydrated()` và chờ `true` rồi mới render
+ * nội dung thật; trước đó hiển thị placeholder ổn định — khớp cả server lẫn
+ * client.
  */
 
 export type CartItem = {
@@ -101,9 +115,29 @@ export const useCart = create<CartState>()(
     {
       name: "leafshoes-cart",
       partialize: (state) => ({ items: state.items }),
+      skipHydration: true,
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);
       },
     },
   ),
 );
+
+/**
+ * Hook dùng chung cho mọi trang đọc giỏ hàng đã persist (`/cart`, và Day 5
+ * Task 5's `/checkout`). Trả về `hasHydrated`; lần render ĐẦU TIÊN trên cả
+ * server lẫn client luôn là `false` (nhờ `skipHydration: true` ở trên) — nên
+ * không có hydration mismatch. Effect chạy sau lần render đầu (chỉ trên
+ * client) để trigger rehydrate thật từ localStorage; khi xong,
+ * `onRehydrateStorage` set `hasHydrated: true` và component re-render với dữ
+ * liệu thật.
+ */
+export function useCartHydrated(): boolean {
+  const hasHydrated = useCart((state) => state.hasHydrated);
+
+  useEffect(() => {
+    void useCart.persist.rehydrate();
+  }, []);
+
+  return hasHydrated;
+}

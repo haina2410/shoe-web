@@ -1,4 +1,6 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { createElement } from "react";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { render } from "@testing-library/react";
 import { useCart } from "./cart";
 
 /**
@@ -95,5 +97,80 @@ describe("useCart", () => {
     const items = useCart.getState().items;
     const subtotal = items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
     expect(subtotal).toBe(1_300_000);
+  });
+});
+
+/**
+ * Regression lock cho fix hydration mismatch (CRITICAL, review Day 5 Task 4).
+ *
+ * Dùng store THẬT (không mock `@/lib/cart`) qua `vi.resetModules()` + import
+ * động, để mô phỏng đúng thời điểm module được đánh giá lần đầu trên client —
+ * kể cả khi `localStorage` đã có sẵn dữ liệu giỏ hàng cũ từ phiên trước.
+ *
+ * Với `skipHydration: true`, store phải khởi tạo `{ hasHydrated: false, items:
+ * [] }` NGAY LẬP TỨC sau khi import (không tự đọc localStorage lúc module
+ * eval) — khớp với HTML server-render. Chỉ sau khi gọi `persist.rehydrate()`
+ * (được trigger từ `useEffect`, tức là sau lần render đầu tiên trên client)
+ * thì `items` mới được nạp và `hasHydrated` mới chuyển `false → true`.
+ */
+describe("hydration (skipHydration)", () => {
+  it("skipHydration: sau import, store là {hasHydrated:false, items:[]} dù localStorage đã có dữ liệu cũ; rehydrate() mới nạp thật và chuyển hasHydrated → true", async () => {
+    window.localStorage.setItem(
+      "leafshoes-cart",
+      JSON.stringify({
+        state: { items: [{ ...baseItem, quantity: 4 }] },
+        version: 0,
+      }),
+    );
+
+    vi.resetModules();
+    const freshModule = await import("./cart");
+    const freshUseCart = freshModule.useCart;
+
+    // Trạng thái ngay sau import (trước rehydrate) phải trung tính — giống
+    // hệt server — dù localStorage đã có dữ liệu.
+    expect(freshUseCart.getState().hasHydrated).toBe(false);
+    expect(freshUseCart.getState().items).toEqual([]);
+
+    await freshUseCart.persist.rehydrate();
+
+    // Sau rehydrate: dữ liệu thật đã nạp, cờ đã chuyển true — chuyển thật
+    // false → true, không phải set cứng.
+    expect(freshUseCart.getState().hasHydrated).toBe(true);
+    expect(freshUseCart.getState().items).toEqual([
+      { ...baseItem, quantity: 4 },
+    ]);
+  });
+
+  it("useCartHydrated(): lần render đầu tiên trả về false (khớp placeholder SSR), rồi chuyển true sau khi rehydrate xong", async () => {
+    window.localStorage.setItem(
+      "leafshoes-cart",
+      JSON.stringify({
+        state: { items: [{ ...baseItem, quantity: 1 }] },
+        version: 0,
+      }),
+    );
+
+    vi.resetModules();
+    const freshModule = await import("./cart");
+    const { useCartHydrated, useCart: freshUseCart } = freshModule;
+
+    const seenValues: boolean[] = [];
+    function TestComponent() {
+      seenValues.push(useCartHydrated());
+      return null;
+    }
+
+    render(createElement(TestComponent));
+
+    // Render ĐẦU TIÊN (trước khi effect trigger rehydrate) phải là `false` —
+    // khớp với HTML server-render, không có hydration mismatch.
+    expect(seenValues[0]).toBe(false);
+    // Sau khi effect chạy (client-only) và rehydrate hoàn tất, giá trị mới
+    // nhất phải là `true`, và store đã nạp đúng dữ liệu persisted.
+    expect(seenValues[seenValues.length - 1]).toBe(true);
+    expect(freshUseCart.getState().items).toEqual([
+      { ...baseItem, quantity: 1 },
+    ]);
   });
 });

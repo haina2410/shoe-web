@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { useCart } from "@/lib/cart";
+import { useCart, useCartHydrated, type CartItem } from "@/lib/cart";
 import { formatVnd } from "@/lib/money";
 import { cartSubtotal } from "@/lib/cart-math";
 
@@ -10,12 +11,13 @@ import { cartSubtotal } from "@/lib/cart-math";
  *
  * Client Component đọc `useCart` (Zustand + `persist`, xem `@/lib/cart`).
  * Chỉ render NỘI DUNG THẬT (danh sách item / trạng thái rỗng) sau khi
- * `hasHydrated === true` — trước đó hiển thị một trạng thái trung tính ổn
- * định, khớp cả HTML server-render lẫn lần render đầu tiên trên client, để
- * tránh cảnh báo hydration mismatch (xem JSDoc trong `@/lib/cart`).
+ * `useCartHydrated()` trả về `true` — trước đó hiển thị một trạng thái trung
+ * tính ổn định, khớp cả HTML server-render lẫn lần render đầu tiên trên
+ * client (kể cả khi `skipHydration` đã tắt tự-rehydrate lúc module eval), để
+ * tránh hydration mismatch (xem JSDoc trong `@/lib/cart`).
  */
 export default function CartPage() {
-  const hasHydrated = useCart((state) => state.hasHydrated);
+  const hasHydrated = useCartHydrated();
   const items = useCart((state) => state.items);
   const setQuantity = useCart((state) => state.setQuantity);
   const removeItem = useCart((state) => state.removeItem);
@@ -101,28 +103,20 @@ export default function CartPage() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                aria-label={`Giảm số lượng ${item.name}`}
+                aria-label={`Giảm số lượng ${item.name} (${item.size}, ${item.color})`}
                 className="flex h-7 w-7 items-center justify-center rounded-md border text-sm"
                 style={{ borderColor: "var(--line)" }}
                 onClick={() => setQuantity(item.variantId, item.quantity - 1)}
               >
                 −
               </button>
-              <input
-                type="number"
-                min={1}
-                aria-label={`Số lượng ${item.name}`}
-                value={item.quantity}
-                onChange={(event) => {
-                  const next = Number(event.target.value);
-                  setQuantity(item.variantId, Number.isNaN(next) ? 0 : next);
-                }}
-                className="w-14 rounded-md border px-2 py-1 text-center text-sm"
-                style={{ borderColor: "var(--line)" }}
+              <QuantityInput
+                item={item}
+                onCommit={(quantity) => setQuantity(item.variantId, quantity)}
               />
               <button
                 type="button"
-                aria-label={`Tăng số lượng ${item.name}`}
+                aria-label={`Tăng số lượng ${item.name} (${item.size}, ${item.color})`}
                 className="flex h-7 w-7 items-center justify-center rounded-md border text-sm"
                 style={{ borderColor: "var(--line)" }}
                 onClick={() => setQuantity(item.variantId, item.quantity + 1)}
@@ -133,7 +127,7 @@ export default function CartPage() {
 
             <button
               type="button"
-              aria-label={`Xoá ${item.name} khỏi giỏ hàng`}
+              aria-label={`Xoá ${item.name} (${item.size}, ${item.color}) khỏi giỏ hàng`}
               className="text-sm font-medium underline"
               style={{ color: "var(--ink)" }}
               onClick={() => removeItem(item.variantId)}
@@ -160,5 +154,60 @@ export default function CartPage() {
         </Link>
       </div>
     </div>
+  );
+}
+
+/**
+ * Ô nhập số lượng của 1 dòng giỏ hàng — fix review Day 5 Task 4 (IMPORTANT 1).
+ *
+ * Trước đây mỗi keystroke gọi thẳng `setQuantity(id, Number(e.target.value))`:
+ * xoá trắng ô (giữa lúc gõ) → `Number("") === 0` → store xoá luôn dòng dưới
+ * con trỏ người dùng. Sửa bằng cách giữ text đang gõ ở state cục bộ (không
+ * đụng store) và chỉ commit vào store lúc `onBlur`, và chỉ khi giá trị là số
+ * nguyên hợp lệ ≥ 1; nếu để trống/không hợp lệ khi rời ô, input tự reset về
+ * đúng số lượng hiện tại của dòng (không xoá, không commit 0/NaN).
+ *
+ * Đồng bộ lại `text` mỗi khi `item.quantity` đổi từ nguồn khác (nút +/-,
+ * hoặc do chính commit ở trên) bằng cách "adjust state while rendering"
+ * (so sánh với `quantity` đã thấy ở lần render trước, set lại state ngay
+ * trong render nếu khác) — theo khuyến nghị của React thay vì dùng
+ * `useEffect` để đồng bộ prop → state (tránh cascading render / lỗi lint
+ * `react-hooks/set-state-in-effect`): https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
+ */
+function QuantityInput({
+  item,
+  onCommit,
+}: {
+  item: CartItem;
+  onCommit: (quantity: number) => void;
+}) {
+  const [text, setText] = useState(() => String(item.quantity));
+  const [prevQuantity, setPrevQuantity] = useState(item.quantity);
+
+  if (item.quantity !== prevQuantity) {
+    setPrevQuantity(item.quantity);
+    setText(String(item.quantity));
+  }
+
+  const handleBlur = () => {
+    const parsed = Number(text);
+    if (text.trim() !== "" && Number.isInteger(parsed) && parsed >= 1) {
+      onCommit(parsed);
+    } else {
+      setText(String(item.quantity));
+    }
+  };
+
+  return (
+    <input
+      type="number"
+      min={1}
+      aria-label={`Số lượng ${item.name} (${item.size}, ${item.color})`}
+      value={text}
+      onChange={(event) => setText(event.target.value)}
+      onBlur={handleBlur}
+      className="w-14 rounded-md border px-2 py-1 text-center text-sm"
+      style={{ borderColor: "var(--line)" }}
+    />
   );
 }
