@@ -114,6 +114,10 @@ export default async function ProductDetailPage({
           <VariantSelector
             variants={product.variants}
             basePrice={product.basePrice}
+            productId={product.id}
+            slug={product.slug}
+            name={product.name}
+            imageUrl={product.images[0]?.url ?? null}
           />
         </div>
       </div>

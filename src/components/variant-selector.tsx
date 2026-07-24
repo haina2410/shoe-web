@@ -1,24 +1,36 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { formatVnd } from "@/lib/money";
 import { Button } from "@/components/ui/button";
+import { useCart } from "@/lib/cart";
 import type { Variant } from "@/generated/prisma/client";
 
 /**
  * `VariantSelector` — chọn size + màu cho trang chi tiết sản phẩm.
  *
  * Client Component: giữ state lựa chọn size/màu, resolve ra variant tương ứng
- * (nếu có) và hiển thị tồn kho. KHÔNG gọi action giỏ hàng nào — nút "Thêm vào
- * giỏ" luôn `disabled` ở Ngày 4 (giỏ hàng để Ngày 5).
+ * (nếu có) và hiển thị tồn kho. Nút "Thêm vào giỏ" gọi `useCart().addItem`
+ * (xem `@/lib/cart`) khi đã chọn được 1 variant còn hàng.
  */
 export function VariantSelector({
   variants,
   basePrice,
+  productId,
+  slug,
+  name,
+  imageUrl,
 }: {
   variants: Variant[];
   basePrice: number;
+  productId: string;
+  slug: string;
+  name: string;
+  imageUrl: string | null;
 }) {
+  const addItem = useCart((state) => state.addItem);
+
   const sizes = useMemo(
     () => [...new Set(variants.map((v) => v.size))],
     [variants],
@@ -30,6 +42,7 @@ export function VariantSelector({
 
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [justAdded, setJustAdded] = useState(false);
 
   const matchedVariant =
     selectedSize && selectedColor
@@ -42,6 +55,8 @@ export function VariantSelector({
     matchedVariant?.priceOverride != null
       ? matchedVariant.priceOverride
       : basePrice;
+
+  const canAddToCart = matchedVariant != null && matchedVariant.stock > 0;
 
   return (
     <div className="mt-6 flex flex-col gap-4">
@@ -58,7 +73,10 @@ export function VariantSelector({
               type="button"
               role="radio"
               aria-checked={selectedSize === size}
-              onClick={() => setSelectedSize(size)}
+              onClick={() => {
+                setSelectedSize(size);
+                setJustAdded(false);
+              }}
               className="rounded-md border px-3 py-1.5 text-sm"
               style={{
                 borderColor: "var(--line)",
@@ -82,7 +100,10 @@ export function VariantSelector({
               type="button"
               role="radio"
               aria-checked={selectedColor === color}
-              onClick={() => setSelectedColor(color)}
+              onClick={() => {
+                setSelectedColor(color);
+                setJustAdded(false);
+              }}
               className="rounded-md border px-3 py-1.5 text-sm"
               style={{
                 borderColor: "var(--line)",
@@ -106,17 +127,36 @@ export function VariantSelector({
       </p>
 
       <div className="flex flex-col gap-1">
-        {/*
-          Ngày 4: giỏ hàng chưa tồn tại (Ngày 5) nên nút này LUÔN disabled,
-          không gọi action/mutation nào — kể cả khi đã chọn được variant còn
-          hàng.
-        */}
-        <Button type="button" disabled className="w-fit">
+        <Button
+          type="button"
+          disabled={!canAddToCart}
+          className="w-fit"
+          onClick={() => {
+            if (!matchedVariant || matchedVariant.stock <= 0) return;
+            addItem({
+              variantId: matchedVariant.id,
+              productId,
+              slug,
+              name,
+              size: matchedVariant.size,
+              color: matchedVariant.color,
+              unitPrice: effectivePrice,
+              imageUrl,
+            });
+            setJustAdded(true);
+          }}
+        >
           Thêm vào giỏ
         </Button>
-        <p className="text-xs text-neutral-500">
-          Giỏ hàng sẽ có ở bước sau
-        </p>
+        {justAdded && (
+          <Link
+            href="/cart"
+            className="text-xs font-medium underline"
+            style={{ color: "var(--evergreen)" }}
+          >
+            Đã thêm — Xem giỏ hàng
+          </Link>
+        )}
       </div>
     </div>
   );

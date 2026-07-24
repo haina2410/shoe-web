@@ -1,8 +1,28 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { VariantSelector } from "./variant-selector";
 import type { Variant } from "@/generated/prisma/client";
+
+const addItem = vi.fn();
+
+vi.mock("@/lib/cart", () => ({
+  useCart: (selector: (state: { addItem: typeof addItem }) => unknown) =>
+    selector({ addItem }),
+}));
+
+// Import sau `vi.mock` để component nhận bản mock của "@/lib/cart".
+const { VariantSelector } = await import("./variant-selector");
+
+const productContext = {
+  productId: "prod-1",
+  slug: "giay-sneaker-la",
+  name: "Giày Sneaker Lá",
+  imageUrl: "https://example.com/a.jpg",
+};
+
+beforeEach(() => {
+  addItem.mockClear();
+});
 
 function makeVariant(overrides: Partial<Variant>): Variant {
   return {
@@ -35,7 +55,9 @@ const variants: Variant[] = [
 describe("VariantSelector", () => {
   it("chọn size+màu còn hàng → hiện đúng số lượng tồn kho", async () => {
     const user = userEvent.setup();
-    render(<VariantSelector variants={variants} basePrice={890000} />);
+    render(
+      <VariantSelector variants={variants} basePrice={890000} {...productContext} />,
+    );
 
     await user.click(screen.getByRole("radio", { name: "39" }));
     await user.click(screen.getByRole("radio", { name: "Đen" }));
@@ -45,7 +67,9 @@ describe("VariantSelector", () => {
 
   it("chọn tổ hợp hết hàng (stock = 0) → hiện 'Hết hàng' và nút thêm giỏ bị disable", async () => {
     const user = userEvent.setup();
-    render(<VariantSelector variants={variants} basePrice={890000} />);
+    render(
+      <VariantSelector variants={variants} basePrice={890000} {...productContext} />,
+    );
 
     await user.click(screen.getByRole("radio", { name: "39" }));
     await user.click(screen.getByRole("radio", { name: "Trắng" }));
@@ -56,7 +80,9 @@ describe("VariantSelector", () => {
 
   it("tổ hợp size+màu không tồn tại variant nào → không crash, báo không có lựa chọn", async () => {
     const user = userEvent.setup();
-    render(<VariantSelector variants={variants} basePrice={890000} />);
+    render(
+      <VariantSelector variants={variants} basePrice={890000} {...productContext} />,
+    );
 
     // size 40 chỉ tồn tại với màu Trắng, không có 40/Đen.
     await user.click(screen.getByRole("radio", { name: "40" }));
@@ -68,7 +94,9 @@ describe("VariantSelector", () => {
 
   it("hiển thị giá theo priceOverride của variant đang chọn khi có", async () => {
     const user = userEvent.setup();
-    render(<VariantSelector variants={variants} basePrice={890000} />);
+    render(
+      <VariantSelector variants={variants} basePrice={890000} {...productContext} />,
+    );
 
     await user.click(screen.getByRole("radio", { name: "40" }));
     await user.click(screen.getByRole("radio", { name: "Trắng" }));
@@ -76,17 +104,76 @@ describe("VariantSelector", () => {
     expect(screen.getByText("750.000 ₫")).toBeInTheDocument();
   });
 
-  it("nút thêm vào giỏ luôn disabled kể cả khi chọn được variant còn hàng (Ngày 5 mới nối action)", async () => {
+  it("nút thêm vào giỏ disabled khi chưa chọn đủ size+màu, hoặc tổ hợp hết hàng", async () => {
     const user = userEvent.setup();
-    render(<VariantSelector variants={variants} basePrice={890000} />);
+    render(
+      <VariantSelector variants={variants} basePrice={890000} {...productContext} />,
+    );
 
-    // Trước khi chọn gì, nút vẫn disabled.
+    // Trước khi chọn gì, nút disabled.
     expect(screen.getByRole("button", { name: /thêm vào giỏ/i })).toBeDisabled();
+
+    // 39/Trắng tồn tại nhưng hết hàng (stock = 0) → vẫn disabled.
+    await user.click(screen.getByRole("radio", { name: "39" }));
+    await user.click(screen.getByRole("radio", { name: "Trắng" }));
+    expect(screen.getByRole("button", { name: /thêm vào giỏ/i })).toBeDisabled();
+
+    expect(addItem).not.toHaveBeenCalled();
+  });
+
+  it("chọn variant còn hàng → nút thêm vào giỏ được bật, click gọi addItem với đúng dữ liệu", async () => {
+    const user = userEvent.setup();
+    render(
+      <VariantSelector variants={variants} basePrice={890000} {...productContext} />,
+    );
 
     await user.click(screen.getByRole("radio", { name: "39" }));
     await user.click(screen.getByRole("radio", { name: "Đen" }));
 
-    // Dù variant đã chọn còn hàng (stock=5), nút vẫn phải disabled ở Ngày 4.
-    expect(screen.getByRole("button", { name: /thêm vào giỏ/i })).toBeDisabled();
+    const addButton = screen.getByRole("button", { name: /thêm vào giỏ/i });
+    expect(addButton).toBeEnabled();
+
+    await user.click(addButton);
+
+    expect(addItem).toHaveBeenCalledTimes(1);
+    expect(addItem).toHaveBeenCalledWith({
+      variantId: "v-39-den",
+      productId: "prod-1",
+      slug: "giay-sneaker-la",
+      name: "Giày Sneaker Lá",
+      size: "39",
+      color: "Đen",
+      unitPrice: 890000,
+      imageUrl: "https://example.com/a.jpg",
+    });
+  });
+
+  it("dùng priceOverride của variant làm unitPrice khi thêm vào giỏ", async () => {
+    const user = userEvent.setup();
+    render(
+      <VariantSelector variants={variants} basePrice={890000} {...productContext} />,
+    );
+
+    await user.click(screen.getByRole("radio", { name: "40" }));
+    await user.click(screen.getByRole("radio", { name: "Trắng" }));
+    await user.click(screen.getByRole("button", { name: /thêm vào giỏ/i }));
+
+    expect(addItem).toHaveBeenCalledWith(
+      expect.objectContaining({ variantId: "v-40-trang", unitPrice: 750000 }),
+    );
+  });
+
+  it("sau khi thêm vào giỏ, hiện phản hồi liên kết tới trang giỏ hàng", async () => {
+    const user = userEvent.setup();
+    render(
+      <VariantSelector variants={variants} basePrice={890000} {...productContext} />,
+    );
+
+    await user.click(screen.getByRole("radio", { name: "39" }));
+    await user.click(screen.getByRole("radio", { name: "Đen" }));
+    await user.click(screen.getByRole("button", { name: /thêm vào giỏ/i }));
+
+    const cartLink = screen.getByRole("link", { name: /xem giỏ hàng/i });
+    expect(cartLink).toHaveAttribute("href", "/cart");
   });
 });
