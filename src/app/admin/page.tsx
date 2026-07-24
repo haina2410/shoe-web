@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function AdminDashboardPage() {
   return (
     <div>
@@ -7,6 +9,21 @@ export default function AdminDashboardPage() {
       <p className="mt-2 text-neutral-600">
         Khu quản trị leafshoes — nội dung sẽ được bổ sung ở các ngày tiếp theo.
       </p>
+
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Link
+          href="/admin/products"
+          className="block rounded-lg border p-4 transition-colors hover:bg-[var(--sage)]/40"
+          style={{ borderColor: "var(--line)" }}
+        >
+          <h2 className="font-semibold" style={{ color: "var(--evergreen)" }}>
+            Quản lý sản phẩm
+          </h2>
+          <p className="mt-1 text-sm text-neutral-600">
+            Xem, thêm, sửa, xoá sản phẩm và cập nhật tồn kho.
+          </p>
+        </Link>
+      </div>
     </div>
   );
 }
