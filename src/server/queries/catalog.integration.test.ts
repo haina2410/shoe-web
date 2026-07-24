@@ -149,6 +149,38 @@ describe("listProducts", () => {
     expect(result.map((r) => r.id)).toEqual([p1.id]);
   });
 
+  it("lọc size/color: khớp CHÉO giữa variants (1 variant khớp size, variant KHÁC khớp color) vẫn phải match", async () => {
+    const cat = await makeCategory("Giày Sneaker", "giay-sneaker");
+    // split: variant A khớp size "40" (nhưng màu Đen không nằm trong filter color),
+    // variant B khớp color "Trắng" (nhưng size 41 không nằm trong filter size).
+    // Không variant nào riêng lẻ khớp CẢ size lẫn color — sản phẩm chỉ match nếu
+    // implementation dùng HAI `some` riêng biệt (AND-across-facet, OR-within-facet),
+    // KHÔNG phải 1 `some` gộp đòi cùng lúc size+color trên 1 variant.
+    const split = await makeProduct({
+      name: "Sản phẩm Chéo Variant",
+      categoryId: cat.id,
+      basePrice: 300000,
+      variants: [
+        { size: "40", color: "Đen", sku: "X-1", stock: 1 },
+        { size: "41", color: "Trắng", sku: "X-2", stock: 1 },
+      ],
+    });
+    // decoy: ACTIVE nhưng không variant nào khớp size "40" hay color "Trắng"
+    await makeProduct({
+      name: "Sản phẩm Decoy",
+      categoryId: cat.id,
+      basePrice: 300000,
+      variants: [{ size: "42", color: "Xanh", sku: "X-3", stock: 1 }],
+    });
+
+    const result = await listProducts(testPrisma, {
+      sizes: ["40"],
+      colors: ["Trắng"],
+    });
+
+    expect(result.map((r) => r.id)).toEqual([split.id]);
+  });
+
   it("lọc price: 1 bucket", async () => {
     const cat = await makeCategory("Giày Sneaker", "giay-sneaker");
     const cheap = await makeProduct({ name: "Rẻ", categoryId: cat.id, basePrice: 100000 });
@@ -178,6 +210,28 @@ describe("listProducts", () => {
     const result = await listProducts(testPrisma, { priceKeys: ["tren-1r5"] });
 
     expect(result.map((r) => r.id)).toEqual([expensive.id]);
+  });
+
+  it("price bucket biên: min inclusive, max exclusive tại đúng mốc 500000 và 1000000", async () => {
+    const cat = await makeCategory("Giày Sneaker", "giay-sneaker");
+    const at500k = await makeProduct({ name: "Đúng 500k", categoryId: cat.id, basePrice: 500000 });
+    const at1tr = await makeProduct({ name: "Đúng 1 triệu", categoryId: cat.id, basePrice: 1000000 });
+
+    // basePrice === 500000 → thuộc "500k-1tr" (gte 500000), KHÔNG thuộc "duoi-500k" (lt 500000)
+    expect(
+      (await listProducts(testPrisma, { priceKeys: ["500k-1tr"] })).map((r) => r.id),
+    ).toContain(at500k.id);
+    expect(
+      (await listProducts(testPrisma, { priceKeys: ["duoi-500k"] })).map((r) => r.id),
+    ).not.toContain(at500k.id);
+
+    // basePrice === 1000000 → thuộc "1tr-1r5" (gte 1000000), KHÔNG thuộc "500k-1tr" (lt 1000000)
+    expect(
+      (await listProducts(testPrisma, { priceKeys: ["1tr-1r5"] })).map((r) => r.id),
+    ).toContain(at1tr.id);
+    expect(
+      (await listProducts(testPrisma, { priceKeys: ["500k-1tr"] })).map((r) => r.id),
+    ).not.toContain(at1tr.id);
   });
 
   it("search không dấu: q khớp bất kể dấu/hoa-thường", async () => {
@@ -282,6 +336,20 @@ describe("getProductBySlug", () => {
     const result = await getProductBySlug(testPrisma, "khong-ton-tai");
     expect(result).toBeNull();
   });
+
+  it("ARCHIVED → null", async () => {
+    const cat = await makeCategory("Giày Sneaker", "giay-sneaker");
+    const product = await makeProduct({
+      name: "Giày Cũ",
+      categoryId: cat.id,
+      basePrice: 300000,
+      status: "ARCHIVED",
+    });
+
+    const result = await getProductBySlug(testPrisma, product.slug);
+
+    expect(result).toBeNull();
+  });
 });
 
 describe("getFacets", () => {
@@ -312,6 +380,30 @@ describe("getFacets", () => {
 
     expect(facets.sizes).toEqual(["40", "41"]);
     expect(facets.colors).toEqual(["Trắng", "Đen"].sort());
+    expect(facets.sizes).not.toContain("99");
+    expect(facets.colors).not.toContain("MauLa");
+  });
+
+  it("không trả size/color chỉ tồn tại trên variant của sản phẩm ARCHIVED", async () => {
+    const cat = await makeCategory("Giày Sneaker", "giay-sneaker");
+    await makeProduct({
+      name: "Active Product",
+      categoryId: cat.id,
+      basePrice: 300000,
+      variants: [{ size: "40", color: "Đen", sku: "F-4", stock: 1 }],
+    });
+    await makeProduct({
+      name: "Archived Product",
+      categoryId: cat.id,
+      basePrice: 300000,
+      status: "ARCHIVED",
+      variants: [{ size: "99", color: "MauLa", sku: "F-5", stock: 1 }],
+    });
+
+    const facets = await getFacets(testPrisma);
+
+    expect(facets.sizes).toEqual(["40"]);
+    expect(facets.colors).toEqual(["Đen"]);
     expect(facets.sizes).not.toContain("99");
     expect(facets.colors).not.toContain("MauLa");
   });
