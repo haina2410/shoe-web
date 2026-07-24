@@ -125,6 +125,13 @@ export async function seed(prisma: Db) {
       create: { province: pz.province, zoneId: zone.id },
     });
   }
+  // Xoá các zone KHÔNG còn trong danh sách khai báo hiện tại (vd. các zone của
+  // scheme cũ 3-tỉnh/2-zone trước khi Ngày 5 Task 2 đổi sang 1 zone đồng giá
+  // toàn quốc). Tại thời điểm này mọi ProvinceZone đã được trỏ lại (vòng lặp
+  // trên) nên không zone cũ nào còn được tham chiếu → xoá an toàn.
+  await prisma.shippingZone.deleteMany({
+    where: { name: { notIn: SHIPPING_ZONES.map((z) => z.name) } },
+  });
 
   // 2) Categories (upsert theo slug)
   const categoryIdBySlug = new Map<string, string>();

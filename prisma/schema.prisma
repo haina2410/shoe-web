@@ -161,7 +161,6 @@ model Order {
   customerName String
   phone        String
   province     String
-  district     String
   ward         String
   addressLine  String
   note         String?

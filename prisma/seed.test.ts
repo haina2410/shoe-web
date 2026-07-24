@@ -20,10 +20,11 @@ describe("seed()", () => {
     expect(productsWithVariants.every((p) => p.variants.length > 0)).toBe(
       true,
     );
-    // 3 tỉnh được map; và có đúng 1 zone mặc định (fallback)
+    // 34 tỉnh/thành được map vào đúng 1 zone đồng giá toàn quốc (fallback = zone đó luôn)
     expect(await testPrisma.provinceZone.count()).toBe(
       PROVINCE_ZONES.length,
-    ); // = 3
+    ); // = 34
+    expect(await testPrisma.shippingZone.count()).toBe(1);
     expect(
       await testPrisma.shippingZone.count({ where: { isDefault: true } }),
     ).toBe(1);
