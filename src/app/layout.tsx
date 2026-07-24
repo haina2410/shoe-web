@@ -3,6 +3,7 @@ import { Be_Vietnam_Pro } from "next/font/google";
 import "./globals.css";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { CartHydrator } from "@/components/cart-hydrator";
 
 const beVietnam = Be_Vietnam_Pro({
   subsets: ["latin", "vietnamese"],
@@ -23,6 +24,7 @@ export default function RootLayout({
   return (
     <html lang="vi" className={beVietnam.variable}>
       <body className="min-h-screen flex flex-col font-sans antialiased">
+        <CartHydrator />
         <SiteHeader />
         <main className="flex-1">{children}</main>
         <SiteFooter />
