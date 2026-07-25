@@ -20,7 +20,7 @@ Spec nguồn: [../README.md](../README.md) và các file `01`–`06`.
 | **3** | Admin CRUD sản phẩm/biến thể/tồn kho + upload ảnh | Unit slug/zod/upload; integration product CRUD (DB thật); authz staff-denied; E2E đăng nhập owner → tạo sản phẩm + biến thể → thấy trong list | [2026-07-24-day3-admin-crud.md](2026-07-24-day3-admin-crud.md) |
 | **4** | Storefront: danh mục, lọc, search, chi tiết | Unit test bộ lọc/search; E2E duyệt danh mục → mở chi tiết | [2026-07-25-day4-storefront.md](2026-07-25-day4-storefront.md) |
 | **5** | Giỏ hàng + checkout + phí ship (phẳng 30k) + sinh VietQR | Unit test tính subtotal/ship/total + sinh orderCode; E2E đặt hàng → thấy QR | [2026-07-26-day5-cart-checkout.md](2026-07-26-day5-cart-checkout.md) |
-| **6** | pg-boss worker + React Email + email xác nhận đặt hàng | Unit test handler job; test render email; đặt hàng → email gửi (mock) | *cuốn chiếu* |
+| **6** | pg-boss worker + React Email + email xác nhận đặt hàng | Unit test handler job; test render email; integration: enqueue trong transaction tạo đơn (rollback ⇒ mất job) + worker thật xử lý job | [2026-07-27-day6-jobs-email.md](2026-07-27-day6-jobs-email.md) |
 | **7** | Webhook SePay + đối soát + idempotency + xác nhận tay + cron hết hạn | Unit test khớp/lệch/lặp webhook; test trừ kho; E2E webhook → PAID | *cuốn chiếu* |
 | **8** | Admin quản lý đơn (list/detail/đổi trạng thái) + giao dịch chưa khớp | Unit test chuyển trạng thái hợp lệ; E2E admin xác nhận + fulfill đơn | *cuốn chiếu* |
 | **9** | Polish thiết kế, responsive, a11y, empty/error states, signature "lá" | E2E happy path xanh trên mobile+desktop; kiểm tra focus/reduced-motion | *cuốn chiếu* |
