@@ -262,6 +262,89 @@ describe("updateProductCore", () => {
     expect(dropped).toBeNull();
   });
 
+  it("không xoá phân loại đã phát sinh đơn hàng và rollback toàn bộ cập nhật sản phẩm", async () => {
+    const category = await makeCategory();
+    const product = await createProductCore(
+      testPrisma,
+      baseCreateInput({}, category.id),
+    );
+    const [keepVariant, orderedVariant] = product.variants;
+    await testPrisma.order.create({
+      data: {
+        orderCode: "LEAF-FK0001",
+        email: "buyer@example.com",
+        customerName: "Khách thử nghiệm",
+        phone: "0900000000",
+        province: "Hà Nội",
+        ward: "Phường Hoàn Kiếm",
+        addressLine: "1 Tràng Tiền",
+        subtotal: orderedVariant.priceOverride ?? product.basePrice,
+        shippingFee: 0,
+        total: orderedVariant.priceOverride ?? product.basePrice,
+        items: {
+          create: {
+            variantId: orderedVariant.id,
+            productName: product.name,
+            size: orderedVariant.size,
+            color: orderedVariant.color,
+            unitPrice: orderedVariant.priceOverride ?? product.basePrice,
+            quantity: 1,
+          },
+        },
+      },
+    });
+
+    const update: UpdateProductInput = {
+      product: {
+        name: "Tên không được persist",
+        description: "Mô tả không được persist",
+        categoryId: category.id,
+        basePrice: 999_000,
+        status: "ARCHIVED",
+      },
+      variants: [
+        {
+          id: keepVariant.id,
+          size: keepVariant.size,
+          color: keepVariant.color,
+          sku: keepVariant.sku,
+          priceOverride: keepVariant.priceOverride,
+          stock: 123,
+        },
+      ],
+      images: [{ url: "/api/uploads/products/not-persisted.jpg", position: 0 }],
+    };
+
+    await expect(
+      updateProductCore(testPrisma, product.id, update),
+    ).rejects.toThrow(
+      "Không thể xoá phân loại đã phát sinh đơn hàng. Hãy đặt tồn kho về 0.",
+    );
+
+    const persisted = await testPrisma.product.findUniqueOrThrow({
+      where: { id: product.id },
+      include: {
+        variants: { orderBy: { sku: "asc" } },
+        images: true,
+      },
+    });
+    expect(persisted).toMatchObject({
+      name: product.name,
+      description: product.description,
+      basePrice: product.basePrice,
+      status: product.status,
+    });
+    expect(persisted.variants).toHaveLength(2);
+    expect(
+      persisted.variants.find((variant) => variant.id === keepVariant.id)
+        ?.stock,
+    ).toBe(keepVariant.stock);
+    expect(
+      persisted.variants.some((variant) => variant.id === orderedVariant.id),
+    ).toBe(true);
+    expect(persisted.images).toHaveLength(0);
+  });
+
   it("cập nhật ảnh → thay thế toàn bộ danh sách ảnh cũ bằng danh sách mới", async () => {
     const category = await makeCategory();
     const product = await createProductCore(testPrisma, {

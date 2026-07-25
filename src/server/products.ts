@@ -18,6 +18,25 @@ import type {
 
 export type ProductWithVariants = Product & { variants: Variant[] };
 
+export const VARIANT_IN_USE_ERROR =
+  "Không thể xoá phân loại đã phát sinh đơn hàng. Hãy đặt tồn kho về 0.";
+
+export class ProductBusinessError extends Error {
+  constructor(public readonly code: "VARIANT_IN_USE") {
+    super(VARIANT_IN_USE_ERROR);
+    this.name = "ProductBusinessError";
+  }
+}
+
+function isForeignKeyConstraintError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "P2003"
+  );
+}
+
 /** Map một variant input (create hoặc update) sang phần data ghi DB (không gồm id/productId). */
 function variantWriteData(v: {
   size: string;
@@ -91,6 +110,18 @@ export async function updateProductCore(
   input: UpdateProductInput,
 ): Promise<ProductWithVariants> {
   return db.$transaction(async (tx) => {
+    await tx.product.update({
+      where: { id },
+      data: {
+        name: input.product.name,
+        nameNormalized: normalizeText(input.product.name),
+        description: input.product.description,
+        categoryId: input.product.categoryId,
+        basePrice: input.product.basePrice,
+        status: input.product.status,
+      },
+    });
+
     const existing = await tx.variant.findMany({
       where: { productId: id },
       select: { id: true },
@@ -105,7 +136,17 @@ export async function updateProductCore(
 
     const idsToDelete = [...existingIds].filter((eid) => !matchedIds.has(eid));
     if (idsToDelete.length > 0) {
-      await tx.variant.deleteMany({ where: { id: { in: idsToDelete } } });
+      try {
+        await tx.variant.deleteMany({ where: { id: { in: idsToDelete } } });
+      } catch (error: unknown) {
+        // Chỉ đổi P2003 phát sinh ngay tại thao tác xoá stale variants thành
+        // lỗi nghiệp vụ. Mọi lỗi Prisma khác tiếp tục nổi lên để không che lỗi
+        // hạ tầng/lập trình không liên quan.
+        if (isForeignKeyConstraintError(error)) {
+          throw new ProductBusinessError("VARIANT_IN_USE");
+        }
+        throw error;
+      }
     }
 
     for (const v of input.variants) {
@@ -133,16 +174,8 @@ export async function updateProductCore(
       });
     }
 
-    return tx.product.update({
+    return tx.product.findUniqueOrThrow({
       where: { id },
-      data: {
-        name: input.product.name,
-        nameNormalized: normalizeText(input.product.name),
-        description: input.product.description,
-        categoryId: input.product.categoryId,
-        basePrice: input.product.basePrice,
-        status: input.product.status,
-      },
       include: { variants: true },
     });
   });

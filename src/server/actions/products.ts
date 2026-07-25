@@ -18,6 +18,7 @@ import {
   updateProductCore,
   deleteProductCore,
   updateVariantStockCore,
+  ProductBusinessError,
 } from "@/server/products";
 import { z } from "zod";
 
@@ -86,7 +87,14 @@ export async function updateProductAction(
     return { ok: false, error: inputParsed.error.message };
   }
 
-  await updateProductCore(prisma, idParsed.data, inputParsed.data);
+  try {
+    await updateProductCore(prisma, idParsed.data, inputParsed.data);
+  } catch (error: unknown) {
+    if (error instanceof ProductBusinessError) {
+      return { ok: false, error: error.message };
+    }
+    throw error;
+  }
 
   revalidatePath("/admin/products");
   redirect("/admin/products");

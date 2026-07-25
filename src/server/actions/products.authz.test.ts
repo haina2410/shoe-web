@@ -11,6 +11,7 @@ const {
   updateProductCoreMock,
   deleteProductCoreMock,
   updateVariantStockCoreMock,
+  ProductBusinessErrorMock,
 } = vi.hoisted(() => ({
   requireAdminMock: vi.fn(),
   redirectMock: vi.fn((path: string) => {
@@ -23,6 +24,14 @@ const {
   updateProductCoreMock: vi.fn(),
   deleteProductCoreMock: vi.fn(),
   updateVariantStockCoreMock: vi.fn(),
+  ProductBusinessErrorMock: class ProductBusinessError extends Error {
+    constructor(public readonly code: string) {
+      super(
+        "Không thể xoá phân loại đã phát sinh đơn hàng. Hãy đặt tồn kho về 0.",
+      );
+      this.name = "ProductBusinessError";
+    }
+  },
 }));
 
 vi.mock("@/lib/auth-guard", () => ({
@@ -42,6 +51,7 @@ vi.mock("@/server/products", () => ({
   updateProductCore: updateProductCoreMock,
   deleteProductCore: deleteProductCoreMock,
   updateVariantStockCore: updateVariantStockCoreMock,
+  ProductBusinessError: ProductBusinessErrorMock,
 }));
 
 vi.mock("@/lib/prisma", () => ({
@@ -55,6 +65,7 @@ import {
   deleteProductAction,
   updateVariantStockAction,
 } from "@/server/actions/products";
+import { ProductBusinessError } from "@/server/products";
 import type { CreateProductInput } from "@/lib/validation/product";
 
 function sessionWithRole(role: string) {
@@ -149,6 +160,27 @@ describe("product actions — authz (role staff bị chặn)", () => {
 
     expect(result.ok).toBe(false);
     expect(createProductCoreMock).not.toHaveBeenCalled();
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it("updateProductAction: trả lỗi nghiệp vụ xoá phân loại an toàn, không rò lỗi Prisma hoặc redirect", async () => {
+    requireAdminMock.mockResolvedValue(sessionWithRole("owner"));
+    updateProductCoreMock.mockRejectedValue(
+      new ProductBusinessError("VARIANT_IN_USE"),
+    );
+
+    const result = await updateProductAction("prod-1", {
+      product: validCreateInput.product,
+      variants: validCreateInput.variants,
+      images: validCreateInput.images,
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error:
+        "Không thể xoá phân loại đã phát sinh đơn hàng. Hãy đặt tồn kho về 0.",
+    });
+    expect(revalidatePathMock).not.toHaveBeenCalled();
     expect(redirectMock).not.toHaveBeenCalled();
   });
 });
