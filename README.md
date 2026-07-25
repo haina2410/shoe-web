@@ -1,36 +1,75 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# leafshoes Việt Nam
 
-## Getting Started
+Demo thương mại điện tử bán giày (tiếng Việt): duyệt sản phẩm → giỏ hàng → checkout khách vãng lai → VietQR → email xác nhận đơn qua job nền → admin quản lý sản phẩm.
 
-First, run the development server:
+Stack: **Next.js 16** (App Router, TS strict) · **Prisma 7** + Postgres · **Better Auth** (RBAC owner/staff) · **Zustand** (giỏ hàng) · **pg-boss** (job nền) · **React Email** + **Resend** · **Vitest** (unit + integration trên DB thật) · **Playwright** (E2E).
+
+Tài liệu thiết kế: [`docs/`](docs/README.md). Kế hoạch triển khai theo ngày: [`docs/plans/`](docs/plans/README.md).
+
+## Chuẩn bị
+
+- Node.js **≥ 22.12** (pg-boss 12 yêu cầu; dự án đang chạy Node 24).
+- Postgres chạy local (Homebrew). Tạo 2 database:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+createdb leafshoes_development && createdb leafshoes_test
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Cài đặt
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+cp .env.example .env
+```
 
-## Learn More
+Điền giá trị thật vào `.env` (file này **đã gitignore**, không bao giờ commit). Sau đó sinh Prisma Client (thư mục `src/generated/prisma` không được commit):
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npx prisma generate
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Chạy migration + seed dữ liệu mẫu:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npx prisma migrate dev && npm run db:seed
+```
 
-## Deploy on Vercel
+## Chạy
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Lệnh | Việc |
+|---|---|
+| `npm run dev` | Web app (http://localhost:3000) |
+| `npm run worker` | **Tiến trình worker** xử lý job nền (gửi email) — chạy song song web app |
+| `npm run db:seed` | Seed danh mục/sản phẩm/biến thể + 34 tỉnh thành + phí ship |
+| `npm test` | Vitest (unit + integration trên `leafshoes_test`) |
+| `npm run test:e2e` | Playwright (tự chạy `npm run build && npm run start`) |
+| `npm run build` | Build production |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Web app và worker là **hai tiến trình riêng**, dùng chung một database:
+
+```bash
+npm run worker
+```
+
+Đặt hàng vẫn thành công khi worker **không** chạy — job chỉ nằm chờ trong hàng đợi tới khi worker khởi động (bộ E2E chạy đúng theo kiểu này).
+
+## Job nền (pg-boss)
+
+- Job `send-order-confirmation` được ghi **trong cùng transaction tạo đơn** (`createOrderCore` → `enqueueOrderConfirmation`, dùng adapter `fromPrisma(tx)` của pg-boss). Đơn rollback ⇒ job biến mất, không bao giờ có job mồ côi.
+- Payload job **chỉ chứa `orderCode`** (không PII) — worker tự đọc lại đơn từ DB khi xử lý.
+- pg-boss tự tạo/migrate schema `pgboss` trong cùng database ở lần `boss.start()` đầu tiên — **không** có migration Prisma nào cho schema này. Đổi tên schema qua `PGBOSS_SCHEMA` nếu cần.
+
+## Email
+
+Email xác nhận đơn hàng render bằng React Email, gửi qua Resend từ worker.
+
+- `MAIL_FROM` phải thuộc **domain đã verify** trong Resend. Không gửi được từ địa chỉ `@gmail.com` (Resend đòi quyền DNS trên domain gửi).
+- Chưa có domain riêng? Dùng sandbox `onboarding@resend.dev` — nhưng Resend **chỉ giao tới email chủ tài khoản**, nên đặt `MAIL_TO_OVERRIDE` để mọi email ở dev đổ về một hộp thư.
+- `MAIL_REPLY_TO` = hộp thư của shop: dùng làm `replyTo` cho mọi email và in ở chân email làm địa chỉ liên hệ, để khách bấm Reply là thư về đúng hộp đó.
+
+## Biến môi trường
+
+Xem [`.env.example`](.env.example). Bắt buộc: `DATABASE_URL`, `DATABASE_URL_TEST`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `SEED_*`, `VIETQR_*`; worker cần thêm `RESEND_API_KEY` và `MAIL_FROM`. Tuỳ chọn: `MAIL_TO_OVERRIDE`, `MAIL_REPLY_TO`, `APP_BASE_URL`, `PGBOSS_SCHEMA`, `UPLOAD_DIR`, `MAX_UPLOAD_BYTES`, `VIETQR_TEMPLATE`.
