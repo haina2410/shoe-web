@@ -41,6 +41,8 @@ vi.mock("@/server/payments/mark-order-paid", () => ({
 
 import { confirmPaymentManuallyAction } from "@/server/actions/payments";
 
+const VALID_ORDER_ID = "cm12345678901234567890123";
+
 function sessionWithRole(role: string) {
   return {
     user: { id: "user-1", email: "admin@example.com", role },
@@ -94,17 +96,31 @@ describe("confirmPaymentManuallyAction", () => {
     expect(markOrderPaidManuallyCoreMock).not.toHaveBeenCalled();
   });
 
+  it("trả lỗi validation cho orderId không rỗng nhưng sai định dạng CUID", async () => {
+    requireAdminMock.mockResolvedValue(sessionWithRole("owner"));
+
+    await expect(
+      confirmPaymentManuallyAction("not-an-order-id"),
+    ).resolves.toEqual({
+      ok: false,
+      error: "Mã đơn hàng không hợp lệ.",
+    });
+
+    expect(getBossMock).not.toHaveBeenCalled();
+    expect(markOrderPaidManuallyCoreMock).not.toHaveBeenCalled();
+  });
+
   it("owner chỉ truyền orderId đã validate và làm nóng getBoss trước khi core mở transaction", async () => {
     requireAdminMock.mockResolvedValue(sessionWithRole("owner"));
 
-    await expect(confirmPaymentManuallyAction("  order-1  ")).resolves.toEqual({
-      ok: true,
-    });
+    await expect(
+      confirmPaymentManuallyAction(`  ${VALID_ORDER_ID}  `),
+    ).resolves.toEqual({ ok: true });
 
     expect(getBossMock).toHaveBeenCalledTimes(1);
     expect(markOrderPaidManuallyCoreMock).toHaveBeenCalledWith(
       prismaMock,
-      "order-1",
+      VALID_ORDER_ID,
     );
     expect(getBossMock.mock.invocationCallOrder[0]).toBeLessThan(
       markOrderPaidManuallyCoreMock.mock.invocationCallOrder[0],
@@ -139,7 +155,7 @@ describe("confirmPaymentManuallyAction", () => {
       new PaymentBusinessErrorMock(code),
     );
 
-    await expect(confirmPaymentManuallyAction("order-1")).resolves.toEqual({
+    await expect(confirmPaymentManuallyAction(VALID_ORDER_ID)).resolves.toEqual({
       ok: false,
       error: message,
     });
@@ -161,7 +177,9 @@ describe("confirmPaymentManuallyAction", () => {
       }
       vi.spyOn(console, "error").mockImplementation(() => undefined);
 
-      await expect(confirmPaymentManuallyAction("order-1")).resolves.toEqual({
+      await expect(
+        confirmPaymentManuallyAction(VALID_ORDER_ID),
+      ).resolves.toEqual({
         ok: false,
         error: "Không thể xác nhận thanh toán lúc này. Vui lòng thử lại.",
       });

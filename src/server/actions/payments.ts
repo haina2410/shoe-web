@@ -16,7 +16,7 @@ export type ConfirmPaymentManuallyResult =
   | { ok: true }
   | { ok: false; error: string };
 
-const orderIdSchema = z.string().trim().min(1);
+const orderIdSchema = z.string().trim().cuid();
 
 const businessErrorMessage: Record<PaymentBusinessErrorCode, string> = {
   ORDER_NOT_FOUND: "Không tìm thấy đơn hàng.",
