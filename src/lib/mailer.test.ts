@@ -1,0 +1,122 @@
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { createResendMailer, mailerFromEnv } from "@/lib/mailer";
+
+/** Client Resend giả tối thiểu để test không cần mạng (không `vi.mock` toàn module). */
+function fakeClient(result: {
+  data?: unknown;
+  error?: { message: string; statusCode: number | null; name: string } | null;
+}) {
+  return {
+    emails: {
+      send: vi.fn().mockResolvedValue({
+        data: result.data ?? null,
+        error: result.error ?? null,
+      }),
+    },
+  };
+}
+
+describe("createResendMailer()", () => {
+  it("gọi resend.emails.send với đúng from/to/subject/html/text", async () => {
+    const client = fakeClient({ data: { id: "email_123" } });
+    const mailer = createResendMailer(
+      { apiKey: "re_test_key", from: "no-reply@leafshoes.vn" },
+      { client },
+    );
+
+    await mailer.send({
+      to: "khach@example.com",
+      subject: "Đơn hàng LEAF-AB12CD — leafshoes Việt Nam",
+      html: "<p>Xin chào</p>",
+      text: "Xin chào",
+    });
+
+    expect(client.emails.send).toHaveBeenCalledWith({
+      from: "no-reply@leafshoes.vn",
+      to: "khach@example.com",
+      subject: "Đơn hàng LEAF-AB12CD — leafshoes Việt Nam",
+      html: "<p>Xin chào</p>",
+      text: "Xin chào",
+    });
+  });
+
+  it("toOverride ghi đè địa chỉ to (dùng cho sandbox dev)", async () => {
+    const client = fakeClient({ data: { id: "email_123" } });
+    const mailer = createResendMailer(
+      {
+        apiKey: "re_test_key",
+        from: "no-reply@leafshoes.vn",
+        toOverride: "dev-sandbox@leafshoes.vn",
+      },
+      { client },
+    );
+
+    await mailer.send({
+      to: "khach@example.com",
+      subject: "s",
+      html: "<p>h</p>",
+      text: "t",
+    });
+
+    expect(client.emails.send).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "dev-sandbox@leafshoes.vn" }),
+    );
+  });
+
+  it("khi resend trả về { error }, throw Error để pg-boss retry, không lộ email trong thông báo", async () => {
+    const customerEmail = "khach-nhay-cam@example.com";
+    const client = fakeClient({
+      error: { message: "Invalid recipient", statusCode: 422, name: "validation_error" },
+    });
+    const mailer = createResendMailer(
+      { apiKey: "re_test_key", from: "no-reply@leafshoes.vn" },
+      { client },
+    );
+
+    const message = {
+      to: customerEmail,
+      subject: "s",
+      html: "<p>h</p>",
+      text: "t",
+    };
+
+    await expect(mailer.send(message)).rejects.toThrow();
+
+    let thrown: unknown;
+    try {
+      await mailer.send(message);
+    } catch (e) {
+      thrown = e;
+    }
+    expect(thrown).toBeInstanceOf(Error);
+    expect((thrown as Error).message).not.toContain(customerEmail);
+  });
+});
+
+describe("mailerFromEnv()", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("throw khi thiếu RESEND_API_KEY", () => {
+    vi.stubEnv("RESEND_API_KEY", "");
+    vi.stubEnv("MAIL_FROM", "no-reply@leafshoes.vn");
+
+    expect(() => mailerFromEnv()).toThrow(/RESEND_API_KEY/);
+  });
+
+  it("throw khi thiếu MAIL_FROM", () => {
+    vi.stubEnv("RESEND_API_KEY", "re_test_key");
+    vi.stubEnv("MAIL_FROM", "");
+
+    expect(() => mailerFromEnv()).toThrow(/MAIL_FROM/);
+  });
+
+  it("tạo được mailer khi có đủ RESEND_API_KEY/MAIL_FROM", () => {
+    vi.stubEnv("RESEND_API_KEY", "re_test_key");
+    vi.stubEnv("MAIL_FROM", "no-reply@leafshoes.vn");
+    vi.stubEnv("MAIL_TO_OVERRIDE", "");
+
+    expect(() => mailerFromEnv()).not.toThrow();
+  });
+});
