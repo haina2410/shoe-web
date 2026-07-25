@@ -65,6 +65,7 @@ const text = await render(<OrderConfirmationEmail {...props} />, { plainText: tr
 | `RESEND_API_KEY` | worker | User tự điền vào `.env`. |
 | `MAIL_FROM` | worker | VD `leafshoes <onboarding@resend.dev>` (sandbox Resend). |
 | `MAIL_TO_OVERRIDE` | không | Dev: ép mọi email về 1 địa chỉ. **Cần khi dùng sandbox** `onboarding@resend.dev` vì Resend chỉ cho gửi tới email chủ tài khoản. |
+| `MAIL_REPLY_TO` | không | Hộp thư Gmail của cửa hàng: đặt `replyTo` cho mọi email + in ở chân email làm địa chỉ liên hệ (xem Task 1b). |
 | `APP_BASE_URL` | không | Mặc định `http://localhost:3000`; dùng dựng link `/orders/<code>` trong email. |
 | `PGBOSS_SCHEMA` | không | Mặc định `pgboss`. |
 
@@ -117,6 +118,18 @@ T1 (deps + mailer + template email, thuần)
 **Cập nhật `.env.example`:** thêm `RESEND_API_KEY`/`MAIL_FROM`/`# MAIL_TO_OVERRIDE`/`# APP_BASE_URL` (placeholder, **không** giá trị thật).
 
 **Model:** standard.
+
+---
+
+### Task 1b — Reply-to + địa chỉ liên hệ trong email (bổ sung sau khi user chốt)
+
+Bối cảnh: Resend **không** cho gửi từ `@gmail.com` (phải verify domain qua DNS). Cách chuẩn: gửi từ địa chỉ no-reply của Resend/domain riêng, còn **hộp thư Gmail của cửa hàng làm `replyTo` + địa chỉ liên hệ in trong email**.
+
+- `src/lib/mailer.ts`: `createResendMailer` nhận thêm `replyTo?: string` trong config, truyền xuống `client.emails.send({ ..., replyTo })` (SDK resend v6 dùng camelCase `replyTo`). `ResendLikeClient` cập nhật theo. `mailerFromEnv()` đọc `MAIL_REPLY_TO` (tuỳ chọn — thiếu thì không set `replyTo`).
+- `src/emails/order-confirmation.tsx` + `.render.ts`: thêm prop **tuỳ chọn** `contactEmail?: string`; nếu có thì chân email hiện dòng liên hệ tiếng Việt (VD “Cần hỗ trợ? Trả lời email này hoặc liên hệ <contactEmail>.”); nếu không có thì **không** render dòng đó (không hardcode địa chỉ nào trong code).
+- `.env.example`: thêm `# MAIL_REPLY_TO="..."` (placeholder, KHÔNG địa chỉ thật).
+- Test: mailer truyền đúng `replyTo` khi có / bỏ qua khi không; `mailerFromEnv` với `MAIL_REPLY_TO` stub; render có/không có dòng liên hệ.
+- Task 3 sẽ truyền `contactEmail: process.env.MAIL_REPLY_TO` khi gọi render.
 
 ---
 
