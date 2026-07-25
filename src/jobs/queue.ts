@@ -70,7 +70,17 @@ export async function getBoss(): Promise<PgBoss> {
     await boss.start();
     await ensureQueues(boss);
     return boss;
-  })();
+  })().catch((error: unknown) => {
+    // Khởi tạo thất bại (vd. DB tạm thời không kết nối được lúc cold start)
+    // → xoá cache để lần gọi getBoss() kế tiếp được retry, thay vì kẹt mãi
+    // mãi với promise reject bị cache trên globalThis cho tới khi process
+    // restart. Vẫn giữ hành vi "gộp" cho các caller đồng thời: những ai đã
+    // đang chờ promise này (kể cả trước khi start() xong) đều nhận cùng một
+    // rejection — chỉ các lời gọi getBoss() SAU khi promise đã settle mới
+    // thấy cache trống và tạo instance mới.
+    globalForBoss.bossPromise = undefined;
+    throw error;
+  });
 
   return globalForBoss.bossPromise;
 }
