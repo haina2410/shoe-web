@@ -1,6 +1,9 @@
 import "dotenv/config";
+import { pathToFileURL } from "node:url";
+import type { PgBoss } from "pg-boss";
+import type { PrismaClient } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
-import { mailerFromEnv } from "@/lib/mailer";
+import { mailerFromEnv, type Mailer } from "@/lib/mailer";
 import { createBoss, ensureQueues, QUEUE_SEND_ORDER_CONFIRMATION } from "@/jobs/queue";
 import { handleSendOrderConfirmation } from "@/jobs/handlers/send-order-confirmation";
 
@@ -20,7 +23,42 @@ import { handleSendOrderConfirmation } from "@/jobs/handlers/send-order-confirma
  * `mailerFromEnv()` được gọi DUY NHẤT MỘT LẦN ở đây, lúc khởi động — fail
  * fast ngay nếu thiếu biến môi trường bắt buộc (`RESEND_API_KEY`,
  * `MAIL_FROM`), thay vì để lỗi rơi vào lúc xử lý job đầu tiên.
+ *
+ * `registerOrderConfirmationWorker()` được export riêng (thay vì inline
+ * trong `main()`) để test tích hợp (`src/jobs/worker.integration.test.ts`)
+ * import và gọi ĐÚNG code đăng ký này — thay vì tự viết lại `boss.work(...)`
+ * — nên một regression trong chính đoạn đăng ký (vd. đổi `for (const job of
+ * jobs)` thành chỉ xử lý `jobs[0]`, hay truyền sai tên queue) sẽ bị test bắt.
+ *
+ * Module này gọi `main()` ở entrypoint, nhưng CHỈ khi được chạy trực tiếp
+ * (`tsx src/worker/index.ts`) — xem guard `pathToFileURL` ở cuối file. Khi
+ * test `import` module để lấy `registerOrderConfirmationWorker`, `main()`
+ * KHÔNG được chạy: nếu chạy sẽ gọi `mailerFromEnv()` thật (fail vì thiếu
+ * `RESEND_API_KEY`/`MAIL_FROM` trong môi trường test), khởi động một boss
+ * thật, và đăng ký signal handler — tất cả đều là side effect không mong
+ * muốn khi chỉ import để test. Khác với `prisma/seed.ts` (dùng
+ * `process.argv[1].includes("seed")` — so khớp lỏng theo tên file, đủ dùng
+ * vì tên file "seed" khó trùng ngẫu nhiên); ở đây dùng so khớp CHÍNH XÁC
+ * bằng URL (`import.meta.url` so với `pathToFileURL(process.argv[1])`) vì
+ * "index" là tên file phổ biến, so khớp lỏng theo tên dễ dương tính giả.
  */
+
+/**
+ * Đăng ký worker xử lý job `send-order-confirmation`. Hàm THUẦN: chỉ gọi
+ * `boss.work(...)`, không tạo boss, không đọc env, không đăng ký signal
+ * handler — để test tích hợp tiêm `db`/`mailer` giả lập mà vẫn chạy đúng
+ * code đăng ký thật.
+ */
+export async function registerOrderConfirmationWorker(
+  boss: PgBoss,
+  deps: { db: PrismaClient; mailer: Mailer },
+): Promise<void> {
+  await boss.work(QUEUE_SEND_ORDER_CONFIRMATION, {}, async (jobs) => {
+    for (const job of jobs) {
+      await handleSendOrderConfirmation(deps, job.data);
+    }
+  });
+}
 
 async function main(): Promise<void> {
   const mailer = mailerFromEnv();
@@ -35,25 +73,37 @@ async function main(): Promise<void> {
   await boss.start();
   await ensureQueues(boss);
 
-  await boss.work(QUEUE_SEND_ORDER_CONFIRMATION, {}, async (jobs) => {
-    for (const job of jobs) {
-      await handleSendOrderConfirmation({ db: prisma, mailer }, job.data);
-    }
-  });
+  await registerOrderConfirmationWorker(boss, { db: prisma, mailer });
 
   console.log(`[worker] sẵn sàng, đang lắng nghe queue "${QUEUE_SEND_ORDER_CONFIRMATION}"...`);
 
   const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
     console.log(`[worker] nhận tín hiệu ${signal}, đang dừng...`);
-    await boss.stop();
-    process.exit(0);
+    try {
+      await boss.stop();
+      process.exit(0);
+    } catch (error: unknown) {
+      // Không nuốt lỗi vào unhandled rejection — log thông điệp (không PII:
+      // chỉ lỗi từ pg-boss.stop(), không chứa dữ liệu job) rồi thoát khác 0
+      // để tiến trình giám sát (systemd/pm2/...) biết shutdown thất bại.
+      console.error("[worker] dừng thất bại:", error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
   };
 
   process.on("SIGINT", () => void shutdown("SIGINT"));
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
 }
 
-main().catch((error: unknown) => {
-  console.error("[worker] khởi động thất bại:", error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+// Chỉ chạy `main()` khi file này được thực thi trực tiếp (`tsx
+// src/worker/index.ts` / `npm run worker`), KHÔNG chạy khi bị import (vd. từ
+// test tích hợp muốn dùng `registerOrderConfirmationWorker`).
+const isDirectExecution =
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isDirectExecution) {
+  main().catch((error: unknown) => {
+    console.error("[worker] khởi động thất bại:", error instanceof Error ? error.message : error);
+    process.exit(1);
+  });
+}
