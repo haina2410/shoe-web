@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { createOrderInputSchema, type CreateOrderInput } from "@/lib/validation/checkout";
-import { createOrderCore } from "@/server/orders";
+import { createOrderCore, OrderBusinessError } from "@/server/orders";
 
 /**
  * `src/server/actions/checkout.ts` — Server Action (`"use server"`), lớp
@@ -38,9 +38,16 @@ export async function createOrderAction(
     const order = await createOrderCore(prisma, parsed.data);
     return { ok: true, orderCode: order.orderCode };
   } catch (err) {
+    // CHỈ trả nguyên văn thông báo cho lỗi NGHIỆP VỤ (`OrderBusinessError`,
+    // ví dụ hết hàng) — mọi lỗi khác (DB mất kết nối, pg-boss enqueue lỗi...)
+    // đều là lỗi hạ tầng, che bằng câu chung để không rò rỉ chi tiết nội bộ
+    // ra client. KHÔNG log `err` hay `input` ở đây (input chứa PII khách).
     return {
       ok: false,
-      error: err instanceof Error ? err.message : "Không thể tạo đơn hàng.",
+      error:
+        err instanceof OrderBusinessError
+          ? err.message
+          : "Không thể tạo đơn hàng, vui lòng thử lại.",
     };
   }
 }

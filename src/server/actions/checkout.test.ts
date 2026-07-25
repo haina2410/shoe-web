@@ -7,7 +7,8 @@ const { createOrderCoreMock } = vi.hoisted(() => ({
   createOrderCoreMock: vi.fn(),
 }));
 
-vi.mock("@/server/orders", () => ({
+vi.mock("@/server/orders", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/server/orders")>()),
   createOrderCore: createOrderCoreMock,
 }));
 
@@ -17,6 +18,7 @@ vi.mock("@/lib/prisma", () => ({
 
 // Import SAU khi mock đã đăng ký (vi.mock được hoist lên đầu file bởi vitest).
 import { createOrderAction } from "@/server/actions/checkout";
+import { OrderBusinessError } from "@/server/orders";
 import type { CreateOrderInput } from "@/lib/validation/checkout";
 
 const validInput: CreateOrderInput = {
@@ -54,11 +56,22 @@ describe("createOrderAction", () => {
     expect(createOrderCoreMock).toHaveBeenCalledTimes(1);
   });
 
-  it("input hợp lệ nhưng core ném lỗi (vd hết hàng) → trả {ok:false, error} thay vì throw", async () => {
-    createOrderCoreMock.mockRejectedValue(new Error("Hết hàng"));
+  it("input hợp lệ nhưng core ném lỗi nghiệp vụ (vd hết hàng) → trả {ok:false, error} giữ nguyên thông báo", async () => {
+    createOrderCoreMock.mockRejectedValue(new OrderBusinessError("Hết hàng"));
 
     const result = await createOrderAction(validInput);
 
     expect(result).toEqual({ ok: false, error: "Hết hàng" });
+  });
+
+  it("core ném lỗi hạ tầng (không phải OrderBusinessError, vd lỗi enqueue pg-boss) → trả câu lỗi chung, KHÔNG rò rỉ chi tiết nội bộ", async () => {
+    createOrderCoreMock.mockRejectedValue(new Error("connect ECONNREFUSED 127.0.0.1:5432"));
+
+    const result = await createOrderAction(validInput);
+
+    expect(result).toEqual({
+      ok: false,
+      error: "Không thể tạo đơn hàng, vui lòng thử lại.",
+    });
   });
 });

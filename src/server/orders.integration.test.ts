@@ -1,8 +1,11 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from "vitest";
+import type { PgBoss } from "pg-boss";
 import { testPrisma, resetDb } from "@/test/db";
 import { createOrderCore } from "@/server/orders";
 import { OrderStatus } from "@/generated/prisma/enums";
 import type { CreateOrderInput } from "@/lib/validation/checkout";
+import { createTestBoss, resetQueues } from "@/test/boss";
+import { QUEUE_SEND_ORDER_CONFIRMATION, ensureQueues, enqueueOrderConfirmation } from "@/jobs/queue";
 
 /**
  * `src/server/orders.integration.test.ts` — integration test cho
@@ -203,5 +206,98 @@ describe("createOrderCore", () => {
 
     const persisted = await testPrisma.variant.findUnique({ where: { id: variant.id } });
     expect(persisted?.stock).toBe(10);
+  });
+
+  it("đặt hàng thành công → deps.enqueueOrderConfirmation được gọi đúng 1 lần với orderCode của đơn vừa tạo", async () => {
+    await makeShippingZone();
+    const category = await makeCategory();
+    const { variant } = await makeProductWithVariant({ categoryId: category.id, stock: 10 });
+    const enqueueFake = vi.fn().mockResolvedValue(undefined);
+
+    const order = await createOrderCore(
+      testPrisma,
+      baseInput({ items: [{ variantId: variant.id, quantity: 1 }] }),
+      { enqueueOrderConfirmation: enqueueFake },
+    );
+
+    expect(enqueueFake).toHaveBeenCalledTimes(1);
+    expect(enqueueFake).toHaveBeenCalledWith(
+      expect.anything(),
+      { orderCode: order.orderCode },
+    );
+  });
+
+  it("hết hàng → deps.enqueueOrderConfirmation KHÔNG được gọi, và không có job mồ côi (0 order)", async () => {
+    await makeShippingZone();
+    const category = await makeCategory();
+    const { variant } = await makeProductWithVariant({ categoryId: category.id, stock: 1 });
+    const enqueueFake = vi.fn().mockResolvedValue(undefined);
+
+    await expect(
+      createOrderCore(
+        testPrisma,
+        baseInput({ items: [{ variantId: variant.id, quantity: 5 }] }),
+        { enqueueOrderConfirmation: enqueueFake },
+      ),
+    ).rejects.toThrow();
+
+    expect(enqueueFake).not.toHaveBeenCalled();
+    expect(await testPrisma.order.count()).toBe(0);
+  });
+
+  it("deps.enqueueOrderConfirmation throw → createOrderCore throw VÀ DB có 0 order (đơn + job nguyên tử)", async () => {
+    await makeShippingZone();
+    const category = await makeCategory();
+    const { variant } = await makeProductWithVariant({ categoryId: category.id, stock: 10 });
+    const enqueueFake = vi.fn().mockRejectedValue(new Error("Lỗi hạ tầng hàng đợi giả lập"));
+
+    await expect(
+      createOrderCore(
+        testPrisma,
+        baseInput({ items: [{ variantId: variant.id, quantity: 1 }] }),
+        { enqueueOrderConfirmation: enqueueFake },
+      ),
+    ).rejects.toThrow("Lỗi hạ tầng hàng đợi giả lập");
+
+    expect(await testPrisma.order.count()).toBe(0);
+    expect(await testPrisma.orderItem.count()).toBe(0);
+  });
+
+  describe("nguyên tử thật với pg-boss thật (không fake)", () => {
+    let boss: PgBoss;
+
+    beforeAll(async () => {
+      boss = createTestBoss();
+      await boss.start();
+      await ensureQueues(boss);
+    });
+
+    afterAll(async () => {
+      await boss.stop();
+    });
+
+    beforeEach(async () => {
+      await resetQueues(boss);
+    });
+
+    it("order tạo qua createOrderCore (deps dùng boss test thật) → job tồn tại trong queue với orderCode đúng", async () => {
+      await makeShippingZone();
+      const category = await makeCategory();
+      const { variant } = await makeProductWithVariant({ categoryId: category.id, stock: 10 });
+
+      const order = await createOrderCore(
+        testPrisma,
+        baseInput({ items: [{ variantId: variant.id, quantity: 1 }] }),
+        {
+          enqueueOrderConfirmation: (tx, payload) => enqueueOrderConfirmation(tx, payload, boss),
+        },
+      );
+
+      const jobs = await boss.findJobs<{ orderCode: string }>(QUEUE_SEND_ORDER_CONFIRMATION, {
+        data: { orderCode: order.orderCode },
+      });
+      expect(jobs).toHaveLength(1);
+      expect(jobs[0].data).toEqual({ orderCode: order.orderCode });
+    });
   });
 });
