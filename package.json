@@ -10,7 +10,8 @@
     "test": "vitest run",
     "db:seed": "prisma db seed",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "worker": "tsx src/worker/index.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
