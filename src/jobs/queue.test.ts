@@ -1,6 +1,6 @@
 import "dotenv/config";
-import { describe, it, expect, afterEach } from "vitest";
-import type { PgBoss } from "pg-boss";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { PgBoss } from "pg-boss";
 import {
   QUEUE_SEND_ORDER_CONFIRMATION,
   orderConfirmationJobSchema,
@@ -82,6 +82,37 @@ describe("getBoss()", () => {
       expect(boss).toBeDefined();
     } finally {
       process.env.DATABASE_URL = originalUrl;
+    }
+  });
+
+  it("start() thành công nhưng ensureQueues() (createQueue) thất bại → instance đã start() đó phải được stop(), không rò rỉ", async () => {
+    // Giả lập đúng hình dạng lỗi finding nêu: `boss.start()` thành công (DB
+    // kết nối được bình thường), nhưng bước SAU đó (`ensureQueues` gọi
+    // `boss.createQueue`) thất bại. Không có cách nào ép `createQueue` thất
+    // bại từ bên ngoài mà không đụng DB thật, nên spy thẳng vào
+    // `PgBoss.prototype.createQueue` (class do thư viện `pg-boss` sở hữu,
+    // không phải seam tự thêm vào module của mình) để reject đúng 1 lần —
+    // `start()` (không đụng `createQueue`, xem `node_modules/pg-boss/dist/
+    // index.js`) vẫn chạy thật, không bị mock.
+    let startedInstance: PgBoss | undefined;
+    const createQueueSpy = vi
+      .spyOn(PgBoss.prototype, "createQueue")
+      .mockImplementationOnce(function (this: PgBoss) {
+        startedInstance = this;
+        return Promise.reject(new Error("createQueue thất bại (giả lập test)"));
+      });
+    const stopSpy = vi.spyOn(PgBoss.prototype, "stop");
+
+    try {
+      await expect(getBoss()).rejects.toThrow("createQueue thất bại (giả lập test)");
+
+      expect(startedInstance).toBeDefined();
+      // `stop()` phải được gọi TRÊN ĐÚNG instance đã `start()` thành công đó
+      // — không phải một instance nào khác — để không rò rỉ pool đang mở.
+      expect(stopSpy.mock.instances).toContain(startedInstance);
+    } finally {
+      createQueueSpy.mockRestore();
+      stopSpy.mockRestore();
     }
   });
 });

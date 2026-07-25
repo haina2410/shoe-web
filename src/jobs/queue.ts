@@ -68,7 +68,23 @@ export async function getBoss(): Promise<PgBoss> {
   globalForBoss.bossPromise ??= (async () => {
     const boss = createBoss();
     await boss.start();
-    await ensureQueues(boss);
+    // Từ đây `boss` đã `start()` thành công (pool/connection đang mở) — nếu
+    // bước sau (`ensureQueues`) throw, PHẢI `stop()` instance này trước khi
+    // ném lỗi tiếp, nếu không nó bị bỏ rơi (rò rỉ pool) vì không ai còn giữ
+    // tham chiếu tới nó (`.catch()` bên ngoài chỉ xoá cache, không có `boss`).
+    // `stop()` tự thất bại thì KHÔNG được che lỗi gốc — chỉ log rồi vẫn ném
+    // lỗi gốc ra ngoài.
+    try {
+      await ensureQueues(boss);
+    } catch (error: unknown) {
+      await boss.stop().catch((stopError: unknown) => {
+        console.error(
+          "[jobs] boss.stop() thất bại khi dọn dẹp sau lỗi khởi tạo:",
+          stopError instanceof Error ? stopError.message : stopError,
+        );
+      });
+      throw error;
+    }
     return boss;
   })().catch((error: unknown) => {
     // Khởi tạo thất bại (vd. DB tạm thời không kết nối được lúc cold start)

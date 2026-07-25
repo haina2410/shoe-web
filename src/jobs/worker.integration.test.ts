@@ -147,12 +147,23 @@ describe("worker: send-order-confirmation", () => {
     expect(mailer.messages[0].to).toBe(order.email);
   });
 
-  it("batch 2 job (2 đơn hàng khác nhau) → CẢ HAI đều được xử lý, không chỉ job đầu tiên", async () => {
-    // Bắt regression cụ thể mà finding review nêu ra: nếu ai đó "đơn giản
-    // hoá" vòng lặp `for (const job of jobs)` thành chỉ xử lý `jobs[0]`, pg-boss
-    // v12 vẫn trao cả mảng job cho handler nên lỗi này sẽ lọt qua nếu test chỉ
-    // enqueue 1 job. Ở đây enqueue 2 đơn hàng khác nhau trong 1 transaction rồi
-    // chờ CẢ HAI cùng 'completed'.
+  it("enqueue 2 job (2 đơn hàng khác nhau) trong 1 transaction → CẢ HAI đều tới 'completed' qua pg-boss thật", async () => {
+    // LƯU Ý: test này KHÔNG chứng minh handler xử lý đúng một BATCH nhiều
+    // job/lần gọi — `work()` mặc định `batchSize: 1` và
+    // `registerOrderConfirmationWorker` truyền `{}` (không set `batchSize`),
+    // nên pg-boss luôn gọi handler với mảng ĐÚNG 1 job/lần (xem
+    // `node_modules/pg-boss/dist/manager.js`, `fetch({ limit: options.batchSize
+    // || 1 })`) — `for (const job of jobs)` và `jobs[0]` cho kết quả GIỐNG HỆT
+    // nhau ở cấu hình này, nên một regression thay vòng lặp bằng `jobs[0]` sẽ
+    // KHÔNG bị test này bắt. Test đó (bắt regression `jobs[0]`) nằm ở
+    // `src/worker/index.test.ts` — tiêm fake boss để gọi handler thật với
+    // mảng 2 job trực tiếp, không phụ thuộc cấu hình `batchSize` của pg-boss.
+    //
+    // Test này CHỨNG MINH điều khác: 2 job độc lập (2 đơn hàng khác nhau)
+    // enqueue trong CÙNG 1 transaction Postgres đều được worker thật xử lý
+    // riêng biệt tới trạng thái 'completed' — tức khớp nối enqueue → pg-boss
+    // thật → handler thật → fake mailer hoạt động đúng cho nhiều job, không chỉ
+    // 1 job.
     await makeShippingZone();
     const orderA = await makeOrder({ skipZone: true });
     const orderB = await makeOrder({ skipZone: true });

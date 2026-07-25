@@ -1,0 +1,169 @@
+import "dotenv/config";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import type { Job, WorkOptions } from "pg-boss";
+import { testPrisma, resetDb } from "@/test/db";
+import { createOrderCore } from "@/server/orders";
+import type { CreateOrderInput } from "@/lib/validation/checkout";
+import type { Mailer, MailMessage } from "@/lib/mailer";
+import { QUEUE_SEND_ORDER_CONFIRMATION } from "@/jobs/queue";
+import { registerOrderConfirmationWorker, type WorkCapableBoss } from "@/worker/index";
+
+/**
+ * `src/worker/index.test.ts` — test HỢP ĐỒNG ĐĂNG KÝ của
+ * `registerOrderConfirmationWorker()`, KHÔNG cần pg-boss thật (khác với
+ * `src/jobs/worker.integration.test.ts` — test đó chạy end-to-end với pg-boss
+ * thật nhưng KHÔNG bắt được regression "chỉ xử lý `jobs[0]`" vì pg-boss mặc
+ * định `batchSize: 1` nên `for (const job of jobs)` và `jobs[0]` cho kết quả
+ * giống hệt nhau khi hàng đợi chỉ giao 1 job/lần gọi — xem bình luận trong
+ * file đó).
+ *
+ * Ở đây tiêm một `fakeBoss` TỐI THIỂU (chỉ có `work`, đúng
+ * `WorkCapableBoss`) để BẮT ĐƯỢC handler thật mà
+ * `registerOrderConfirmationWorker()` truyền cho `boss.work(...)`, rồi tự
+ * gọi handler đó với MỘT MẢNG 2 job (giả lập batch — bất kể pg-boss thật có
+ * bao giờ giao batch >1 hay không) và assert CẢ HAI job đều được xử lý. Test
+ * này FAIL nếu handler bị "đơn giản hoá" thành chỉ xử lý `jobs[0]` — xem báo
+ * cáo Task 3 (`/.superpowers/sdd/task-3-report.md`) để có bằng chứng thực
+ * nghiệm (tạm sửa handler thành `jobs[0]`, chạy lại test này, thấy fail,
+ * rồi phục hồi).
+ */
+
+const ZONE_FEE = 30000;
+const TEST_PROVINCE = "Hà Nội";
+
+async function makeShippingZone(fee = ZONE_FEE, province = TEST_PROVINCE) {
+  const zone = await testPrisma.shippingZone.create({
+    data: { name: `Zone ${province}-${Math.random().toString(36).slice(2, 8)}`, fee, isDefault: false },
+  });
+  await testPrisma.provinceZone.create({
+    data: { province, zoneId: zone.id },
+  });
+  return zone;
+}
+
+async function makeCategory(name = "Giày Sneaker", slug?: string) {
+  return testPrisma.category.create({
+    data: { name, slug: slug ?? "giay-sneaker-" + Math.random().toString(36).slice(2, 8) },
+  });
+}
+
+async function makeProductWithVariant(opts: { categoryId: string }) {
+  const product = await testPrisma.product.create({
+    data: {
+      name: "Giày Chạy Bộ Alpha",
+      nameNormalized: "giay chay bo alpha",
+      categoryId: opts.categoryId,
+      basePrice: 300000,
+      status: "ACTIVE",
+      slug: "giay-" + Math.random().toString(36).slice(2, 10),
+      variants: {
+        create: [
+          {
+            size: "40",
+            color: "Đen",
+            sku: "SKU-" + Math.random().toString(36).slice(2, 10),
+            priceOverride: null,
+            stock: 10,
+          },
+        ],
+      },
+    },
+    include: { variants: true },
+  });
+  return { product, variant: product.variants[0] };
+}
+
+function baseInput(overrides: Partial<CreateOrderInput> = {}): CreateOrderInput {
+  return {
+    customerName: "Nguyễn Văn A",
+    email: "khach@example.com",
+    phone: "0901234567",
+    province: TEST_PROVINCE,
+    ward: "Phường Ba Đình",
+    addressLine: "123 Đường Láng",
+    items: [],
+    ...overrides,
+  };
+}
+
+async function makeOrder(opts: { skipZone?: boolean } = {}) {
+  if (!opts.skipZone) await makeShippingZone();
+  const category = await makeCategory();
+  const { variant } = await makeProductWithVariant({ categoryId: category.id });
+  return createOrderCore(
+    testPrisma,
+    baseInput({ items: [{ variantId: variant.id, quantity: 1 }] }),
+  );
+}
+
+function fakeMailer(): Mailer & { messages: MailMessage[] } {
+  const messages: MailMessage[] = [];
+  return {
+    messages,
+    send: vi.fn(async (message: MailMessage) => {
+      messages.push(message);
+    }),
+  };
+}
+
+/** Job giả tối thiểu — chỉ điền field mà `handleSendOrderConfirmation` thực
+ * sự đọc (`data`) + field bắt buộc theo type `Job<T>` của pg-boss. */
+function fakeJob(orderCode: string): Job<unknown> {
+  return {
+    id: "job-" + Math.random().toString(36).slice(2, 8),
+    name: QUEUE_SEND_ORDER_CONFIRMATION,
+    data: { orderCode },
+    expireInSeconds: 900,
+    heartbeatSeconds: null,
+    signal: new AbortController().signal,
+  };
+}
+
+/** Fake boss TỐI THIỂU (đúng `WorkCapableBoss`) — chỉ bắt lại tham số truyền
+ * cho `work(...)`, không chạy pg-boss thật (không kết nối DB queue). */
+function createCapturingBoss(): WorkCapableBoss & {
+  captured?: { name: string; options: WorkOptions; handler: (jobs: Job<unknown>[]) => Promise<void> };
+} {
+  const boss: ReturnType<typeof createCapturingBoss> = {
+    async work(name, options, handler) {
+      boss.captured = { name, options, handler };
+      return "fake-work-id";
+    },
+  };
+  return boss;
+}
+
+describe("registerOrderConfirmationWorker (hợp đồng đăng ký)", () => {
+  beforeEach(async () => {
+    await resetDb();
+  });
+
+  it("đăng ký đúng tên queue send-order-confirmation", async () => {
+    const boss = createCapturingBoss();
+    const mailer = fakeMailer();
+
+    await registerOrderConfirmationWorker(boss, { db: testPrisma, mailer });
+
+    expect(boss.captured?.name).toBe(QUEUE_SEND_ORDER_CONFIRMATION);
+  });
+
+  it("handler xử lý CẢ HAI job trong 1 lần gọi (batch giả lập), không chỉ job đầu tiên", async () => {
+    await makeShippingZone();
+    const orderA = await makeOrder({ skipZone: true });
+    const orderB = await makeOrder({ skipZone: true });
+
+    const boss = createCapturingBoss();
+    const mailer = fakeMailer();
+
+    await registerOrderConfirmationWorker(boss, { db: testPrisma, mailer });
+    const handler = boss.captured?.handler;
+    expect(handler).toBeDefined();
+
+    await handler!([fakeJob(orderA.orderCode), fakeJob(orderB.orderCode)]);
+
+    expect(mailer.send).toHaveBeenCalledTimes(2);
+    const recipients = mailer.messages.map((m) => m.subject);
+    expect(recipients).toContain(`Đơn hàng ${orderA.orderCode} — leafshoes Việt Nam`);
+    expect(recipients).toContain(`Đơn hàng ${orderB.orderCode} — leafshoes Việt Nam`);
+  });
+});

@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { pathToFileURL } from "node:url";
-import type { PgBoss } from "pg-boss";
+import type { PgBoss, Job, WorkOptions } from "pg-boss";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { mailerFromEnv, type Mailer } from "@/lib/mailer";
@@ -44,13 +44,31 @@ import { handleSendOrderConfirmation } from "@/jobs/handlers/send-order-confirma
  */
 
 /**
+ * Interface tối thiểu mà `registerOrderConfirmationWorker` thực sự cần từ
+ * `boss` — chỉ `work(...)`. Thu hẹp lại (thay vì nhận nguyên `PgBoss`) để
+ * test hợp đồng đăng ký (`src/worker/index.test.ts`) có thể tiêm một fake
+ * boss tối thiểu — không cần dựng cả `PgBoss` thật (kết nối DB) — mà vẫn gọi
+ * ĐÚNG code đăng ký thật, bắt được đúng `name`/`options`/`handler` đã truyền
+ * cho `boss.work(...)` rồi tự gọi `handler` với nhiều job để kiểm tra CẢ
+ * MẢNG job được xử lý (không chỉ job đầu tiên). `PgBoss` thật thoả interface
+ * này tự nhiên (chỉ thu hẹp, không đổi hành vi thật).
+ */
+export interface WorkCapableBoss {
+  work(
+    name: string,
+    options: WorkOptions,
+    handler: (jobs: Job<unknown>[]) => Promise<void>,
+  ): Promise<string>;
+}
+
+/**
  * Đăng ký worker xử lý job `send-order-confirmation`. Hàm THUẦN: chỉ gọi
  * `boss.work(...)`, không tạo boss, không đọc env, không đăng ký signal
  * handler — để test tích hợp tiêm `db`/`mailer` giả lập mà vẫn chạy đúng
  * code đăng ký thật.
  */
 export async function registerOrderConfirmationWorker(
-  boss: PgBoss,
+  boss: WorkCapableBoss,
   deps: { db: PrismaClient; mailer: Mailer },
 ): Promise<void> {
   await boss.work(QUEUE_SEND_ORDER_CONFIRMATION, {}, async (jobs) => {
