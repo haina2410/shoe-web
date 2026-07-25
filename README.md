@@ -68,8 +68,8 @@ npm run worker
 
 Email xác nhận đơn hàng render bằng React Email, gửi qua Resend từ worker.
 
-- `MAIL_FROM` phải thuộc **domain đã verify** trong Resend. Không gửi được từ địa chỉ `@gmail.com` (Resend đòi quyền DNS trên domain gửi).
-- Chưa có domain riêng? Dùng sandbox `onboarding@resend.dev` — nhưng Resend **chỉ giao tới email chủ tài khoản**, nên đặt `MAIL_TO_OVERRIDE` để mọi email ở dev đổ về một hộp thư.
+- `MAIL_FROM` phải thuộc **domain đã verify** trong Resend. Không gửi được từ địa chỉ `@gmail.com` (Resend đòi quyền DNS trên domain gửi). Domain dự kiến của shop là **`leafshoesvietnam.com`** — khi verify xong thì đặt `MAIL_FROM="no-reply@leafshoesvietnam.com"`.
+- Chưa verify domain? Dùng sandbox `onboarding@resend.dev` — nhưng Resend **chỉ giao tới email chủ tài khoản**, nên đặt `MAIL_TO_OVERRIDE` để mọi email ở dev đổ về một hộp thư. Gửi từ một domain chưa verify bị Resend trả `422 domain is not verified` và job sẽ fail.
 - `MAIL_REPLY_TO` = hộp thư của shop: dùng làm `replyTo` cho mọi email và in ở chân email làm địa chỉ liên hệ, để khách bấm Reply là thư về đúng hộp đó.
 - `APP_BASE_URL` dùng để dựng link `/orders/<mã đơn>` trong email — **bắt buộc cho worker** (không có mặc định localhost cho worker; thiếu biến này worker từ chối khởi động thay vì mail khách một link chết).
 
