@@ -89,4 +89,38 @@ describe("ensureQueues", () => {
     await expect(ensureQueues(boss)).resolves.not.toThrow();
     await expect(ensureQueues(boss)).resolves.not.toThrow();
   });
+
+  it("áp dụng retryLimit/retryDelay/retryBackoff đúng đặc tả chống mất email khi Resend lỗi tạm thời (F5)", async () => {
+    await ensureQueues(boss);
+
+    const queue = await boss.getQueue(QUEUE_SEND_ORDER_CONFIRMATION);
+
+    expect(queue?.retryLimit).toBe(5);
+    expect(queue?.retryDelay).toBe(60);
+    expect(queue?.retryBackoff).toBe(true);
+  });
+
+  it("hội tụ về ĐÚNG options hiện tại kể cả khi queue đã tồn tại từ trước với options CŨ (updateQueue, không chỉ createQueue — F5)", async () => {
+    // `createQueue` là INSERT ... ON CONFLICT DO NOTHING nên KHÔNG áp dụng
+    // options cho một hàng đã tồn tại — mô phỏng đúng ca đó: đổi queue hiện
+    // có về options "cũ" (giống một bản dev/test được tạo trước khi
+    // QUEUE_RETRY_OPTIONS tồn tại) rồi gọi lại `ensureQueues()` — phải hội tụ
+    // về đúng options mới.
+    await boss.updateQueue(QUEUE_SEND_ORDER_CONFIRMATION, {
+      retryLimit: 1,
+      retryDelay: 0,
+      retryBackoff: false,
+    });
+
+    const before = await boss.getQueue(QUEUE_SEND_ORDER_CONFIRMATION);
+    expect(before?.retryLimit).toBe(1);
+    expect(before?.retryBackoff).toBe(false);
+
+    await ensureQueues(boss);
+
+    const after = await boss.getQueue(QUEUE_SEND_ORDER_CONFIRMATION);
+    expect(after?.retryLimit).toBe(5);
+    expect(after?.retryDelay).toBe(60);
+    expect(after?.retryBackoff).toBe(true);
+  });
 });

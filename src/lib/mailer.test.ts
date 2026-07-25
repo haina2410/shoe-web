@@ -132,6 +132,41 @@ describe("createResendMailer()", () => {
     expect(thrown).toBeInstanceOf(Error);
     expect((thrown as Error).message).not.toContain(customerEmail);
   });
+
+  it("thông điệp lỗi THÔ của Resend chứa địa chỉ email (vd. lỗi sandbox/validation) → KHÔNG xuất hiện nguyên văn trong Error ném ra, nhưng vẫn giữ error.name để debug (F6)", async () => {
+    // Mô phỏng đúng hình dạng lỗi sandbox Resend thật: thông điệp ECHO lại
+    // địa chỉ (không phải field `to` tách riêng — nằm ngay trong `message`).
+    const client = fakeClient({
+      error: {
+        message:
+          "You can only send testing emails to your own email address (chu-tai-khoan@vidu.dev). To send emails to other recipients, please verify a domain.",
+        statusCode: 403,
+        name: "validation_error",
+      },
+    });
+    const mailer = createResendMailer(
+      { apiKey: "re_test_key", from: "no-reply@leafshoes.vn" },
+      { client },
+    );
+
+    let thrown: unknown;
+    try {
+      await mailer.send({
+        to: "khach@example.com",
+        subject: "s",
+        html: "<p>h</p>",
+        text: "t",
+      });
+    } catch (e) {
+      thrown = e;
+    }
+
+    expect(thrown).toBeInstanceOf(Error);
+    const thrownMessage = (thrown as Error).message;
+    expect(thrownMessage).not.toContain("chu-tai-khoan@vidu.dev");
+    expect(thrownMessage).not.toMatch(/[\w.+-]+@[\w-]+\.[\w-]+/); // không còn dạng email nào
+    expect(thrownMessage).toContain("validation_error"); // vẫn giữ LOẠI lỗi để debug
+  });
 });
 
 describe("mailerFromEnv()", () => {

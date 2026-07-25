@@ -5,6 +5,8 @@ import {
   QUEUE_SEND_ORDER_CONFIRMATION,
   orderConfirmationJobSchema,
   getBoss,
+  createBoss,
+  enqueueOrderConfirmation,
 } from "@/jobs/queue";
 
 /**
@@ -49,6 +51,25 @@ describe("orderConfirmationJobSchema", () => {
   });
 });
 
+describe("createBoss() — chặn DATABASE_URL mặc định trong test (F1)", () => {
+  it("NODE_ENV=test (mặc định của vitest) + không truyền connectionString → throw ngay, không mở kết nối nào", () => {
+    // NODE_ENV đã LÀ "test" trong tiến trình vitest (mặc định, xem
+    // `src/__tmp_nodeenv.test.ts` đã dùng để xác nhận thực nghiệm trong báo
+    // cáo) — không cần stub gì thêm, đây chính là kịch bản thật mà finding F1
+    // mô tả: `getBoss()`/`enqueueOrderConfirmation` mặc định gọi
+    // `createBoss()` KHÔNG tham số.
+    expect(process.env.NODE_ENV).toBe("test");
+    expect(() => createBoss()).toThrow(/NODE_ENV=test/);
+  });
+
+  it("truyền connectionString tường minh → KHÔNG bị chặn dù NODE_ENV=test (test thật vẫn tạo boss được, chỉ không dùng DATABASE_URL mặc định)", () => {
+    const testUrl = process.env.DATABASE_URL_TEST;
+    if (!testUrl) throw new Error("DATABASE_URL_TEST chưa được cấu hình");
+
+    expect(() => createBoss({ connectionString: testUrl })).not.toThrow();
+  });
+});
+
 describe("getBoss()", () => {
   afterEach(async () => {
     // Dọn cache + boss thật (nếu có) sau mỗi test để không rò rỉ sang test
@@ -67,6 +88,16 @@ describe("getBoss()", () => {
     if (!testUrl) throw new Error("DATABASE_URL_TEST chưa được cấu hình");
 
     try {
+      // Test này nhắm vào hành vi RETRY-SAU-THẤT-BẠI nội bộ của `getBoss()`
+      // (không phải guard F1 — guard đó đã có test riêng ở trên), nên tạm
+      // thoát khỏi NODE_ENV=test để `createBoss()` bên trong `getBoss()`
+      // không bị chặn sớm — `getBoss()` vẫn đọc `DATABASE_URL` (biến này
+      // được trỏ tạm sang test DB/địa chỉ không kết nối được bên dưới, KHÔNG
+      // bao giờ chạm `leafshoes_development` thật trong suốt test). Dùng
+      // `vi.stubEnv` (không gán thẳng `process.env.NODE_ENV` — `@types/node`
+      // khai báo field này readonly).
+      vi.stubEnv("NODE_ENV", "development");
+
       // Trỏ vào một địa chỉ chắc chắn không kết nối được để `boss.start()`
       // reject (không có gì lắng nghe ở cổng 1).
       process.env.DATABASE_URL =
@@ -82,6 +113,7 @@ describe("getBoss()", () => {
       expect(boss).toBeDefined();
     } finally {
       process.env.DATABASE_URL = originalUrl;
+      vi.unstubAllEnvs();
     }
   });
 
@@ -94,10 +126,22 @@ describe("getBoss()", () => {
     // không phải seam tự thêm vào module của mình) để reject đúng 1 lần —
     // `start()` (không đụng `createQueue`, xem `node_modules/pg-boss/dist/
     // index.js`) vẫn chạy thật, không bị mock.
+    //
+    // Guard F1 (`createBoss()` chặn NODE_ENV=test không connectionString) có
+    // test riêng ở trên — test NÀY nhắm vào hành vi cleanup của `getBoss()`,
+    // nên tạm thoát NODE_ENV=test để không bị guard chặn trước khi tới được
+    // đoạn `createQueue` đang test.
+    vi.stubEnv("NODE_ENV", "development");
+
     let startedInstance: PgBoss | undefined;
     const createQueueSpy = vi
       .spyOn(PgBoss.prototype, "createQueue")
       .mockImplementationOnce(function (this: PgBoss) {
+        // Cần bắt lại chính instance `this` mà pg-boss gọi method này lên, để
+        // assert `stop()` sau đó được gọi TRÊN ĐÚNG instance đó (không phải một
+        // cái khác) — không phải antipattern "alias this cho tiện", đây là cách
+        // duy nhất để lấy tham chiếu instance từ trong một `mockImplementationOnce`.
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
         startedInstance = this;
         return Promise.reject(new Error("createQueue thất bại (giả lập test)"));
       });
@@ -113,6 +157,66 @@ describe("getBoss()", () => {
     } finally {
       createQueueSpy.mockRestore();
       stopSpy.mockRestore();
+      vi.unstubAllEnvs();
     }
+  });
+
+  it("start() TỰ NÓ throw (không tới ensureQueues) → instance đó vẫn phải được stop(), không rò rỉ (F4)", async () => {
+    // Cùng kỹ thuật với test ensureQueues() ở trên nhưng spy thẳng vào
+    // `PgBoss.prototype.start` — mô phỏng đúng ca F4 nêu: role DB thiếu
+    // quyền CREATE trên schema `pgboss` khiến chính `start()` reject, KHÔNG
+    // chạy tới `ensureQueues()`.
+    vi.stubEnv("NODE_ENV", "development");
+
+    let startedInstance: PgBoss | undefined;
+    const startSpy = vi
+      .spyOn(PgBoss.prototype, "start")
+      .mockImplementationOnce(function (this: PgBoss) {
+        // Cần bắt lại chính instance `this` mà pg-boss gọi method này lên, để
+        // assert `stop()` sau đó được gọi TRÊN ĐÚNG instance đó (không phải một
+        // cái khác) — không phải antipattern "alias this cho tiện", đây là cách
+        // duy nhất để lấy tham chiếu instance từ trong một `mockImplementationOnce`.
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
+        startedInstance = this;
+        return Promise.reject(new Error("start() thất bại (giả lập test)"));
+      });
+    const stopSpy = vi.spyOn(PgBoss.prototype, "stop");
+
+    try {
+      await expect(getBoss()).rejects.toThrow("start() thất bại (giả lập test)");
+
+      expect(startedInstance).toBeDefined();
+      expect(stopSpy.mock.instances).toContain(startedInstance);
+    } finally {
+      startSpy.mockRestore();
+      stopSpy.mockRestore();
+      vi.unstubAllEnvs();
+    }
+  });
+});
+
+describe("enqueueOrderConfirmation — boss.send() trả về null (F2)", () => {
+  it("boss.send() resolve null (INSERT ảnh hưởng 0 dòng) → throw, không nuốt âm thầm", async () => {
+    const fakeBoss = {
+      send: vi.fn().mockResolvedValue(null),
+    } as unknown as PgBoss;
+    const fakeTx = { $queryRawUnsafe: vi.fn() };
+
+    await expect(
+      enqueueOrderConfirmation(fakeTx, { orderCode: "LEAF-NULLJOB" }, fakeBoss),
+    ).rejects.toThrow(/LEAF-NULLJOB/);
+
+    expect(fakeBoss.send).toHaveBeenCalledTimes(1);
+  });
+
+  it("boss.send() resolve một id hợp lệ → KHÔNG throw", async () => {
+    const fakeBoss = {
+      send: vi.fn().mockResolvedValue("job-id-123"),
+    } as unknown as PgBoss;
+    const fakeTx = { $queryRawUnsafe: vi.fn() };
+
+    await expect(
+      enqueueOrderConfirmation(fakeTx, { orderCode: "LEAF-OKJOB" }, fakeBoss),
+    ).resolves.toBeUndefined();
   });
 });

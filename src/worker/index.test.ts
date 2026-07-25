@@ -1,12 +1,16 @@
 import "dotenv/config";
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import type { Job, WorkOptions } from "pg-boss";
 import { testPrisma, resetDb } from "@/test/db";
 import { createOrderCore } from "@/server/orders";
 import type { CreateOrderInput } from "@/lib/validation/checkout";
 import type { Mailer, MailMessage } from "@/lib/mailer";
 import { QUEUE_SEND_ORDER_CONFIRMATION } from "@/jobs/queue";
-import { registerOrderConfirmationWorker, type WorkCapableBoss } from "@/worker/index";
+import {
+  registerOrderConfirmationWorker,
+  requireAppBaseUrlForWorker,
+  type WorkCapableBoss,
+} from "@/worker/index";
 
 /**
  * `src/worker/index.test.ts` — test HỢP ĐỒNG ĐĂNG KÝ của
@@ -90,9 +94,14 @@ async function makeOrder(opts: { skipZone?: boolean } = {}) {
   if (!opts.skipZone) await makeShippingZone();
   const category = await makeCategory();
   const { variant } = await makeProductWithVariant({ categoryId: category.id });
+  // F1 (final review Ngày 6): KHÔNG dùng deps mặc định của `createOrderCore`
+  // (gọi `enqueueOrderConfirmation` thật → `getBoss()` → DATABASE_URL) — test
+  // này chỉ cần đơn hàng làm fixture, việc enqueue/xử lý job thật do các test
+  // dưới tự làm qua `boss`/`registerOrderConfirmationWorker` được tiêm riêng.
   return createOrderCore(
     testPrisma,
     baseInput({ items: [{ variantId: variant.id, quantity: 1 }] }),
+    { enqueueOrderConfirmation: vi.fn().mockResolvedValue(undefined) },
   );
 }
 
@@ -165,5 +174,49 @@ describe("registerOrderConfirmationWorker (hợp đồng đăng ký)", () => {
     const recipients = mailer.messages.map((m) => m.subject);
     expect(recipients).toContain(`Đơn hàng ${orderA.orderCode} — leafshoes Việt Nam`);
     expect(recipients).toContain(`Đơn hàng ${orderB.orderCode} — leafshoes Việt Nam`);
+  });
+
+  it("job thất bại (mailer.send throw) → console.error 1 dòng chứa queue/jobId/orderCode (KHÔNG PII) VÀ vẫn rethrow cho pg-boss (F5)", async () => {
+    const order = await makeOrder();
+    const boss = createCapturingBoss();
+    const mailer: Mailer & { messages: MailMessage[] } = {
+      messages: [],
+      send: vi.fn().mockRejectedValue(new Error("Gửi email thất bại (application_error): lỗi giả lập")),
+    };
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await registerOrderConfirmationWorker(boss, { db: testPrisma, mailer });
+    const handler = boss.captured?.handler;
+    expect(handler).toBeDefined();
+
+    await expect(handler!([fakeJob(order.orderCode)])).rejects.toThrow("lỗi giả lập");
+
+    expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+    const logged = consoleErrorSpy.mock.calls[0].join(" ");
+    expect(logged).toContain(QUEUE_SEND_ORDER_CONFIRMATION);
+    expect(logged).toContain(order.orderCode);
+    expect(logged).toContain("lỗi giả lập");
+    // Không chứa PII của khách hàng (email dùng trong baseInput()).
+    expect(logged).not.toContain("khach@example.com");
+
+    consoleErrorSpy.mockRestore();
+  });
+});
+
+describe("requireAppBaseUrlForWorker() (F7)", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("thiếu APP_BASE_URL → throw, nêu tên biến, KHÔNG dùng mặc định localhost", () => {
+    vi.stubEnv("APP_BASE_URL", "");
+
+    expect(() => requireAppBaseUrlForWorker()).toThrow(/APP_BASE_URL/);
+  });
+
+  it("có APP_BASE_URL → không throw", () => {
+    vi.stubEnv("APP_BASE_URL", "https://leafshoes.vn");
+
+    expect(() => requireAppBaseUrlForWorker()).not.toThrow();
   });
 });

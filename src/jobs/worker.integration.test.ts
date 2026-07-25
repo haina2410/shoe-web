@@ -91,9 +91,15 @@ async function makeOrder(opts: { skipZone?: boolean } = {}) {
   if (!opts.skipZone) await makeShippingZone();
   const category = await makeCategory();
   const { variant } = await makeProductWithVariant({ categoryId: category.id });
+  // F1 (final review Ngày 6): KHÔNG dùng deps mặc định của `createOrderCore`
+  // (gọi `enqueueOrderConfirmation` thật → `getBoss()` → DATABASE_URL) — các
+  // test dưới đây tự enqueue job THẬT qua `enqueueOrderConfirmation(tx,
+  // {orderCode}, boss)` (boss test tường minh) NGAY SAU KHI đơn đã tồn tại,
+  // nên việc tạo fixture ở đây không cần enqueue gì cả.
   return createOrderCore(
     testPrisma,
     baseInput({ items: [{ variantId: variant.id, quantity: 1 }] }),
+    { enqueueOrderConfirmation: vi.fn().mockResolvedValue(undefined) },
   );
 }
 

@@ -83,6 +83,18 @@ function baseInput(overrides: Partial<CreateOrderInput> = {}): CreateOrderInput 
   };
 }
 
+/**
+ * Deps giả cho các test KHÔNG nhắm vào hành vi enqueue (F1, final review Ngày
+ * 6): TRƯỚC ĐÂY các call site này gọi `createOrderCore` với deps MẶC ĐỊNH —
+ * tức `enqueueOrderConfirmation` thật → `getBoss()` → `DATABASE_URL` (database
+ * PHÁT TRIỂN, không phải `testPrisma` trỏ `DATABASE_URL_TEST`) — để lại schema
+ * `pgboss` + job rác trong `leafshoes_development` (xác nhận thực nghiệm, xem
+ * báo cáo). Một fake mới mỗi lần gọi để không rò rỉ call-count giữa các test.
+ */
+function noEnqueueDeps() {
+  return { enqueueOrderConfirmation: vi.fn().mockResolvedValue(undefined) };
+}
+
 describe("createOrderCore", () => {
   beforeEach(async () => {
     await resetDb();
@@ -101,6 +113,7 @@ describe("createOrderCore", () => {
     const order = await createOrderCore(
       testPrisma,
       baseInput({ items: [{ variantId: variant.id, quantity: 2 }] }),
+      noEnqueueDeps(),
     );
 
     expect(order.subtotal).toBe(600000);
@@ -131,6 +144,7 @@ describe("createOrderCore", () => {
     const order = await createOrderCore(
       testPrisma,
       baseInput({ items: [{ variantId: variant.id, quantity: 1 }] }),
+      noEnqueueDeps(),
     );
 
     expect(order.items[0].unitPrice).toBe(250000);
@@ -149,6 +163,7 @@ describe("createOrderCore", () => {
       createOrderCore(
         testPrisma,
         baseInput({ items: [{ variantId: variant.id, quantity: 5 }] }),
+        noEnqueueDeps(),
       ),
     ).rejects.toThrow();
 
@@ -163,6 +178,7 @@ describe("createOrderCore", () => {
       createOrderCore(
         testPrisma,
         baseInput({ items: [{ variantId: "khong-ton-tai", quantity: 1 }] }),
+        noEnqueueDeps(),
       ),
     ).rejects.toThrow();
 
@@ -180,10 +196,12 @@ describe("createOrderCore", () => {
     const order1 = await createOrderCore(
       testPrisma,
       baseInput({ items: [{ variantId: variant.id, quantity: 1 }] }),
+      noEnqueueDeps(),
     );
     const order2 = await createOrderCore(
       testPrisma,
       baseInput({ items: [{ variantId: variant.id, quantity: 1 }] }),
+      noEnqueueDeps(),
     );
 
     expect(order1.orderCode).toMatch(/^LEAF-[A-Z0-9]{6}$/);
@@ -202,6 +220,7 @@ describe("createOrderCore", () => {
     await createOrderCore(
       testPrisma,
       baseInput({ items: [{ variantId: variant.id, quantity: 3 }] }),
+      noEnqueueDeps(),
     );
 
     const persisted = await testPrisma.variant.findUnique({ where: { id: variant.id } });

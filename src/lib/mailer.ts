@@ -28,14 +28,33 @@ interface ResendLikeClient {
       html: string;
       text: string;
       replyTo?: string;
-    }): Promise<{ data: unknown; error: { message: string } | null }>;
+    }): Promise<{ data: unknown; error: { message: string; name: string } | null }>;
   };
+}
+
+/**
+ * Khớp một chuỗi trông giống địa chỉ email — dùng để LỌC KHỎI thông báo lỗi
+ * trước khi ném ra (F6, final review Ngày 6). Thông báo lỗi thô của Resend
+ * (sandbox/validation, vd. `"You can only send testing emails to your own
+ * email address (ban@domain.com)."` hoặc `"Invalid `to` field: ..."`) có thể
+ * ECHO lại địa chỉ người nhận/người gửi — và thông báo ném ra từ hàm này trở
+ * thành `output` của job pg-boss, LƯU 14 NGÀY trong bảng `pgboss.job`, đúng
+ * bảng mà quy tắc "không PII trong payload/job output" muốn bảo vệ.
+ */
+const EMAIL_LIKE_PATTERN = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
+
+function scrubEmailAddresses(message: string): string {
+  return message.replace(EMAIL_LIKE_PATTERN, "[đã ẩn địa chỉ email]");
 }
 
 /**
  * Tạo `Mailer` dùng Resend. `resend.emails.send` KHÔNG throw khi lỗi — trả về
  * `{ error }` — nên ở đây phải tự kiểm tra và `throw` để pg-boss (Task 2) có
- * thể retry job. Thông báo lỗi ném ra KHÔNG được chứa địa chỉ email (PII).
+ * thể retry job. Thông báo lỗi ném ra KHÔNG được chứa địa chỉ email (PII) —
+ * `error.message` thô của Resend bị lọc qua `scrubEmailAddresses` trước khi
+ * nội suy vào `Error`; `error.name` (loại lỗi Resend, vd `validation_error`)
+ * được giữ nguyên vì đó là PHÂN LOẠI lỗi, không phải dữ liệu khách hàng — vẫn
+ * đủ để debug là lỗi loại gì mà không cần thông điệp thô.
  */
 export function createResendMailer(
   config: { apiKey: string; from: string; toOverride?: string; replyTo?: string },
@@ -56,7 +75,7 @@ export function createResendMailer(
       });
 
       if (error) {
-        throw new Error(`Gửi email thất bại: ${error.message}`);
+        throw new Error(`Gửi email thất bại (${error.name}): ${scrubEmailAddresses(error.message)}`);
       }
     },
   };

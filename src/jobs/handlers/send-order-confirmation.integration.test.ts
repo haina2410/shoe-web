@@ -87,9 +87,14 @@ async function makeOrder() {
   await makeShippingZone();
   const category = await makeCategory();
   const { variant } = await makeProductWithVariant({ categoryId: category.id });
+  // F1 (final review Ngày 6): KHÔNG dùng deps mặc định của `createOrderCore`
+  // (gọi `enqueueOrderConfirmation` thật → `getBoss()` → DATABASE_URL) — file
+  // này chỉ test `handleSendOrderConfirmation` gọi trực tiếp, không cần job
+  // thật nào được enqueue.
   return createOrderCore(
     testPrisma,
     baseInput({ items: [{ variantId: variant.id, quantity: 2 }] }),
+    { enqueueOrderConfirmation: vi.fn().mockResolvedValue(undefined) },
   );
 }
 

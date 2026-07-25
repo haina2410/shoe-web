@@ -61,6 +61,8 @@ npm run worker
 - Job `send-order-confirmation` được ghi **trong cùng transaction tạo đơn** (`createOrderCore` → `enqueueOrderConfirmation`, dùng adapter `fromPrisma(tx)` của pg-boss). Đơn rollback ⇒ job biến mất, không bao giờ có job mồ côi.
 - Payload job **chỉ chứa `orderCode`** (không PII) — worker tự đọc lại đơn từ DB khi xử lý.
 - pg-boss tự tạo/migrate schema `pgboss` trong cùng database ở lần `boss.start()` đầu tiên — **không** có migration Prisma nào cho schema này. Đổi tên schema qua `PGBOSS_SCHEMA` nếu cần.
+- Queue cấu hình `retryLimit: 5, retryDelay: 60s, retryBackoff: true` (thay vì mặc định pg-boss `retryLimit: 2, retryDelay: 0`) để chịu được lỗi 429/5xx tạm thời từ Resend mà không mất email. Một job thất bại được log ra console (queue, jobId, `orderCode` — không PII) trước khi pg-boss tự retry/dead-letter.
+- **`npm run worker` xác thực TOÀN BỘ biến môi trường mình cần lúc khởi động** (không phải lúc xử lý job đầu tiên) — thiếu bất kỳ biến bắt buộc nào bên dưới (mail, VietQR, `APP_BASE_URL`) sẽ khiến worker từ chối khởi động (fail fast) thay vì gửi mail lỗi hoặc chứa link chết.
 
 ## Email
 
@@ -69,7 +71,12 @@ Email xác nhận đơn hàng render bằng React Email, gửi qua Resend từ w
 - `MAIL_FROM` phải thuộc **domain đã verify** trong Resend. Không gửi được từ địa chỉ `@gmail.com` (Resend đòi quyền DNS trên domain gửi).
 - Chưa có domain riêng? Dùng sandbox `onboarding@resend.dev` — nhưng Resend **chỉ giao tới email chủ tài khoản**, nên đặt `MAIL_TO_OVERRIDE` để mọi email ở dev đổ về một hộp thư.
 - `MAIL_REPLY_TO` = hộp thư của shop: dùng làm `replyTo` cho mọi email và in ở chân email làm địa chỉ liên hệ, để khách bấm Reply là thư về đúng hộp đó.
+- `APP_BASE_URL` dùng để dựng link `/orders/<mã đơn>` trong email — **bắt buộc cho worker** (không có mặc định localhost cho worker; thiếu biến này worker từ chối khởi động thay vì mail khách một link chết).
 
 ## Biến môi trường
 
-Xem [`.env.example`](.env.example). Bắt buộc: `DATABASE_URL`, `DATABASE_URL_TEST`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `SEED_*`, `VIETQR_*`; worker cần thêm `RESEND_API_KEY` và `MAIL_FROM`. Tuỳ chọn: `MAIL_TO_OVERRIDE`, `MAIL_REPLY_TO`, `APP_BASE_URL`, `PGBOSS_SCHEMA`, `UPLOAD_DIR`, `MAX_UPLOAD_BYTES`, `VIETQR_TEMPLATE`.
+Xem [`.env.example`](.env.example). Bắt buộc: `DATABASE_URL`, `DATABASE_URL_TEST`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `SEED_*`, `VIETQR_*`.
+
+Worker (`npm run worker`) xác thực lúc khởi động, cần thêm: `RESEND_API_KEY`, `MAIL_FROM`, `VIETQR_BANK_CODE`/`VIETQR_ACCOUNT_NO`/`VIETQR_ACCOUNT_NAME` (đã bắt buộc chung ở trên, worker chỉ xác thực lại sớm hơn), và **`APP_BASE_URL`** (bắt buộc riêng cho worker — không dùng mặc định localhost).
+
+Tuỳ chọn: `MAIL_TO_OVERRIDE`, `MAIL_REPLY_TO`, `PGBOSS_SCHEMA`, `UPLOAD_DIR`, `MAX_UPLOAD_BYTES`, `VIETQR_TEMPLATE`.
