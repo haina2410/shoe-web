@@ -12,6 +12,6 @@ export const testPrisma = new PrismaClient({
 // Xoá dữ liệu nghiệp vụ theo thứ tự FK (không đụng bảng auth).
 export async function resetDb() {
   await testPrisma.$executeRawUnsafe(
-    `TRUNCATE "order_item","payment","order","variant","product_image","product","category","province_zone","shipping_zone" RESTART IDENTITY CASCADE;`,
+    `TRUNCATE "order_item","payment","bank_transaction","order","variant","product_image","product","category","province_zone","shipping_zone" RESTART IDENTITY CASCADE;`,
   );
 }

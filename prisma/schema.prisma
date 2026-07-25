@@ -154,25 +154,32 @@ enum OrderStatus {
   EXPIRED
 }
 
+enum BankTransactionStatus {
+  RECEIVED
+  MATCHED
+  REVIEW_REQUIRED
+}
+
 model Order {
-  id           String      @id @default(cuid())
-  orderCode    String      @unique
-  email        String
-  customerName String
-  phone        String
-  province     String
-  ward         String
-  addressLine  String
-  note         String?
-  subtotal     Int
-  shippingFee  Int
-  total        Int
-  status       OrderStatus @default(PENDING_PAYMENT)
-  paidAt       DateTime?
-  items        OrderItem[]
-  payments     Payment[]
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  id               String            @id @default(cuid())
+  orderCode        String            @unique
+  email            String
+  customerName     String
+  phone            String
+  province         String
+  ward             String
+  addressLine      String
+  note             String?
+  subtotal         Int
+  shippingFee      Int
+  total            Int
+  status           OrderStatus       @default(PENDING_PAYMENT)
+  paidAt           DateTime?
+  items            OrderItem[]
+  payments         Payment[]
+  bankTransactions BankTransaction[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
   @@index([email])
   @@index([status])
   @@map("order")
@@ -204,6 +211,31 @@ model Payment {
   matchedAt     DateTime @default(now())
   @@index([orderId])
   @@map("payment")
+}
+
+model BankTransaction {
+  id                    String                @id @default(cuid())
+  provider              String
+  providerTransactionId String                @unique
+  gateway               String
+  accountNumber         String
+  transferType          String
+  amount                Int
+  content               String
+  referenceCode         String?
+  occurredAt            DateTime
+  rawPayload            Json
+  status                BankTransactionStatus @default(RECEIVED)
+  reviewReason          String?
+  orderId               String?
+  order                 Order?                @relation(fields: [orderId], references: [id])
+  processedAt           DateTime?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  @@index([status, createdAt])
+  @@index([orderId])
+  @@map("bank_transaction")
 }
 
 model ShippingZone {
