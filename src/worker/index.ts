@@ -1,11 +1,17 @@
 import "dotenv/config";
 import { pathToFileURL } from "node:url";
-import type { PgBoss, Job, WorkOptions } from "pg-boss";
+import type { Job, WorkOptions } from "pg-boss";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { mailerFromEnv, type Mailer } from "@/lib/mailer";
-import { createBoss, ensureQueues, QUEUE_SEND_ORDER_CONFIRMATION } from "@/jobs/queue";
+import {
+  createBoss,
+  ensureQueues,
+  QUEUE_SEND_ORDER_CONFIRMATION,
+  QUEUE_SEND_PAYMENT_CONFIRMED,
+} from "@/jobs/queue";
 import { handleSendOrderConfirmation } from "@/jobs/handlers/send-order-confirmation";
+import { handleSendPaymentConfirmed } from "@/jobs/handlers/send-payment-confirmed";
 import { vietQrConfigFromEnv } from "@/lib/vietqr";
 
 /**
@@ -124,6 +130,27 @@ export async function registerOrderConfirmationWorker(
   });
 }
 
+/** Đăng ký worker xác nhận thanh toán; xử lý mọi job trong batch. */
+export async function registerPaymentConfirmedWorker(
+  boss: WorkCapableBoss,
+  deps: { db: PrismaClient; mailer: Mailer },
+): Promise<void> {
+  await boss.work(QUEUE_SEND_PAYMENT_CONFIRMED, {}, async (jobs) => {
+    for (const job of jobs) {
+      try {
+        await handleSendPaymentConfirmed(deps, job.data);
+      } catch (error: unknown) {
+        // Không log message lỗi: dependency có thể vô tình nhúng PII vào đó.
+        console.error(
+          `[worker] job thất bại: queue=${QUEUE_SEND_PAYMENT_CONFIRMED} ` +
+            `jobId=${job.id} orderCode=${orderCodeForLog(job.data)}`,
+        );
+        throw error;
+      }
+    }
+  });
+}
+
 /**
  * Xác thực TOÀN BỘ biến môi trường mà worker cần, MỘT LẦN, TRƯỚC khi
  * `boss.start()`/nhận job (F7, final review Ngày 6) — sai cấu hình phải chặn
@@ -159,8 +186,12 @@ async function main(): Promise<void> {
   await ensureQueues(boss);
 
   await registerOrderConfirmationWorker(boss, { db: prisma, mailer });
+  await registerPaymentConfirmedWorker(boss, { db: prisma, mailer });
 
-  console.log(`[worker] sẵn sàng, đang lắng nghe queue "${QUEUE_SEND_ORDER_CONFIRMATION}"...`);
+  console.log(
+    `[worker] sẵn sàng, đang lắng nghe queues "${QUEUE_SEND_ORDER_CONFIRMATION}", ` +
+      `"${QUEUE_SEND_PAYMENT_CONFIRMED}"...`,
+  );
 
   const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
     console.log(`[worker] nhận tín hiệu ${signal}, đang dừng...`);

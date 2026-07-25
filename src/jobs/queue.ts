@@ -9,6 +9,7 @@ import { z } from "zod";
 
 /** Tên queue gửi email xác nhận đơn hàng. */
 export const QUEUE_SEND_ORDER_CONFIRMATION = "send-order-confirmation";
+export const QUEUE_SEND_PAYMENT_CONFIRMED = "send-payment-confirmed";
 
 /**
  * Payload job gửi email xác nhận đơn hàng. CHỈ chứa `orderCode` — KHÔNG được
@@ -21,6 +22,13 @@ export const orderConfirmationJobSchema = z.object({
 });
 
 export type OrderConfirmationJob = z.infer<typeof orderConfirmationJobSchema>;
+
+/** Payload xác nhận thanh toán chỉ mang khoá tra cứu, tuyệt đối không có PII. */
+export const paymentConfirmedJobSchema = z.object({
+  orderCode: z.string().min(1),
+});
+
+export type PaymentConfirmedJob = z.infer<typeof paymentConfirmedJobSchema>;
 
 /**
  * Tạo instance `PgBoss` mới (không cache). Dùng `createBoss()` khi cần một
@@ -105,6 +113,8 @@ const QUEUE_RETRY_OPTIONS = {
 export async function ensureQueues(boss: PgBoss): Promise<void> {
   await boss.createQueue(QUEUE_SEND_ORDER_CONFIRMATION, QUEUE_RETRY_OPTIONS);
   await boss.updateQueue(QUEUE_SEND_ORDER_CONFIRMATION, QUEUE_RETRY_OPTIONS);
+  await boss.createQueue(QUEUE_SEND_PAYMENT_CONFIRMED, QUEUE_RETRY_OPTIONS);
+  await boss.updateQueue(QUEUE_SEND_PAYMENT_CONFIRMED, QUEUE_RETRY_OPTIONS);
 }
 
 const globalForBoss = globalThis as unknown as { bossPromise?: Promise<PgBoss> };
@@ -193,4 +203,19 @@ export async function enqueueOrderConfirmation(
       `Ghi job gửi email xác nhận đơn hàng thất bại (pg-boss trả về id rỗng cho orderCode: ${data.orderCode}) — không thể đảm bảo email sẽ được gửi.`,
     );
   }
+}
+
+/** Ghi job xác nhận thanh toán nguyên tử cùng transaction cập nhật đơn. */
+export async function enqueuePaymentConfirmed(
+  tx: PrismaTransactionLike,
+  payload: PaymentConfirmedJob,
+  boss?: PgBoss,
+): Promise<void> {
+  const data = paymentConfirmedJobSchema.parse(payload);
+  const bossInstance = boss ?? (await getBoss());
+
+  const jobId = await bossInstance.send(QUEUE_SEND_PAYMENT_CONFIRMED, data, {
+    db: fromPrisma(tx),
+  });
+  if (!jobId) throw new Error("Ghi job xác nhận thanh toán thất bại.");
 }

@@ -5,9 +5,13 @@ import { testPrisma, resetDb } from "@/test/db";
 import { createOrderCore } from "@/server/orders";
 import type { CreateOrderInput } from "@/lib/validation/checkout";
 import type { Mailer, MailMessage } from "@/lib/mailer";
-import { QUEUE_SEND_ORDER_CONFIRMATION } from "@/jobs/queue";
+import {
+  QUEUE_SEND_ORDER_CONFIRMATION,
+  QUEUE_SEND_PAYMENT_CONFIRMED,
+} from "@/jobs/queue";
 import {
   registerOrderConfirmationWorker,
+  registerPaymentConfirmedWorker,
   requireAppBaseUrlForWorker,
   type WorkCapableBoss,
 } from "@/worker/index";
@@ -200,6 +204,75 @@ describe("registerOrderConfirmationWorker (hợp đồng đăng ký)", () => {
     expect(logged).not.toContain("khach@example.com");
 
     consoleErrorSpy.mockRestore();
+  });
+});
+
+describe("registerPaymentConfirmedWorker (hợp đồng đăng ký)", () => {
+  beforeEach(async () => {
+    await resetDb();
+  });
+
+  it("đăng ký đúng queue send-payment-confirmed", async () => {
+    const boss = createCapturingBoss();
+
+    await registerPaymentConfirmedWorker(boss, {
+      db: testPrisma,
+      mailer: fakeMailer(),
+    });
+
+    expect(boss.captured?.name).toBe(QUEUE_SEND_PAYMENT_CONFIRMED);
+  });
+
+  it("handler xử lý toàn bộ job trong batch", async () => {
+    await makeShippingZone();
+    const orderA = await makeOrder({ skipZone: true });
+    const orderB = await makeOrder({ skipZone: true });
+    const boss = createCapturingBoss();
+    const mailer = fakeMailer();
+
+    await registerPaymentConfirmedWorker(boss, { db: testPrisma, mailer });
+    await boss.captured?.handler([
+      { ...fakeJob(orderA.orderCode), name: QUEUE_SEND_PAYMENT_CONFIRMED },
+      { ...fakeJob(orderB.orderCode), name: QUEUE_SEND_PAYMENT_CONFIRMED },
+    ]);
+
+    expect(mailer.send).toHaveBeenCalledTimes(2);
+    expect(mailer.messages.map((message) => message.subject)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining(orderA.orderCode),
+        expect.stringContaining(orderB.orderCode),
+      ]),
+    );
+  });
+
+  it("lỗi handler → log không PII rồi rethrow", async () => {
+    const order = await makeOrder();
+    const boss = createCapturingBoss();
+    const mailer: Mailer = {
+      send: vi.fn().mockRejectedValue(new Error("lỗi gửi giả lập")),
+    };
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      await registerPaymentConfirmedWorker(boss, { db: testPrisma, mailer });
+      const job = {
+        ...fakeJob(order.orderCode),
+        name: QUEUE_SEND_PAYMENT_CONFIRMED,
+      };
+
+      await expect(boss.captured?.handler([job])).rejects.toThrow(
+        "lỗi gửi giả lập",
+      );
+
+      const logged = consoleErrorSpy.mock.calls.flat().join(" ");
+      expect(logged).toContain(QUEUE_SEND_PAYMENT_CONFIRMED);
+      expect(logged).toContain(order.orderCode);
+      expect(logged).not.toContain(order.email);
+      expect(logged).not.toContain(order.phone);
+      expect(logged).not.toContain(order.addressLine);
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 });
 

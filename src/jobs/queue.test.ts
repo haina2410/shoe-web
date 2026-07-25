@@ -3,10 +3,13 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { PgBoss } from "pg-boss";
 import {
   QUEUE_SEND_ORDER_CONFIRMATION,
+  QUEUE_SEND_PAYMENT_CONFIRMED,
   orderConfirmationJobSchema,
+  paymentConfirmedJobSchema,
   getBoss,
   createBoss,
   enqueueOrderConfirmation,
+  enqueuePaymentConfirmed,
 } from "@/jobs/queue";
 
 /**
@@ -48,6 +51,25 @@ describe("orderConfirmationJobSchema", () => {
 
   it("tên queue đúng như đặc tả", () => {
     expect(QUEUE_SEND_ORDER_CONFIRMATION).toBe("send-order-confirmation");
+  });
+});
+
+describe("paymentConfirmedJobSchema", () => {
+  it("chỉ giữ orderCode, không lưu PII vào payload job", () => {
+    expect(
+      paymentConfirmedJobSchema.parse({
+        orderCode: "LEAF-ABC123",
+        email: "must-not-persist@example.com",
+      }),
+    ).toEqual({ orderCode: "LEAF-ABC123" });
+  });
+
+  it("loại orderCode rỗng", () => {
+    expect(() => paymentConfirmedJobSchema.parse({ orderCode: "" })).toThrow();
+  });
+
+  it("dùng đúng tên queue thanh toán", () => {
+    expect(QUEUE_SEND_PAYMENT_CONFIRMED).toBe("send-payment-confirmed");
   });
 });
 
@@ -218,5 +240,44 @@ describe("enqueueOrderConfirmation — boss.send() trả về null (F2)", () => 
     await expect(
       enqueueOrderConfirmation(fakeTx, { orderCode: "LEAF-OKJOB" }, fakeBoss),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("enqueuePaymentConfirmed", () => {
+  it("boss.send() trả id hợp lệ → gửi payload đã lọc vào đúng queue", async () => {
+    const fakeBoss = {
+      send: vi.fn().mockResolvedValue("payment-job-id"),
+    } as unknown as PgBoss;
+    const fakeTx = { $queryRawUnsafe: vi.fn() };
+
+    await expect(
+      enqueuePaymentConfirmed(
+        fakeTx,
+        {
+          orderCode: "LEAF-PAID01",
+          // @ts-expect-error cố tình truyền PII để chứng minh schema loại bỏ
+          email: "must-not-persist@example.com",
+        },
+        fakeBoss,
+      ),
+    ).resolves.toBeUndefined();
+
+    expect(fakeBoss.send).toHaveBeenCalledTimes(1);
+    expect(fakeBoss.send).toHaveBeenCalledWith(
+      QUEUE_SEND_PAYMENT_CONFIRMED,
+      { orderCode: "LEAF-PAID01" },
+      expect.objectContaining({ db: expect.anything() }),
+    );
+  });
+
+  it("boss.send() trả null → throw để transaction không commit thiếu job", async () => {
+    const fakeBoss = {
+      send: vi.fn().mockResolvedValue(null),
+    } as unknown as PgBoss;
+    const fakeTx = { $queryRawUnsafe: vi.fn() };
+
+    await expect(
+      enqueuePaymentConfirmed(fakeTx, { orderCode: "LEAF-NULLPAID" }, fakeBoss),
+    ).rejects.toThrow("Ghi job xác nhận thanh toán thất bại.");
   });
 });

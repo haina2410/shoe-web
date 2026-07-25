@@ -4,8 +4,10 @@ import { testPrisma } from "@/test/db";
 import { createTestBoss, resetQueues } from "@/test/boss";
 import {
   QUEUE_SEND_ORDER_CONFIRMATION,
+  QUEUE_SEND_PAYMENT_CONFIRMED,
   ensureQueues,
   enqueueOrderConfirmation,
+  enqueuePaymentConfirmed,
 } from "@/jobs/queue";
 
 /**
@@ -84,6 +86,44 @@ describe("enqueueOrderConfirmation", () => {
   });
 });
 
+describe("enqueuePaymentConfirmed", () => {
+  it("transaction commit → job chỉ chứa { orderCode }", async () => {
+    await testPrisma.$transaction(async (tx) => {
+      await enqueuePaymentConfirmed(
+        tx,
+        {
+          orderCode: "LEAF-PAIDCOMMIT",
+          // @ts-expect-error PII phải bị schema loại trước khi ghi job
+          email: "must-not-persist@example.com",
+        },
+        boss,
+      );
+    });
+
+    const jobs = await boss.findJobs<{ orderCode: string }>(
+      QUEUE_SEND_PAYMENT_CONFIRMED,
+      { data: { orderCode: "LEAF-PAIDCOMMIT" } },
+    );
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].data).toEqual({ orderCode: "LEAF-PAIDCOMMIT" });
+  });
+
+  it("transaction rollback → không tạo job xác nhận thanh toán", async () => {
+    await expect(
+      testPrisma.$transaction(async (tx) => {
+        await enqueuePaymentConfirmed(tx, { orderCode: "LEAF-PAIDROLLBACK" }, boss);
+        throw new Error("Buộc rollback payment job");
+      }),
+    ).rejects.toThrow("Buộc rollback payment job");
+
+    const jobs = await boss.findJobs<{ orderCode: string }>(
+      QUEUE_SEND_PAYMENT_CONFIRMED,
+      { data: { orderCode: "LEAF-PAIDROLLBACK" } },
+    );
+    expect(jobs).toHaveLength(0);
+  });
+});
+
 describe("ensureQueues", () => {
   it("gọi 2 lần liên tiếp không lỗi (idempotent)", async () => {
     await expect(ensureQueues(boss)).resolves.not.toThrow();
@@ -98,6 +138,11 @@ describe("ensureQueues", () => {
     expect(queue?.retryLimit).toBe(5);
     expect(queue?.retryDelay).toBe(60);
     expect(queue?.retryBackoff).toBe(true);
+
+    const paymentQueue = await boss.getQueue(QUEUE_SEND_PAYMENT_CONFIRMED);
+    expect(paymentQueue?.retryLimit).toBe(5);
+    expect(paymentQueue?.retryDelay).toBe(60);
+    expect(paymentQueue?.retryBackoff).toBe(true);
   });
 
   it("hội tụ về ĐÚNG options hiện tại kể cả khi queue đã tồn tại từ trước với options CŨ (updateQueue, không chỉ createQueue — F5)", async () => {

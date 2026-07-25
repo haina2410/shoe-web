@@ -2,8 +2,17 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vites
 import type { PgBoss } from "pg-boss";
 import { testPrisma, resetDb } from "@/test/db";
 import { createTestBoss, resetQueues } from "@/test/boss";
-import { QUEUE_SEND_ORDER_CONFIRMATION, ensureQueues, enqueueOrderConfirmation } from "@/jobs/queue";
-import { registerOrderConfirmationWorker } from "@/worker/index";
+import {
+  QUEUE_SEND_ORDER_CONFIRMATION,
+  QUEUE_SEND_PAYMENT_CONFIRMED,
+  ensureQueues,
+  enqueueOrderConfirmation,
+  enqueuePaymentConfirmed,
+} from "@/jobs/queue";
+import {
+  registerOrderConfirmationWorker,
+  registerPaymentConfirmedWorker,
+} from "@/worker/index";
 import { createOrderCore } from "@/server/orders";
 import type { CreateOrderInput } from "@/lib/validation/checkout";
 import type { Mailer, MailMessage } from "@/lib/mailer";
@@ -195,5 +204,49 @@ describe("worker: send-order-confirmation", () => {
     const subjects = mailer.messages.map((m) => m.subject);
     expect(subjects).toContain(`Đơn hàng ${orderA.orderCode} — leafshoes Việt Nam`);
     expect(subjects).toContain(`Đơn hàng ${orderB.orderCode} — leafshoes Việt Nam`);
+  });
+});
+
+describe("worker: send-payment-confirmed", () => {
+  let boss: PgBoss;
+  let mailer: Mailer & { messages: MailMessage[] };
+
+  beforeAll(async () => {
+    boss = createTestBoss();
+    await boss.start();
+    await ensureQueues(boss);
+  });
+
+  afterAll(async () => {
+    await boss.stop();
+  });
+
+  beforeEach(async () => {
+    await resetDb();
+    await resetQueues(boss);
+    mailer = fakeMailer();
+    await boss.offWork(QUEUE_SEND_PAYMENT_CONFIRMED);
+    await registerPaymentConfirmedWorker(boss, { db: testPrisma, mailer });
+  });
+
+  it("enqueue nguyên tử → worker hoàn tất và gửi email xác nhận thanh toán", async () => {
+    const order = await makeOrder();
+    const spy = boss.getSpy<{ orderCode: string }>(QUEUE_SEND_PAYMENT_CONFIRMED);
+
+    await testPrisma.$transaction(async (tx) => {
+      await enqueuePaymentConfirmed(tx, { orderCode: order.orderCode }, boss);
+    });
+
+    const completed = await spy.waitForJob(
+      (data) => data.orderCode === order.orderCode,
+      "completed",
+    );
+
+    expect(completed.data).toEqual({ orderCode: order.orderCode });
+    expect(mailer.send).toHaveBeenCalledTimes(1);
+    expect(mailer.messages[0].to).toBe(order.email);
+    expect(mailer.messages[0].text.toLocaleLowerCase("vi")).toContain(
+      "đã nhận thanh toán",
+    );
   });
 });
