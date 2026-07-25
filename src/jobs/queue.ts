@@ -32,7 +32,6 @@ export type OrderConfirmationJob = z.infer<typeof orderConfirmationJobSchema>;
  */
 export function createBoss(options?: {
   connectionString?: string;
-  schema?: string;
   supervise?: boolean;
   schedule?: boolean;
 }): PgBoss {
@@ -41,7 +40,7 @@ export function createBoss(options?: {
 
   return new PgBoss({
     connectionString,
-    schema: options?.schema ?? process.env.PGBOSS_SCHEMA ?? "pgboss",
+    schema: process.env.PGBOSS_SCHEMA ?? "pgboss",
     supervise: options?.supervise ?? false,
     schedule: options?.schedule ?? false,
   });
