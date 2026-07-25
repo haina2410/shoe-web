@@ -7,9 +7,12 @@ import { mailerFromEnv, type Mailer } from "@/lib/mailer";
 import {
   createBoss,
   ensureQueues,
+  ensureSchedules,
+  QUEUE_EXPIRE_UNPAID,
   QUEUE_SEND_ORDER_CONFIRMATION,
   QUEUE_SEND_PAYMENT_CONFIRMED,
 } from "@/jobs/queue";
+import { expireUnpaidOrders } from "@/jobs/handlers/expire-unpaid";
 import { handleSendOrderConfirmation } from "@/jobs/handlers/send-order-confirmation";
 import { handleSendPaymentConfirmed } from "@/jobs/handlers/send-payment-confirmed";
 import { vietQrConfigFromEnv } from "@/lib/vietqr";
@@ -151,6 +154,25 @@ export async function registerPaymentConfirmedWorker(
   });
 }
 
+/** Đăng ký worker expiry; xử lý mọi job trong batch và không log payload/lỗi. */
+export async function registerExpireUnpaidWorker(
+  boss: WorkCapableBoss,
+  deps: { db: PrismaClient },
+): Promise<void> {
+  await boss.work(QUEUE_EXPIRE_UNPAID, {}, async (jobs) => {
+    for (const job of jobs) {
+      try {
+        await expireUnpaidOrders(deps, {});
+      } catch (error: unknown) {
+        console.error(
+          `[worker] job thất bại: queue=${QUEUE_EXPIRE_UNPAID} jobId=${job.id}`,
+        );
+        throw error;
+      }
+    }
+  });
+}
+
 /**
  * Xác thực TOÀN BỘ biến môi trường mà worker cần, MỘT LẦN, TRƯỚC khi
  * `boss.start()`/nhận job (F7, final review Ngày 6) — sai cấu hình phải chặn
@@ -184,13 +206,15 @@ async function main(): Promise<void> {
 
   await boss.start();
   await ensureQueues(boss);
+  await ensureSchedules(boss);
 
   await registerOrderConfirmationWorker(boss, { db: prisma, mailer });
   await registerPaymentConfirmedWorker(boss, { db: prisma, mailer });
+  await registerExpireUnpaidWorker(boss, { db: prisma });
 
   console.log(
     `[worker] sẵn sàng, đang lắng nghe queues "${QUEUE_SEND_ORDER_CONFIRMATION}", ` +
-      `"${QUEUE_SEND_PAYMENT_CONFIRMED}"...`,
+      `"${QUEUE_SEND_PAYMENT_CONFIRMED}", "${QUEUE_EXPIRE_UNPAID}"...`,
   );
 
   const shutdown = async (signal: NodeJS.Signals): Promise<void> => {

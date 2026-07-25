@@ -2,12 +2,14 @@ import "dotenv/config";
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { PgBoss } from "pg-boss";
 import {
+  QUEUE_EXPIRE_UNPAID,
   QUEUE_SEND_ORDER_CONFIRMATION,
   QUEUE_SEND_PAYMENT_CONFIRMED,
   orderConfirmationJobSchema,
   paymentConfirmedJobSchema,
   getBoss,
   createBoss,
+  ensureSchedules,
   enqueueOrderConfirmation,
   enqueuePaymentConfirmed,
 } from "@/jobs/queue";
@@ -20,6 +22,24 @@ import {
  * test case.
  */
 const globalForBoss = globalThis as unknown as { bossPromise?: Promise<PgBoss> };
+
+describe("expire-unpaid queue schedule", () => {
+  it("đăng ký đúng queue, cron, UTC và stable key theo signature pg-boss 12.26", async () => {
+    const schedule = vi.fn().mockResolvedValue(undefined);
+    const boss = { schedule } as unknown as PgBoss;
+
+    await ensureSchedules(boss);
+
+    expect(QUEUE_EXPIRE_UNPAID).toBe("expire-unpaid");
+    expect(schedule).toHaveBeenCalledTimes(1);
+    expect(schedule).toHaveBeenCalledWith(
+      QUEUE_EXPIRE_UNPAID,
+      "*/15 * * * *",
+      {},
+      { tz: "UTC", key: "expire-unpaid-15m" },
+    );
+  });
+});
 
 describe("orderConfirmationJobSchema", () => {
   it("chấp nhận payload chỉ có orderCode (KHÔNG có PII)", () => {
@@ -135,6 +155,25 @@ describe("getBoss()", () => {
       expect(boss).toBeDefined();
     } finally {
       process.env.DATABASE_URL = originalUrl;
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("singleton phía app không đăng ký schedule vì createBoss mặc định schedule:false", async () => {
+    const originalUrl = process.env.DATABASE_URL;
+    const testUrl = process.env.DATABASE_URL_TEST;
+    if (!testUrl) throw new Error("DATABASE_URL_TEST chưa được cấu hình");
+
+    vi.stubEnv("NODE_ENV", "development");
+    process.env.DATABASE_URL = testUrl;
+    const scheduleSpy = vi.spyOn(PgBoss.prototype, "schedule");
+
+    try {
+      await getBoss();
+      expect(scheduleSpy).not.toHaveBeenCalled();
+    } finally {
+      process.env.DATABASE_URL = originalUrl;
+      scheduleSpy.mockRestore();
       vi.unstubAllEnvs();
     }
   });

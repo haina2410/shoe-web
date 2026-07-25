@@ -3,6 +3,7 @@ import type { PgBoss } from "pg-boss";
 import { testPrisma, resetDb } from "@/test/db";
 import { createTestBoss, resetQueues } from "@/test/boss";
 import {
+  QUEUE_EXPIRE_UNPAID,
   QUEUE_SEND_ORDER_CONFIRMATION,
   QUEUE_SEND_PAYMENT_CONFIRMED,
   ensureQueues,
@@ -10,6 +11,7 @@ import {
   enqueuePaymentConfirmed,
 } from "@/jobs/queue";
 import {
+  registerExpireUnpaidWorker,
   registerOrderConfirmationWorker,
   registerPaymentConfirmedWorker,
 } from "@/worker/index";
@@ -248,5 +250,48 @@ describe("worker: send-payment-confirmed", () => {
     expect(mailer.messages[0].text.toLocaleLowerCase("vi")).toContain(
       "đã nhận thanh toán",
     );
+  });
+});
+
+describe("worker: expire-unpaid", () => {
+  let boss: PgBoss;
+
+  beforeAll(async () => {
+    boss = createTestBoss();
+    await boss.start();
+    await ensureQueues(boss);
+  });
+
+  afterAll(async () => {
+    await boss.stop();
+  });
+
+  beforeEach(async () => {
+    await resetDb();
+    await resetQueues(boss);
+    await boss.offWork(QUEUE_EXPIRE_UNPAID);
+    await registerExpireUnpaidWorker(boss, { db: testPrisma });
+  });
+
+  it("job thật qua pg-boss gọi worker và expire đơn pending quá 24 giờ", async () => {
+    const order = await makeOrder();
+    await testPrisma.order.update({
+      where: { id: order.id },
+      data: { createdAt: new Date(Date.now() - 25 * 60 * 60 * 1_000) },
+    });
+    const spy = boss.getSpy<Record<string, never>>(QUEUE_EXPIRE_UNPAID);
+
+    const jobId = await boss.send(QUEUE_EXPIRE_UNPAID, {});
+    expect(jobId).not.toBeNull();
+
+    const completed = await spy.waitForJob(() => true, "completed");
+
+    expect(completed.state).toBe("completed");
+    await expect(
+      testPrisma.order.findUniqueOrThrow({
+        where: { id: order.id },
+        select: { status: true },
+      }),
+    ).resolves.toEqual({ status: "EXPIRED" });
   });
 });

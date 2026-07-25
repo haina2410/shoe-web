@@ -10,6 +10,7 @@ import { z } from "zod";
 /** Tên queue gửi email xác nhận đơn hàng. */
 export const QUEUE_SEND_ORDER_CONFIRMATION = "send-order-confirmation";
 export const QUEUE_SEND_PAYMENT_CONFIRMED = "send-payment-confirmed";
+export const QUEUE_EXPIRE_UNPAID = "expire-unpaid";
 
 /**
  * Payload job gửi email xác nhận đơn hàng. CHỈ chứa `orderCode` — KHÔNG được
@@ -115,6 +116,21 @@ export async function ensureQueues(boss: PgBoss): Promise<void> {
   await boss.updateQueue(QUEUE_SEND_ORDER_CONFIRMATION, QUEUE_RETRY_OPTIONS);
   await boss.createQueue(QUEUE_SEND_PAYMENT_CONFIRMED, QUEUE_RETRY_OPTIONS);
   await boss.updateQueue(QUEUE_SEND_PAYMENT_CONFIRMED, QUEUE_RETRY_OPTIONS);
+  await boss.createQueue(QUEUE_EXPIRE_UNPAID, QUEUE_RETRY_OPTIONS);
+  await boss.updateQueue(QUEUE_EXPIRE_UNPAID, QUEUE_RETRY_OPTIONS);
+}
+
+/**
+ * Đăng ký cron ổn định cho worker. Chỉ tiến trình worker gọi hàm này sau
+ * `ensureQueues()`; singleton phía app giữ `schedule:false` và không gọi nó.
+ */
+export async function ensureSchedules(boss: PgBoss): Promise<void> {
+  await boss.schedule(
+    QUEUE_EXPIRE_UNPAID,
+    "*/15 * * * *",
+    {},
+    { tz: "UTC", key: "expire-unpaid-15m" },
+  );
 }
 
 const globalForBoss = globalThis as unknown as { bossPromise?: Promise<PgBoss> };

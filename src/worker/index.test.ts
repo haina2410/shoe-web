@@ -6,10 +6,12 @@ import { createOrderCore } from "@/server/orders";
 import type { CreateOrderInput } from "@/lib/validation/checkout";
 import type { Mailer, MailMessage } from "@/lib/mailer";
 import {
+  QUEUE_EXPIRE_UNPAID,
   QUEUE_SEND_ORDER_CONFIRMATION,
   QUEUE_SEND_PAYMENT_CONFIRMED,
 } from "@/jobs/queue";
 import {
+  registerExpireUnpaidWorker,
   registerOrderConfirmationWorker,
   registerPaymentConfirmedWorker,
   requireAppBaseUrlForWorker,
@@ -271,6 +273,82 @@ describe("registerPaymentConfirmedWorker (hợp đồng đăng ký)", () => {
       expect(logged).not.toContain(order.phone);
       expect(logged).not.toContain(order.addressLine);
     } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+});
+
+describe("registerExpireUnpaidWorker (hợp đồng đăng ký)", () => {
+  beforeEach(async () => {
+    await resetDb();
+  });
+
+  it("đăng ký đúng queue và xử lý toàn bộ batch bằng handler thật", async () => {
+    await makeShippingZone();
+    const orders = await Promise.all([
+      makeOrder({ skipZone: true }),
+      makeOrder({ skipZone: true }),
+    ]);
+    await testPrisma.order.updateMany({
+      where: { id: { in: orders.map((order) => order.id) } },
+      data: { createdAt: new Date("2026-07-23T00:00:00.000Z") },
+    });
+    const boss = createCapturingBoss();
+    const updateManySpy = vi.spyOn(testPrisma.order, "updateMany");
+
+    try {
+      await registerExpireUnpaidWorker(boss, { db: testPrisma });
+      expect(boss.captured?.name).toBe(QUEUE_EXPIRE_UNPAID);
+
+      await boss.captured?.handler([
+        { ...fakeJob("ignored-a"), name: QUEUE_EXPIRE_UNPAID, data: {} },
+        { ...fakeJob("ignored-b"), name: QUEUE_EXPIRE_UNPAID, data: {} },
+      ]);
+
+      expect(updateManySpy).toHaveBeenCalledTimes(2);
+      const expired = await testPrisma.order.count({
+        where: { status: "EXPIRED" },
+      });
+      expect(expired).toBe(2);
+    } finally {
+      updateManySpy.mockRestore();
+    }
+  });
+
+  it("lỗi handler chỉ log metadata job không PII rồi rethrow", async () => {
+    const boss = createCapturingBoss();
+    const updateManySpy = vi
+      .spyOn(testPrisma.order, "updateMany")
+      .mockRejectedValue(
+        new Error("khach@example.com 0901234567 1 Phố Thử Nghiệm"),
+      );
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      await registerExpireUnpaidWorker(boss, { db: testPrisma });
+      const job = {
+        ...fakeJob("ignored"),
+        id: "expire-job-1",
+        name: QUEUE_EXPIRE_UNPAID,
+        data: {
+          email: "khach@example.com",
+          phone: "0901234567",
+          address: "1 Phố Thử Nghiệm",
+        },
+      };
+
+      await expect(boss.captured?.handler([job])).rejects.toThrow(
+        "khach@example.com",
+      );
+
+      const logged = consoleErrorSpy.mock.calls.flat().join(" ");
+      expect(logged).toContain(QUEUE_EXPIRE_UNPAID);
+      expect(logged).toContain("expire-job-1");
+      expect(logged).not.toContain("khach@example.com");
+      expect(logged).not.toContain("0901234567");
+      expect(logged).not.toContain("1 Phố Thử Nghiệm");
+    } finally {
+      updateManySpy.mockRestore();
       consoleErrorSpy.mockRestore();
     }
   });

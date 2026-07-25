@@ -3,9 +3,11 @@ import type { PgBoss } from "pg-boss";
 import { testPrisma } from "@/test/db";
 import { createTestBoss, resetQueues } from "@/test/boss";
 import {
+  QUEUE_EXPIRE_UNPAID,
   QUEUE_SEND_ORDER_CONFIRMATION,
   QUEUE_SEND_PAYMENT_CONFIRMED,
   ensureQueues,
+  ensureSchedules,
   enqueueOrderConfirmation,
   enqueuePaymentConfirmed,
 } from "@/jobs/queue";
@@ -143,6 +145,8 @@ describe("ensureQueues", () => {
     expect(paymentQueue?.retryLimit).toBe(5);
     expect(paymentQueue?.retryDelay).toBe(60);
     expect(paymentQueue?.retryBackoff).toBe(true);
+
+    expect(await boss.getQueue(QUEUE_EXPIRE_UNPAID)).not.toBeNull();
   });
 
   it("hội tụ về ĐÚNG options hiện tại kể cả khi queue đã tồn tại từ trước với options CŨ (updateQueue, không chỉ createQueue — F5)", async () => {
@@ -167,5 +171,27 @@ describe("ensureQueues", () => {
     expect(after?.retryLimit).toBe(5);
     expect(after?.retryDelay).toBe(60);
     expect(after?.retryBackoff).toBe(true);
+  });
+});
+
+describe("ensureSchedules", () => {
+  it("gọi lặp hội tụ về một schedule ổn định với cron */15, timezone UTC và key cố định", async () => {
+    await ensureQueues(boss);
+    await ensureSchedules(boss);
+    await ensureSchedules(boss);
+
+    const schedules = await boss.getSchedules(
+      QUEUE_EXPIRE_UNPAID,
+      "expire-unpaid-15m",
+    );
+
+    expect(schedules).toHaveLength(1);
+    expect(schedules[0]).toMatchObject({
+      name: QUEUE_EXPIRE_UNPAID,
+      key: "expire-unpaid-15m",
+      cron: "*/15 * * * *",
+      timezone: "UTC",
+      data: {},
+    });
   });
 });
