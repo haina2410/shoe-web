@@ -58,11 +58,19 @@ npm run worker
 
 ## Job nền (pg-boss)
 
-- Job `send-order-confirmation` được ghi **trong cùng transaction tạo đơn** (`createOrderCore` → `enqueueOrderConfirmation`, dùng adapter `fromPrisma(tx)` của pg-boss). Đơn rollback ⇒ job biến mất, không bao giờ có job mồ côi.
+- Worker xử lý cả hai queue email: `send-order-confirmation` khi tạo đơn và `send-payment-confirmed` khi nhận tiền. Worker cũng đăng ký lịch UTC `expire-unpaid` mỗi 15 phút để chuyển đơn `PENDING_PAYMENT` quá 24 giờ sang `EXPIRED`.
+- Cả job `send-order-confirmation` lẫn `send-payment-confirmed` đều được ghi **trong cùng transaction nghiệp vụ** (qua adapter `fromPrisma(tx)` của pg-boss). Transaction rollback ⇒ job biến mất, không bao giờ có job mồ côi.
 - Payload job **chỉ chứa `orderCode`** (không PII) — worker tự đọc lại đơn từ DB khi xử lý.
 - pg-boss tự tạo/migrate schema `pgboss` trong cùng database ở lần `boss.start()` đầu tiên — **không** có migration Prisma nào cho schema này. Đổi tên schema qua `PGBOSS_SCHEMA` nếu cần.
 - Queue cấu hình `retryLimit: 5, retryDelay: 60s, retryBackoff: true` (thay vì mặc định pg-boss `retryLimit: 2, retryDelay: 0`) để chịu được lỗi 429/5xx tạm thời từ Resend mà không mất email. Một job thất bại được log ra console (queue, jobId, `orderCode` — không PII) trước khi pg-boss tự retry/dead-letter.
 - **`npm run worker` xác thực TOÀN BỘ biến môi trường mình cần lúc khởi động** (không phải lúc xử lý job đầu tiên) — thiếu bất kỳ biến bắt buộc nào bên dưới (mail, VietQR, `APP_BASE_URL`) sẽ khiến worker từ chối khởi động (fail fast) thay vì gửi mail lỗi hoặc chứa link chết.
+
+## Webhook SePay
+
+- `POST /api/webhooks/sepay` yêu cầu `X-SePay-Timestamp` (Unix seconds) và `X-SePay-Signature: sha256=<hex>`.
+- Chữ ký là HMAC-SHA256 với `SEPAY_WEBHOOK_SECRET` trên đúng chuỗi `<timestamp>.<raw request body>`; không parse rồi stringify lại body trước khi verify. Timestamp chỉ hợp lệ trong cửa sổ 5 phút.
+- Event dùng `payload.id` chính thức của SePay làm ID giao dịch duy nhất. Event hợp lệ luôn được lưu trước khi đối soát; giao dịch thiếu/sai mã đơn, lệch tiền, đơn không còn pending hoặc thiếu tồn kho được giữ ở `BankTransaction.REVIEW_REQUIRED` cho màn hình xử lý Ngày 8.
+- Kết quả đã khớp, webhook lặp và giao dịch cần review đều được acknowledge HTTP 200 với body chính xác `{"success":true}`. Lỗi chữ ký/validation/hạ tầng không giả thành success.
 
 ## Email
 
@@ -75,7 +83,7 @@ Email xác nhận đơn hàng render bằng React Email, gửi qua Resend từ w
 
 ## Biến môi trường
 
-Xem [`.env.example`](.env.example). Bắt buộc: `DATABASE_URL`, `DATABASE_URL_TEST`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `SEED_*`, `VIETQR_*`.
+Xem [`.env.example`](.env.example). Bắt buộc: `DATABASE_URL`, `DATABASE_URL_TEST`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `SEED_*`, `VIETQR_*`, `SEPAY_WEBHOOK_SECRET`.
 
 Worker (`npm run worker`) xác thực lúc khởi động, cần thêm: `RESEND_API_KEY`, `MAIL_FROM`, `VIETQR_BANK_CODE`/`VIETQR_ACCOUNT_NO`/`VIETQR_ACCOUNT_NAME` (đã bắt buộc chung ở trên, worker chỉ xác thực lại sớm hơn), và **`APP_BASE_URL`** (bắt buộc riêng cho worker — không dùng mặc định localhost).
 

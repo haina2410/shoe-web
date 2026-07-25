@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { OrderStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { formatVnd } from "@/lib/money";
 import { buildVietQrImageUrl, vietQrConfigFromEnv } from "@/lib/vietqr";
@@ -32,6 +33,36 @@ export const dynamic = "force-dynamic";
 
 type Params = { orderCode: string };
 
+const ORDER_STATUS_PRESENTATION = {
+  [OrderStatus.PENDING_PAYMENT]: {
+    label: "Chờ thanh toán",
+    kind: "pending",
+  },
+  [OrderStatus.PAID]: {
+    label: "Đã thanh toán",
+    kind: "paid",
+  },
+  [OrderStatus.FULFILLED]: {
+    label: "Đã thanh toán",
+    kind: "paid",
+  },
+  [OrderStatus.COMPLETED]: {
+    label: "Đã thanh toán",
+    kind: "paid",
+  },
+  [OrderStatus.EXPIRED]: {
+    label: "Đã hết hạn",
+    kind: "inactive",
+  },
+  [OrderStatus.CANCELLED]: {
+    label: "Đã hủy",
+    kind: "inactive",
+  },
+} as const satisfies Record<
+  OrderStatus,
+  { label: string; kind: "pending" | "paid" | "inactive" }
+>;
+
 async function loadOrder(orderCode: string) {
   return prisma.order.findUnique({
     where: { orderCode },
@@ -60,12 +91,7 @@ export default async function OrderConfirmationPage({
     notFound();
   }
 
-  const vietQrConfig = vietQrConfigFromEnv();
-  const qrUrl = buildVietQrImageUrl({
-    ...vietQrConfig,
-    amount: order.total,
-    addInfo: order.orderCode,
-  });
+  const statusPresentation = ORDER_STATUS_PRESENTATION[order.status];
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
@@ -77,47 +103,43 @@ export default async function OrderConfirmationPage({
         <span data-testid="order-code" className="font-semibold">
           {order.orderCode}
         </span>{" "}
-        — Trạng thái: <span className="font-semibold">Chờ thanh toán</span>
+        — Trạng thái:{" "}
+        <span data-testid="order-status" className="font-semibold">
+          {statusPresentation.label}
+        </span>
       </p>
 
       <div className="mt-8 grid gap-8 md:grid-cols-2">
-        <section>
-          <h2 className="text-lg font-semibold" style={{ color: "var(--evergreen)" }}>
-            Quét mã QR để thanh toán
-          </h2>
-
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={qrUrl}
-            alt="Mã QR chuyển khoản VietQR"
-            className="mt-4 w-64 max-w-full rounded-lg border"
-            style={{ borderColor: "var(--line)" }}
+        {statusPresentation.kind === "pending" ? (
+          <PendingPaymentSection
+            orderCode={order.orderCode}
+            total={order.total}
           />
-
-          <dl className="mt-4 space-y-1 text-sm">
-            <div className="flex justify-between">
-              <dt className="text-neutral-500">Ngân hàng</dt>
-              <dd className="font-medium">{vietQrConfig.bankCode}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-neutral-500">Số tài khoản</dt>
-              <dd className="font-medium">{vietQrConfig.accountNo}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-neutral-500">Chủ tài khoản</dt>
-              <dd className="font-medium">{vietQrConfig.accountName}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-neutral-500">Số tiền</dt>
-              <dd className="font-medium">{formatVnd(order.total)}</dd>
-            </div>
-          </dl>
-
-          <p className="mt-4 text-sm font-semibold" style={{ color: "var(--destructive)" }}>
-            Vui lòng ghi đúng nội dung chuyển khoản:{" "}
-            <span data-testid="order-transfer-content">{order.orderCode}</span>
-          </p>
-        </section>
+        ) : statusPresentation.kind === "paid" ? (
+          <section>
+            <h2
+              className="text-lg font-semibold"
+              style={{ color: "var(--evergreen)" }}
+            >
+              Thanh toán đã được xác nhận
+            </h2>
+            <p className="mt-4 text-sm text-neutral-600">
+              Chúng tôi đã nhận được thanh toán và đang xử lý đơn hàng của bạn.
+            </p>
+          </section>
+        ) : (
+          <section>
+            <h2
+              className="text-lg font-semibold"
+              style={{ color: "var(--evergreen)" }}
+            >
+              Đơn hàng không còn hoạt động
+            </h2>
+            <p className="mt-4 text-sm text-neutral-600">
+              Đơn hàng không còn nhận thanh toán.
+            </p>
+          </section>
+        )}
 
         <section>
           <h2 className="text-lg font-semibold" style={{ color: "var(--evergreen)" }}>
@@ -156,11 +178,74 @@ export default async function OrderConfirmationPage({
               style={{ borderColor: "var(--line)" }}
             >
               <span>Tổng cộng</span>
-              <span data-testid="order-total">{formatVnd(order.total)}</span>
+              <span data-testid="order-total" data-total={order.total}>
+                {formatVnd(order.total)}
+              </span>
             </div>
           </div>
         </section>
       </div>
     </div>
+  );
+}
+
+function PendingPaymentSection({
+  orderCode,
+  total,
+}: {
+  orderCode: string;
+  total: number;
+}) {
+  const vietQrConfig = vietQrConfigFromEnv();
+  const qrUrl = buildVietQrImageUrl({
+    ...vietQrConfig,
+    amount: total,
+    addInfo: orderCode,
+  });
+
+  return (
+    <section>
+      <h2
+        className="text-lg font-semibold"
+        style={{ color: "var(--evergreen)" }}
+      >
+        Quét mã QR để thanh toán
+      </h2>
+
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={qrUrl}
+        alt="Mã QR chuyển khoản VietQR"
+        className="mt-4 w-64 max-w-full rounded-lg border"
+        style={{ borderColor: "var(--line)" }}
+      />
+
+      <dl className="mt-4 space-y-1 text-sm">
+        <div className="flex justify-between">
+          <dt className="text-neutral-500">Ngân hàng</dt>
+          <dd className="font-medium">{vietQrConfig.bankCode}</dd>
+        </div>
+        <div className="flex justify-between">
+          <dt className="text-neutral-500">Số tài khoản</dt>
+          <dd className="font-medium">{vietQrConfig.accountNo}</dd>
+        </div>
+        <div className="flex justify-between">
+          <dt className="text-neutral-500">Chủ tài khoản</dt>
+          <dd className="font-medium">{vietQrConfig.accountName}</dd>
+        </div>
+        <div className="flex justify-between">
+          <dt className="text-neutral-500">Số tiền</dt>
+          <dd className="font-medium">{formatVnd(total)}</dd>
+        </div>
+      </dl>
+
+      <p
+        className="mt-4 text-sm font-semibold"
+        style={{ color: "var(--destructive)" }}
+      >
+        Vui lòng ghi đúng nội dung chuyển khoản:{" "}
+        <span data-testid="order-transfer-content">{orderCode}</span>
+      </p>
+    </section>
   );
 }

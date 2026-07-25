@@ -69,9 +69,9 @@ Nền tảng(1) → Data+RBAC(2) → Admin CRUD(3) ─┐
 ## Ngày 7 — Webhook SePay + đối soát + xác nhận tay + cron hết hạn
 
 - **Mục tiêu:** thanh toán tự động chuyển đơn sang PAID + fallback tay.
-- **Bàn giao:** route `/api/webhooks/sepay` (verify API key, parse, khớp orderCode+amount, idempotent theo `transactionId`); trong transaction: tạo `Payment`, `Order→PAID`, **trừ tồn kho**, enqueue `send-payment-confirmed`; nút admin "Xác nhận đã thanh toán"; cron pg-boss `expire-unpaid`.
-- **Module/file chính:** `src/app/api/webhooks/sepay/route.ts`, `src/server/payments/reconcile.ts`, `src/jobs/handlers/send-payment-confirmed.ts`, `src/jobs/handlers/expire-unpaid.ts`, `src/emails/payment-confirmed.tsx`.
-- **Trọng tâm test:** unit đối soát (khớp đúng; sai nội dung → không confirm; lệch tiền → không confirm; webhook lặp cùng txId → bỏ qua); test trừ tồn kho chính xác; E2E mô phỏng webhook → đơn PAID.
+- **Bàn giao:** route `/api/webhooks/sepay` verify HMAC-SHA256 trên đúng `<timestamp>.<raw body>` bằng `SEPAY_WEBHOOK_SECRET`, parse payload chính thức, lưu mọi event hợp lệ rồi khớp `payload.code` + amount, idempotent theo `payload.id`; giao dịch không khớp được giữ ở `BankTransaction.REVIEW_REQUIRED` cho Ngày 8. Trong transaction: tạo `Payment`, `Order→PAID`, **trừ tồn kho**, enqueue `send-payment-confirmed`; nút owner "Xác nhận đã thanh toán". Worker xử lý cả hai queue email và đăng ký cron `expire-unpaid` mỗi 15 phút (đơn pending quá 24 giờ).
+- **Module/file chính:** `src/app/api/webhooks/sepay/route.ts`, `src/server/payments/reconcile-sepay.ts`, `src/server/payments/mark-order-paid.ts`, `src/jobs/handlers/send-payment-confirmed.ts`, `src/jobs/handlers/expire-unpaid.ts`, `src/emails/payment-confirmed.tsx`.
+- **Trọng tâm test:** HMAC exact raw JSON; đối soát khớp đúng; sai/missing code và lệch tiền được persist để review; webhook lặp cùng `payload.id` là no-op; test trừ tồn kho chính xác; E2E ký webhook thật → refresh thấy đơn PAID và không còn QR.
 - **Phụ thuộc:** Ngày 5, 6. | **Rủi ro:** khác biệt payload sandbox vs production (giữ verify + test bằng payload mẫu).
 
 ## Ngày 8 — Admin quản lý đơn hàng

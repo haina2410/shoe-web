@@ -2,7 +2,7 @@
 
 ## Tổng quan
 
-Khách chuyển khoản qua **VietQR**. Hệ thống đối soát **tự động** qua webhook **SePay/Casso**, đồng thời cho admin **xác nhận tay** khi auto-match trượt.
+Khách chuyển khoản qua **VietQR**. Hệ thống đối soát **tự động** qua webhook **SePay**, đồng thời cho owner **xác nhận tay** khi auto-match trượt.
 
 ## Luồng checkout (tạo đơn)
 
@@ -22,30 +22,31 @@ Khách chuyển khoản qua **VietQR**. Hệ thống đối soát **tự động
 - Dùng thông tin tài khoản ngân hàng nhận tiền (từ env). Sinh ảnh QR theo chuẩn VietQR (qua `img.vietqr.io` hoặc endpoint QR của SePay).
 - Trang hiển thị: QR, số TK, chủ TK, số tiền, nội dung CK, hướng dẫn "ghi đúng nội dung `orderCode`".
 
-## Đối soát tự động (webhook SePay/Casso)
+## Đối soát tự động (webhook SePay)
 
 ```
 Khách CK ─► Ngân hàng ─► SePay phát hiện GD vào ─► POST /api/webhooks/sepay
                                                         │
-   verify API key ─► parse (amount, content, txId) ─────┤
+   verify HMAC raw body ─► parse (amount, code, id) ────┤
                                                         ▼
-   tìm Order theo orderCode trong content + khớp amount
+   lưu BankTransaction ─► tìm Order theo code + khớp amount
                                                         │
                     ┌──── khớp ────┐        ┌──── không khớp ────┐
                     ▼                        ▼
-   TRANSACTION:                     ghi log "chưa khớp" để admin xử lý tay
-     • Payment (txId unique)
+   TRANSACTION:                     BankTransaction.REVIEW_REQUIRED
+     • Payment (payload.id unique)  được giữ lại để admin xử lý Ngày 8
      • Order.status = PAID, paidAt
      • trừ stock từng OrderItem
      • enqueue send-payment-confirmed
-   trả 200
+   trả 200 {"success":true}
 ```
 
 ### Quy tắc quan trọng
-- **Idempotency:** `Payment.transactionId` unique. Nếu webhook gọi lại cùng `txId` → bỏ qua, trả 200 (đã xử lý).
-- **Verify nguồn:** kiểm tra API key/chữ ký SePay trước khi xử lý; từ chối nếu sai.
-- **Khớp lỏng số tiền:** khớp chính xác `total`; nếu lệch → không auto-confirm, đẩy sang xử lý tay.
-- **Trả 200 nhanh:** việc nặng (email) đẩy vào job, webhook chỉ ghi DB + enqueue.
+- **HMAC trên bytes gốc:** cấu hình `SEPAY_WEBHOOK_SECRET`; yêu cầu header `X-SePay-Timestamp` (Unix seconds) và `X-SePay-Signature: sha256=<hex>`. Chữ ký HMAC-SHA256 được tính trên đúng `<timestamp>.<raw request body>`, với cửa sổ thời gian 5 phút. Không stringify lại JSON trước khi verify.
+- **Idempotency:** chuỗi của `payload.id` là `BankTransaction.providerTransactionId` và `Payment.transactionId` unique. Webhook lặp cùng `payload.id` là no-op an toàn.
+- **Persist trước, match sau:** mọi event đã xác thực và hợp lệ được lưu trước khi đối soát. Thiếu/sai mã đơn, lệch tiền, đơn không pending hoặc thiếu tồn kho được đánh dấu `REVIEW_REQUIRED`, không bị mất, để Ngày 8 xử lý.
+- **Khớp số tiền nghiêm ngặt:** `transferAmount` phải bằng chính xác `Order.total`; nếu lệch thì không auto-confirm.
+- **Acknowledge chính xác:** matched, duplicate và review-required đều trả HTTP 200 với body `{"success":true}`. Email được đẩy vào job; lỗi authentication/validation/hạ tầng trả failure tương ứng thay vì giả thành success.
 
 ## Xác nhận thủ công (fallback admin)
 
@@ -61,7 +62,7 @@ Khách CK ─► Ngân hàng ─► SePay phát hiện GD vào ─► POST /api/
 | `send-payment-confirmed` | khi đơn PAID | Email báo đã nhận thanh toán |
 | `expire-unpaid` (cron) | định kỳ (VD mỗi 15') | Huỷ đơn `PENDING_PAYMENT` quá hạn (VD 24h) → `EXPIRED` |
 
-- pg-boss lo **retry** email khi lỗi tạm thời.
+- Worker xử lý cả hai queue email, đồng thời đăng ký lịch `expire-unpaid` mỗi 15 phút theo UTC. pg-boss lo **retry/backoff** email khi lỗi tạm thời; expiry dùng update có điều kiện nên chạy lặp an toàn.
 
 ## Email (React Email + Resend)
 
