@@ -27,6 +27,7 @@ interface ResendLikeClient {
       subject: string;
       html: string;
       text: string;
+      replyTo?: string;
     }): Promise<{ data: unknown; error: { message: string } | null }>;
   };
 }
@@ -37,7 +38,7 @@ interface ResendLikeClient {
  * thể retry job. Thông báo lỗi ném ra KHÔNG được chứa địa chỉ email (PII).
  */
 export function createResendMailer(
-  config: { apiKey: string; from: string; toOverride?: string },
+  config: { apiKey: string; from: string; toOverride?: string; replyTo?: string },
   deps?: { client?: ResendLikeClient },
 ): Mailer {
   const client: ResendLikeClient = deps?.client ?? new Resend(config.apiKey);
@@ -51,6 +52,7 @@ export function createResendMailer(
         subject: message.subject,
         html: message.html,
         text: message.text,
+        ...(config.replyTo ? { replyTo: config.replyTo } : {}),
       });
 
       if (error) {
@@ -62,10 +64,11 @@ export function createResendMailer(
 
 /**
  * Đọc cấu hình mailer từ biến môi trường: `RESEND_API_KEY`, `MAIL_FROM`
- * (bắt buộc), `MAIL_TO_OVERRIDE` (tuỳ chọn, dùng cho sandbox dev). Ném
+ * (bắt buộc), `MAIL_TO_OVERRIDE` (tuỳ chọn, dùng cho sandbox dev),
+ * `MAIL_REPLY_TO` (tuỳ chọn — hộp thư của shop nhận reply từ khách). Ném
  * `Error` nêu rõ tên biến còn thiếu nếu cấu hình chưa đầy đủ.
  */
-export function mailerFromEnv(): Mailer {
+export function mailerFromEnv(deps?: { client?: ResendLikeClient }): Mailer {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.MAIL_FROM;
 
@@ -79,9 +82,13 @@ export function mailerFromEnv(): Mailer {
     );
   }
 
-  return createResendMailer({
-    apiKey: apiKey!,
-    from: from!,
-    toOverride: process.env.MAIL_TO_OVERRIDE || undefined,
-  });
+  return createResendMailer(
+    {
+      apiKey: apiKey!,
+      from: from!,
+      toOverride: process.env.MAIL_TO_OVERRIDE || undefined,
+      replyTo: process.env.MAIL_REPLY_TO || undefined,
+    },
+    deps,
+  );
 }

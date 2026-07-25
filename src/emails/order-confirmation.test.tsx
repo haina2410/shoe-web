@@ -75,4 +75,19 @@ describe("renderOrderConfirmationEmail()", () => {
   it("không throw với danh sách nhiều sản phẩm", async () => {
     await expect(renderOrderConfirmationEmail(sampleProps())).resolves.toBeDefined();
   });
+
+  it("html chứa dòng liên hệ kèm địa chỉ khi có contactEmail", async () => {
+    const props = { ...sampleProps(), contactEmail: "shop@example.com" };
+    const { html } = await renderOrderConfirmationEmail(props);
+
+    expect(html).toContain("shop@example.com");
+    expect(html).toContain("Cần hỗ trợ");
+    expect(html.indexOf("Cần hỗ trợ")).toBeLessThan(html.indexOf("shop@example.com"));
+  });
+
+  it("html KHÔNG chứa dòng liên hệ khi không truyền contactEmail", async () => {
+    const { html } = await renderOrderConfirmationEmail(sampleProps());
+
+    expect(html).not.toContain("Cần hỗ trợ");
+  });
 });

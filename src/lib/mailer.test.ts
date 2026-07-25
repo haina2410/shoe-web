@@ -40,6 +40,47 @@ describe("createResendMailer()", () => {
     });
   });
 
+  it("truyền replyTo cho resend.emails.send khi có cấu hình", async () => {
+    const client = fakeClient({ data: { id: "email_123" } });
+    const mailer = createResendMailer(
+      {
+        apiKey: "re_test_key",
+        from: "no-reply@leafshoes.vn",
+        replyTo: "shop@example.com",
+      },
+      { client },
+    );
+
+    await mailer.send({
+      to: "khach@example.com",
+      subject: "s",
+      html: "<p>h</p>",
+      text: "t",
+    });
+
+    expect(client.emails.send).toHaveBeenCalledWith(
+      expect.objectContaining({ replyTo: "shop@example.com" }),
+    );
+  });
+
+  it("không gửi khoá replyTo khi không cấu hình", async () => {
+    const client = fakeClient({ data: { id: "email_123" } });
+    const mailer = createResendMailer(
+      { apiKey: "re_test_key", from: "no-reply@leafshoes.vn" },
+      { client },
+    );
+
+    await mailer.send({
+      to: "khach@example.com",
+      subject: "s",
+      html: "<p>h</p>",
+      text: "t",
+    });
+
+    const payload = client.emails.send.mock.calls[0][0];
+    expect(payload).not.toHaveProperty("replyTo");
+  });
+
   it("toOverride ghi đè địa chỉ to (dùng cho sandbox dev)", async () => {
     const client = fakeClient({ data: { id: "email_123" } });
     const mailer = createResendMailer(
@@ -118,5 +159,28 @@ describe("mailerFromEnv()", () => {
     vi.stubEnv("MAIL_TO_OVERRIDE", "");
 
     expect(() => mailerFromEnv()).not.toThrow();
+  });
+
+  it("vẫn tạo được mailer khi thiếu MAIL_REPLY_TO (tuỳ chọn)", () => {
+    vi.stubEnv("RESEND_API_KEY", "re_test_key");
+    vi.stubEnv("MAIL_FROM", "no-reply@leafshoes.vn");
+    vi.stubEnv("MAIL_REPLY_TO", "");
+
+    expect(() => mailerFromEnv()).not.toThrow();
+  });
+
+  it("đọc MAIL_REPLY_TO và truyền vào resend.emails.send khi có cấu hình", async () => {
+    vi.stubEnv("RESEND_API_KEY", "re_test_key");
+    vi.stubEnv("MAIL_FROM", "no-reply@leafshoes.vn");
+    vi.stubEnv("MAIL_REPLY_TO", "shop@example.com");
+
+    const client = fakeClient({ data: { id: "email_123" } });
+    const mailer = mailerFromEnv({ client });
+
+    await mailer.send({ to: "khach@example.com", subject: "s", html: "<p>h</p>", text: "t" });
+
+    expect(client.emails.send).toHaveBeenCalledWith(
+      expect.objectContaining({ replyTo: "shop@example.com" }),
+    );
   });
 });

@@ -34,6 +34,9 @@ export type OrderConfirmationEmailProps = {
   qrImageUrl: string;
   bank: { bankCode: string; accountNo: string; accountName: string };
   orderUrl: string;
+  /** Hộp thư của shop nhận reply từ khách (đồng bộ với `Mailer.replyTo`,
+   * xem `src/lib/mailer.ts`). Không có thì không hiển thị dòng liên hệ. */
+  contactEmail?: string;
 };
 
 /**
@@ -43,8 +46,19 @@ export type OrderConfirmationEmailProps = {
  * truyền vào từ nơi gọi (worker, Task 3), template chỉ hiển thị.
  */
 export function OrderConfirmationEmail(props: OrderConfirmationEmailProps) {
-  const { orderCode, customerName, items, subtotal, shippingFee, total, address, qrImageUrl, bank, orderUrl } =
-    props;
+  const {
+    orderCode,
+    customerName,
+    items,
+    subtotal,
+    shippingFee,
+    total,
+    address,
+    qrImageUrl,
+    bank,
+    orderUrl,
+    contactEmail,
+  } = props;
 
   return (
     <Html lang="vi">
@@ -149,9 +163,20 @@ export function OrderConfirmationEmail(props: OrderConfirmationEmailProps) {
             Xem chi tiết đơn hàng tại: <Link href={orderUrl}>{orderUrl}</Link>
           </Text>
 
-          <Text style={{ color: "#999999", fontSize: "12px" }}>
-            Đây là email tự động từ leafshoes Việt Nam, vui lòng không trả lời email này.
-          </Text>
+          {contactEmail ? (
+            <>
+              <Text style={{ color: "#999999", fontSize: "12px" }}>
+                Đây là email tự động từ leafshoes Việt Nam.
+              </Text>
+              <Text style={{ color: "#999999", fontSize: "12px" }}>
+                Cần hỗ trợ? Trả lời email này hoặc liên hệ {contactEmail}.
+              </Text>
+            </>
+          ) : (
+            <Text style={{ color: "#999999", fontSize: "12px" }}>
+              Đây là email tự động từ leafshoes Việt Nam, vui lòng không trả lời email này.
+            </Text>
+          )}
         </Container>
       </Body>
     </Html>
