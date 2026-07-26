@@ -8,11 +8,11 @@ describe("buildVietQrImageUrl()", () => {
       accountNo: "0123456789",
       accountName: "NGUYEN VAN A",
       amount: 630000,
-      addInfo: "LEAF-AB12CD",
+      addInfo: "LEAFAB12CD",
     });
 
     expect(url).toBe(
-      "https://img.vietqr.io/image/VCB-0123456789-compact2.png?amount=630000&addInfo=LEAF-AB12CD&accountName=NGUYEN%20VAN%20A",
+      "https://img.vietqr.io/image/VCB-0123456789-compact2.png?amount=630000&addInfo=LEAFAB12CD&accountName=NGUYEN%20VAN%20A",
     );
   });
 
@@ -22,7 +22,7 @@ describe("buildVietQrImageUrl()", () => {
       accountNo: "0123456789",
       accountName: "NGUYEN VAN A",
       amount: 100000,
-      addInfo: "LEAF-XYZ999",
+      addInfo: "LEAFXYZ999",
       template: "qr_only",
     });
 
@@ -35,12 +35,12 @@ describe("buildVietQrImageUrl()", () => {
       accountNo: "999",
       accountName: "Trần Thị B",
       amount: 1000,
-      addInfo: "Thanh toán đơn LEAF-QWE123",
+      addInfo: "Thanh toán đơn LEAFQWE123",
     });
 
     const parsed = new URL(url);
     expect(parsed.searchParams.get("addInfo")).toBe(
-      "Thanh toán đơn LEAF-QWE123",
+      "Thanh toán đơn LEAFQWE123",
     );
     expect(parsed.searchParams.get("accountName")).toBe("Trần Thị B");
   });

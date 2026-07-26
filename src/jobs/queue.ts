@@ -12,6 +12,8 @@ export const QUEUE_SEND_ORDER_CONFIRMATION = "send-order-confirmation";
 export const QUEUE_SEND_PAYMENT_CONFIRMED = "send-payment-confirmed";
 export const QUEUE_EXPIRE_UNPAID = "expire-unpaid";
 
+const ORDER_CODE_PATTERN = /^LEAF[A-Z0-9]{6}$/;
+
 /**
  * Payload job gửi email xác nhận đơn hàng. CHỈ chứa `orderCode` — KHÔNG được
  * chứa PII (email/SĐT/địa chỉ khách) vì payload này lưu thẳng trong bảng
@@ -19,14 +21,14 @@ export const QUEUE_EXPIRE_UNPAID = "expire-unpaid";
  * cần thiết khi gửi mail.
  */
 export const orderConfirmationJobSchema = z.object({
-  orderCode: z.string().min(1),
+  orderCode: z.string().regex(ORDER_CODE_PATTERN),
 });
 
 export type OrderConfirmationJob = z.infer<typeof orderConfirmationJobSchema>;
 
 /** Payload xác nhận thanh toán chỉ mang khoá tra cứu, tuyệt đối không có PII. */
 export const paymentConfirmedJobSchema = z.object({
-  orderCode: z.string().min(1),
+  orderCode: z.string().regex(ORDER_CODE_PATTERN),
 });
 
 export type PaymentConfirmedJob = z.infer<typeof paymentConfirmedJobSchema>;

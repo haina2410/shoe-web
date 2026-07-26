@@ -132,7 +132,19 @@ export async function updateVariantStockAction(
     return { ok: false, error: parsed.error.message };
   }
 
-  await updateVariantStockCore(prisma, parsed.data.variantId, parsed.data.stock);
+  try {
+    await updateVariantStockCore(
+      prisma,
+      parsed.data.variantId,
+      parsed.data.stock,
+      parsed.data.expectedStock,
+    );
+  } catch (error: unknown) {
+    if (error instanceof ProductBusinessError) {
+      return { ok: false, error: error.message };
+    }
+    throw error;
+  }
 
   revalidatePath("/admin/products");
   redirect("/admin/products");

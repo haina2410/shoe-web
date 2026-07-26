@@ -4,7 +4,7 @@ import { randomInt } from "node:crypto";
 const CODE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
 /**
- * Sinh mã đơn hàng dạng `LEAF-XXXXXX` với 6 ký tự ngẫu nhiên từ `[A-Z0-9]`.
+ * Sinh mã đơn hàng dạng `LEAFXXXXXX` với 6 ký tự ngẫu nhiên từ `[A-Z0-9]`.
  * Dùng `crypto.randomInt` (CSPRNG) thay vì `Math.random` để tránh trùng lặp
  * dự đoán được.
  */
@@ -13,5 +13,5 @@ export function generateOrderCode(): string {
   for (let i = 0; i < 6; i += 1) {
     suffix += CODE_CHARS[randomInt(CODE_CHARS.length)];
   }
-  return `LEAF-${suffix}`;
+  return `LEAF${suffix}`;
 }

@@ -69,13 +69,15 @@ npm run worker
 
 - `POST /api/webhooks/sepay` yêu cầu `X-SePay-Timestamp` (Unix seconds) và `X-SePay-Signature: sha256=<hex>`.
 - Chữ ký là HMAC-SHA256 với `SEPAY_WEBHOOK_SECRET` trên đúng chuỗi `<timestamp>.<raw request body>`; không parse rồi stringify lại body trước khi verify. Timestamp chỉ hợp lệ trong cửa sổ 5 phút.
-- Event dùng `payload.id` chính thức của SePay làm ID giao dịch duy nhất. Event hợp lệ luôn được lưu trước khi đối soát; giao dịch thiếu/sai mã đơn, lệch tiền, đơn không còn pending hoặc thiếu tồn kho được giữ ở `BankTransaction.REVIEW_REQUIRED` cho màn hình xử lý Ngày 8.
+- Cấu hình payment code phía SePay: prefix `LEAF`, suffix đúng 6 ký tự alphanumeric. Mã đơn/payment canonical là `LEAFXXXXXX` (`^LEAF[A-Z0-9]{6}$`).
+- Event dùng `payload.id` chính thức của SePay làm ID giao dịch duy nhất. Event hợp lệ cùng original JSON được lưu trước khi khởi tạo queue; retry chỉ dùng canonical code/amount đã persist. Queue warm-up lỗi vẫn giữ event `RECEIVED`; giao dịch thiếu/sai mã đơn, lệch tiền, đơn không còn pending hoặc thiếu tồn kho được giữ ở `BankTransaction.REVIEW_REQUIRED` cho màn hình xử lý Ngày 8.
 - Kết quả đã khớp, webhook lặp và giao dịch cần review đều được acknowledge HTTP 200 với body chính xác `{"success":true}`. Lỗi chữ ký/validation/hạ tầng không giả thành success.
 
 ## Email
 
 Email xác nhận đơn hàng render bằng React Email, gửi qua Resend từ worker.
 
+- Email xác nhận thanh toán dùng provider idempotency key ổn định `payment-confirmed:<orderCode>` để retry không gửi trùng.
 - `MAIL_FROM` phải thuộc **domain đã verify** trong Resend. Không gửi được từ địa chỉ `@gmail.com` (Resend đòi quyền DNS trên domain gửi). Domain dự kiến của shop là **`leafshoesvietnam.com`** — khi verify xong thì đặt `MAIL_FROM="no-reply@leafshoesvietnam.com"`.
 - Chưa verify domain? Dùng sandbox `onboarding@resend.dev` — nhưng Resend **chỉ giao tới email chủ tài khoản**, nên đặt `MAIL_TO_OVERRIDE` để mọi email ở dev đổ về một hộp thư. Gửi từ một domain chưa verify bị Resend trả `422 domain is not verified` và job sẽ fail.
 - `MAIL_REPLY_TO` = hộp thư của shop: dùng làm `replyTo` cho mọi email và in ở chân email làm địa chỉ liên hệ, để khách bấm Reply là thư về đúng hộp đó.

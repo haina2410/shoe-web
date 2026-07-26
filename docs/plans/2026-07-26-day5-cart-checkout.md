@@ -36,7 +36,7 @@ Tỉnh (28): Lai Châu, Điện Biên, Sơn La, Lào Cai, Tuyên Quang, Thái Ng
 - **Tiền = số nguyên VND (`Int`)** ở mọi nơi (subtotal/shippingFee/total/unitPrice). Không float.
 - **Guest checkout — KHÔNG auth**, NHƯNG action là POST không tin cậy: `safeParse` input + **đọc lại giá & tồn kho từ DB** (client chỉ gửi `variantId` + `quantity` + địa chỉ; KHÔNG BAO GIỜ tin `unitPrice`/tên do client gửi).
 - **Ranh giới scope Ngày 5 (theo doc 04):** chỉ **KIỂM TRA** tồn kho (`stock >= quantity`) + tạo `Order` `PENDING_PAYMENT`. **KHÔNG trừ kho**, **KHÔNG enqueue job/email**, **KHÔNG webhook** — đó là Ngày 6.
-- **`orderCode`** là nội dung đối soát = `addInfo` của VietQR. Sinh duy nhất (`LEAF-XXXXXX`), unique DB (retry khi trùng trong transaction).
+- **`orderCode`** là nội dung đối soát = `addInfo` của VietQR. Sinh duy nhất (`LEAFXXXXXX`), unique DB (retry khi trùng trong transaction).
 - **Bí mật:** `VIETQR_*` thật chỉ ở `.env` (gitignored); `.env.example` chỉ placeholder. KHÔNG log PII khách (email/phone/địa chỉ).
 - **Giá trị dropdown tỉnh = đúng chuỗi `ProvinceZone.province`** (cùng nguồn `PROVINCES`) để `getShippingFee` khớp.
 - **UI tiếng Việt có dấu.**
@@ -59,7 +59,7 @@ Base cho T1 = commit tạo plan này.
 
 **File tạo:**
 - `src/lib/provinces.ts` — `export const PROVINCES = [...34...] as const;` (đúng danh sách trên, đúng chính tả). Optional `isKnownProvince(p): boolean`.
-- `src/lib/order-code.ts` — `generateOrderCode(): string` → `LEAF-` + 6 ký tự `[A-Z0-9]` (dùng `crypto`, tránh ký tự dễ nhầm nếu muốn nhưng không bắt buộc). Thuần (không DB).
+- `src/lib/order-code.ts` — `generateOrderCode(): string` → `LEAF` + 6 ký tự `[A-Z0-9]` (dùng `crypto`, tránh ký tự dễ nhầm nếu muốn nhưng không bắt buộc). Thuần (không DB).
 - `src/lib/vietqr.ts` —
   - `buildVietQrImageUrl(p: { bankCode; accountNo; accountName; amount: number; addInfo: string; template?: string }): string` — thuần, `encodeURIComponent` cho `addInfo`/`accountName`, `template` mặc định `"compact2"`, `amount` là số nguyên.
   - `vietQrConfigFromEnv(): { bankCode; accountNo; accountName; template? }` — đọc `VIETQR_BANK_CODE`/`VIETQR_ACCOUNT_NO`/`VIETQR_ACCOUNT_NAME`/`VIETQR_TEMPLATE?` (server-only usage). Thiếu env bắt buộc → throw thông báo rõ.
@@ -69,7 +69,7 @@ Base cho T1 = commit tạo plan này.
   - `createOrderInputSchema = z.object({ customerName: trim.min(1), email: trim.email(), phone: trim.min(1), province: z.enum(PROVINCES), ward: trim.min(1), addressLine: trim.min(1), note: trim.optional(), items: array(checkoutItemSchema).min(1) })`.
   - export types.
 
-**Test (vitest unit):** `provinces.test.ts` (đúng 34 phần tử, không trùng, chứa 3 tỉnh mapped); `order-code.test.ts` (khớp `^LEAF-[A-Z0-9]{6}$`, nhiều lần gọi khác nhau); `vietqr.test.ts` (cấu trúc URL, encode dấu cách/tiếng Việt, `amount` đúng, `addInfo`=orderCode, template mặc định + override); `cart-math.test.ts`; `validation/checkout.test.ts` (province ngoài danh sách bị loại, email sai loại, items rỗng loại, quantity<1 loại).
+**Test (vitest unit):** `provinces.test.ts` (đúng 34 phần tử, không trùng, chứa 3 tỉnh mapped); `order-code.test.ts` (khớp `^LEAF[A-Z0-9]{6}$`, nhiều lần gọi khác nhau); `vietqr.test.ts` (cấu trúc URL, encode dấu cách/tiếng Việt, `amount` đúng, `addInfo`=orderCode, template mặc định + override); `cart-math.test.ts`; `validation/checkout.test.ts` (province ngoài danh sách bị loại, email sai loại, items rỗng loại, quantity<1 loại).
 
 **Model:** rẻ nhất (chủ yếu transcription).
 

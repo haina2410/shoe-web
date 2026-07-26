@@ -75,7 +75,7 @@ describe("CheckoutPage", () => {
   });
 
   it("submit form hợp lệ → gọi createOrderAction với items map đúng (chỉ variantId+quantity)", async () => {
-    createOrderActionMock.mockResolvedValue({ ok: true, orderCode: "LEAF-ABC123" });
+    createOrderActionMock.mockResolvedValue({ ok: true, orderCode: "LEAFABC123" });
     const user = userEvent.setup();
     render(<CheckoutPage />);
 
@@ -102,7 +102,7 @@ describe("CheckoutPage", () => {
   });
 
   it("submit thành công → clear() giỏ hàng rồi điều hướng tới /orders/<orderCode>", async () => {
-    createOrderActionMock.mockResolvedValue({ ok: true, orderCode: "LEAF-ABC123" });
+    createOrderActionMock.mockResolvedValue({ ok: true, orderCode: "LEAFABC123" });
     const user = userEvent.setup();
     render(<CheckoutPage />);
 
@@ -114,7 +114,7 @@ describe("CheckoutPage", () => {
     await user.click(screen.getByRole("button", { name: /đặt hàng/i }));
 
     await waitFor(() => expect(clearMock).toHaveBeenCalledTimes(1));
-    expect(pushMock).toHaveBeenCalledWith("/orders/LEAF-ABC123");
+    expect(pushMock).toHaveBeenCalledWith("/orders/LEAFABC123");
   });
 
   it("submit thất bại (res.ok=false) → hiện lỗi tiếng Việt, KHÔNG clear() và KHÔNG điều hướng", async () => {

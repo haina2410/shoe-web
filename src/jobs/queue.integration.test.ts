@@ -55,23 +55,23 @@ async function findJobsByOrderCode(boss: PgBoss, orderCode: string) {
 describe("enqueueOrderConfirmation", () => {
   it("transaction commit → job tồn tại trong queue với payload { orderCode } đúng", async () => {
     await testPrisma.$transaction(async (tx) => {
-      await enqueueOrderConfirmation(tx, { orderCode: "LEAF-COMMIT1" }, boss);
+      await enqueueOrderConfirmation(tx, { orderCode: "LEAFCMIT01" }, boss);
     });
 
-    const jobs = await findJobsByOrderCode(boss, "LEAF-COMMIT1");
+    const jobs = await findJobsByOrderCode(boss, "LEAFCMIT01");
     expect(jobs).toHaveLength(1);
-    expect(jobs[0].data).toEqual({ orderCode: "LEAF-COMMIT1" });
+    expect(jobs[0].data).toEqual({ orderCode: "LEAFCMIT01" });
   });
 
   it("transaction rollback (throw ở cuối) → KHÔNG có job nào được tạo (bằng chứng nguyên tử fromPrisma(tx))", async () => {
     await expect(
       testPrisma.$transaction(async (tx) => {
-        await enqueueOrderConfirmation(tx, { orderCode: "LEAF-ROLLBACK1" }, boss);
+        await enqueueOrderConfirmation(tx, { orderCode: "LEAFROLL01" }, boss);
         throw new Error("Buộc rollback để kiểm tra tính nguyên tử");
       }),
     ).rejects.toThrow("Buộc rollback để kiểm tra tính nguyên tử");
 
-    const jobs = await findJobsByOrderCode(boss, "LEAF-ROLLBACK1");
+    const jobs = await findJobsByOrderCode(boss, "LEAFROLL01");
     expect(jobs).toHaveLength(0);
   });
 
@@ -94,7 +94,7 @@ describe("enqueuePaymentConfirmed", () => {
       await enqueuePaymentConfirmed(
         tx,
         {
-          orderCode: "LEAF-PAIDCOMMIT",
+          orderCode: "LEAFPCMIT1",
           // @ts-expect-error PII phải bị schema loại trước khi ghi job
           email: "must-not-persist@example.com",
         },
@@ -104,23 +104,23 @@ describe("enqueuePaymentConfirmed", () => {
 
     const jobs = await boss.findJobs<{ orderCode: string }>(
       QUEUE_SEND_PAYMENT_CONFIRMED,
-      { data: { orderCode: "LEAF-PAIDCOMMIT" } },
+      { data: { orderCode: "LEAFPCMIT1" } },
     );
     expect(jobs).toHaveLength(1);
-    expect(jobs[0].data).toEqual({ orderCode: "LEAF-PAIDCOMMIT" });
+    expect(jobs[0].data).toEqual({ orderCode: "LEAFPCMIT1" });
   });
 
   it("transaction rollback → không tạo job xác nhận thanh toán", async () => {
     await expect(
       testPrisma.$transaction(async (tx) => {
-        await enqueuePaymentConfirmed(tx, { orderCode: "LEAF-PAIDROLLBACK" }, boss);
+        await enqueuePaymentConfirmed(tx, { orderCode: "LEAFPROLL1" }, boss);
         throw new Error("Buộc rollback payment job");
       }),
     ).rejects.toThrow("Buộc rollback payment job");
 
     const jobs = await boss.findJobs<{ orderCode: string }>(
       QUEUE_SEND_PAYMENT_CONFIRMED,
-      { data: { orderCode: "LEAF-PAIDROLLBACK" } },
+      { data: { orderCode: "LEAFPROLL1" } },
     );
     expect(jobs).toHaveLength(0);
   });

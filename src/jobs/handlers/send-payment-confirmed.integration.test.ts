@@ -78,6 +78,10 @@ describe("handleSendPaymentConfirmed", () => {
     );
     expect(mailer.messages[0].text).toContain("630.000");
     expect(mailer.messages[0].text).toContain("Giày Chạy Bộ Alpha");
+    expect(mailer.messages[0].idempotencyKey).toBe(
+      `payment-confirmed:${order.orderCode}`,
+    );
+    expect(mailer.messages[0].idempotencyKey).not.toContain(order.email);
   });
 
   it("orderCode không tồn tại → throw và không gửi email", async () => {
@@ -86,7 +90,7 @@ describe("handleSendPaymentConfirmed", () => {
     await expect(
       handleSendPaymentConfirmed(
         { db: testPrisma, mailer },
-        { orderCode: "LEAF-KHONGCO" },
+        { orderCode: "LEAFKHNGCO" },
       ),
     ).rejects.toThrow();
 

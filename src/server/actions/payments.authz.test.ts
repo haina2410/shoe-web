@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   getBossMock,
@@ -56,8 +56,12 @@ describe("confirmPaymentManuallyAction", () => {
     getBossMock.mockResolvedValue(undefined);
     markOrderPaidManuallyCoreMock.mockResolvedValue({
       kind: "paid",
-      orderCode: "LEAF-ABC123",
+      orderCode: "LEAFABC123",
     });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("để requireAdmin từ chối phiên ẩn danh trước mọi side effect", async () => {
@@ -131,7 +135,7 @@ describe("confirmPaymentManuallyAction", () => {
     );
     expect(revalidatePathMock).toHaveBeenNthCalledWith(
       2,
-      "/orders/LEAF-ABC123",
+      "/orders/LEAFABC123",
     );
   });
 
@@ -185,6 +189,43 @@ describe("confirmPaymentManuallyAction", () => {
       });
 
       expect(revalidatePathMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["queue", "database"])(
+    "logs only a stable operation/category for %s failures and excludes every sensitive sentinel",
+    async (source) => {
+      requireAdminMock.mockResolvedValue(sessionWithRole("owner"));
+      const sentinels = [
+        "secret-token-8f31",
+        "private-customer@example.com",
+        "0909123456",
+        "001122334455",
+      ];
+      const infrastructureError = new Error(sentinels.join(" | "));
+      if (source === "queue") {
+        getBossMock.mockRejectedValue(infrastructureError);
+      } else {
+        markOrderPaidManuallyCoreMock.mockRejectedValue(infrastructureError);
+      }
+      const consoleErrorSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => undefined);
+
+      await confirmPaymentManuallyAction(VALID_ORDER_ID);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "[payments] operation=confirm-manual-payment category=infrastructure",
+      );
+      for (const call of consoleErrorSpy.mock.calls) {
+        for (const argument of call) {
+          const logged =
+            typeof argument === "string" ? argument : JSON.stringify(argument);
+          for (const sentinel of sentinels) {
+            expect(logged).not.toContain(sentinel);
+          }
+        }
+      }
     },
   );
 });

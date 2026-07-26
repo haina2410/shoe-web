@@ -44,8 +44,8 @@ describe("expire-unpaid queue schedule", () => {
 describe("orderConfirmationJobSchema", () => {
   it("chấp nhận payload chỉ có orderCode (KHÔNG có PII)", () => {
     expect(
-      orderConfirmationJobSchema.parse({ orderCode: "LEAF-ABC123" }),
-    ).toEqual({ orderCode: "LEAF-ABC123" });
+      orderConfirmationJobSchema.parse({ orderCode: "LEAFABC123" }),
+    ).toEqual({ orderCode: "LEAFABC123" });
   });
 
   it("loại payload thiếu orderCode", () => {
@@ -58,14 +58,21 @@ describe("orderConfirmationJobSchema", () => {
     ).toThrow();
   });
 
+  it.each(["LEAFABC12", "LEAFABC1234", "OTHERABC123", "leafabc123"])(
+    "loại orderCode không đúng định dạng canonical LEAF + 6 ký tự: %s",
+    (orderCode) => {
+      expect(() => orderConfirmationJobSchema.parse({ orderCode })).toThrow();
+    },
+  );
+
   it("loại field lạ chứa PII (email, phone) khỏi payload — kết quả CHỈ còn đúng orderCode", () => {
     const parsed = orderConfirmationJobSchema.parse({
-      orderCode: "LEAF-XXXXXX",
+      orderCode: "LEAFXXXXXX",
       email: "khach@example.com",
       phone: "0900000000",
     });
 
-    expect(parsed).toEqual({ orderCode: "LEAF-XXXXXX" });
+    expect(parsed).toEqual({ orderCode: "LEAFXXXXXX" });
     expect(Object.keys(parsed)).toEqual(["orderCode"]);
   });
 
@@ -78,15 +85,22 @@ describe("paymentConfirmedJobSchema", () => {
   it("chỉ giữ orderCode, không lưu PII vào payload job", () => {
     expect(
       paymentConfirmedJobSchema.parse({
-        orderCode: "LEAF-ABC123",
+        orderCode: "LEAFABC123",
         email: "must-not-persist@example.com",
       }),
-    ).toEqual({ orderCode: "LEAF-ABC123" });
+    ).toEqual({ orderCode: "LEAFABC123" });
   });
 
   it("loại orderCode rỗng", () => {
     expect(() => paymentConfirmedJobSchema.parse({ orderCode: "" })).toThrow();
   });
+
+  it.each(["LEAFABC12", "LEAFABC1234", "OTHERABC123", "leafabc123"])(
+    "loại orderCode không đúng định dạng canonical LEAF + 6 ký tự: %s",
+    (orderCode) => {
+      expect(() => paymentConfirmedJobSchema.parse({ orderCode })).toThrow();
+    },
+  );
 
   it("dùng đúng tên queue thanh toán", () => {
     expect(QUEUE_SEND_PAYMENT_CONFIRMED).toBe("send-payment-confirmed");
@@ -264,8 +278,8 @@ describe("enqueueOrderConfirmation — boss.send() trả về null (F2)", () => 
     const fakeTx = { $queryRawUnsafe: vi.fn() };
 
     await expect(
-      enqueueOrderConfirmation(fakeTx, { orderCode: "LEAF-NULLJOB" }, fakeBoss),
-    ).rejects.toThrow(/LEAF-NULLJOB/);
+      enqueueOrderConfirmation(fakeTx, { orderCode: "LEAFNULJOB" }, fakeBoss),
+    ).rejects.toThrow(/LEAFNULJOB/);
 
     expect(fakeBoss.send).toHaveBeenCalledTimes(1);
   });
@@ -277,7 +291,7 @@ describe("enqueueOrderConfirmation — boss.send() trả về null (F2)", () => 
     const fakeTx = { $queryRawUnsafe: vi.fn() };
 
     await expect(
-      enqueueOrderConfirmation(fakeTx, { orderCode: "LEAF-OKJOB" }, fakeBoss),
+      enqueueOrderConfirmation(fakeTx, { orderCode: "LEAFOKJOB1" }, fakeBoss),
     ).resolves.toBeUndefined();
   });
 });
@@ -293,7 +307,7 @@ describe("enqueuePaymentConfirmed", () => {
       enqueuePaymentConfirmed(
         fakeTx,
         {
-          orderCode: "LEAF-PAID01",
+          orderCode: "LEAFPAID01",
           // @ts-expect-error cố tình truyền PII để chứng minh schema loại bỏ
           email: "must-not-persist@example.com",
         },
@@ -304,7 +318,7 @@ describe("enqueuePaymentConfirmed", () => {
     expect(fakeBoss.send).toHaveBeenCalledTimes(1);
     expect(fakeBoss.send).toHaveBeenCalledWith(
       QUEUE_SEND_PAYMENT_CONFIRMED,
-      { orderCode: "LEAF-PAID01" },
+      { orderCode: "LEAFPAID01" },
       expect.objectContaining({ db: expect.anything() }),
     );
   });
@@ -316,7 +330,7 @@ describe("enqueuePaymentConfirmed", () => {
     const fakeTx = { $queryRawUnsafe: vi.fn() };
 
     await expect(
-      enqueuePaymentConfirmed(fakeTx, { orderCode: "LEAF-NULLPAID" }, fakeBoss),
+      enqueuePaymentConfirmed(fakeTx, { orderCode: "LEAFNULPAY" }, fakeBoss),
     ).rejects.toThrow("Ghi job xác nhận thanh toán thất bại.");
   });
 });

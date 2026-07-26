@@ -14,6 +14,7 @@ import {
 } from "@/lib/sepay";
 import { enqueuePaymentConfirmed } from "@/jobs/queue";
 import {
+  BankEventClaimError,
   markOrderPaidCore,
   PaymentBusinessError,
   type MarkOrderPaidDeps,
@@ -42,11 +43,13 @@ function isUniqueConstraintError(
   );
 }
 
-async function persistEvent(
+export async function persistSePayEventCore(
   db: PrismaClient,
   payload: SePayWebhookPayload,
+  rawPayload: Prisma.InputJsonValue = payload as Prisma.InputJsonObject,
 ): Promise<BankTransaction> {
   const providerTransactionId = String(payload.id);
+  const paymentCode = orderCodeFromSePay(payload);
 
   try {
     return await db.bankTransaction.create({
@@ -57,10 +60,11 @@ async function persistEvent(
         accountNumber: payload.accountNumber,
         transferType: payload.transferType,
         amount: payload.transferAmount,
+        paymentCode,
         content: payload.content,
         referenceCode: payload.referenceCode,
         occurredAt: occurredAtFromSePay(payload.transactionDate),
-        rawPayload: payload,
+        rawPayload,
       },
     });
   } catch (error: unknown) {
@@ -103,18 +107,20 @@ async function markReviewRequired(
   throw new Error("Không thể cập nhật trạng thái giao dịch ngân hàng.");
 }
 
-export async function reconcileSePayCore(
+export async function reconcilePersistedSePayEventCore(
   db: PrismaClient,
-  payload: SePayWebhookPayload,
+  eventId: string,
   deps: ReconcileSePayDeps = { enqueuePaymentConfirmed },
 ): Promise<ReconcileResult> {
-  const event = await persistEvent(db, payload);
+  const event = await db.bankTransaction.findUniqueOrThrow({
+    where: { id: eventId },
+  });
 
   if (event.status !== BankTransactionStatus.RECEIVED) {
     return { kind: "duplicate" };
   }
 
-  const orderCode = orderCodeFromSePay(payload);
+  const orderCode = event.paymentCode;
   if (!orderCode) {
     return markReviewRequired(db, event.id, "MISSING_ORDER_CODE");
   }
@@ -126,7 +132,7 @@ export async function reconcileSePayCore(
   if (!order) {
     return markReviewRequired(db, event.id, "ORDER_NOT_FOUND");
   }
-  if (order.total !== payload.transferAmount) {
+  if (order.total !== event.amount) {
     return markReviewRequired(db, event.id, "AMOUNT_MISMATCH");
   }
   if (order.status !== OrderStatus.PENDING_PAYMENT) {
@@ -139,8 +145,8 @@ export async function reconcileSePayCore(
       {
         orderId: order.id,
         provider: "sepay",
-        transactionId: String(payload.id),
-        amount: payload.transferAmount,
+        transactionId: event.providerTransactionId,
+        amount: event.amount,
         bankTransactionId: event.id,
       },
       deps,
@@ -150,7 +156,12 @@ export async function reconcileSePayCore(
       ? { kind: "matched" }
       : { kind: "duplicate" };
   } catch (error: unknown) {
-    if (!(error instanceof PaymentBusinessError)) throw error;
+    if (
+      !(error instanceof PaymentBusinessError) &&
+      !(error instanceof BankEventClaimError)
+    ) {
+      throw error;
+    }
 
     const current = await db.bankTransaction.findUniqueOrThrow({
       where: { id: event.id },
@@ -160,6 +171,20 @@ export async function reconcileSePayCore(
       return { kind: "duplicate" };
     }
 
+    if (error instanceof BankEventClaimError) {
+      throw error;
+    }
+
     return markReviewRequired(db, event.id, error.code);
   }
+}
+
+export async function reconcileSePayCore(
+  db: PrismaClient,
+  payload: SePayWebhookPayload,
+  deps: ReconcileSePayDeps = { enqueuePaymentConfirmed },
+  rawPayload: Prisma.InputJsonValue = payload as Prisma.InputJsonObject,
+): Promise<ReconcileResult> {
+  const event = await persistSePayEventCore(db, payload, rawPayload);
+  return reconcilePersistedSePayEventCore(db, event.id, deps);
 }

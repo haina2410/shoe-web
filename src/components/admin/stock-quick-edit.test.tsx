@@ -28,6 +28,7 @@ describe("StockQuickEdit", () => {
     expect(updateVariantStockActionMock).toHaveBeenCalledWith({
       variantId: "variant-1",
       stock: 12,
+      expectedStock: 5,
     });
   });
 });

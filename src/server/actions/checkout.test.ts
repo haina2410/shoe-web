@@ -59,11 +59,11 @@ describe("createOrderAction", () => {
   });
 
   it("input hợp lệ, core thành công → trả {ok:true, orderCode}", async () => {
-    createOrderCoreMock.mockResolvedValue({ orderCode: "LEAF-ABC123" });
+    createOrderCoreMock.mockResolvedValue({ orderCode: "LEAFABC123" });
 
     const result = await createOrderAction(validInput);
 
-    expect(result).toEqual({ ok: true, orderCode: "LEAF-ABC123" });
+    expect(result).toEqual({ ok: true, orderCode: "LEAFABC123" });
     expect(createOrderCoreMock).toHaveBeenCalledTimes(1);
   });
 
@@ -89,7 +89,7 @@ describe("createOrderAction", () => {
   // --- F3: làm nóng getBoss() TRƯỚC transaction tạo đơn ---
 
   it("input hợp lệ → getBoss() được gọi TRƯỚC createOrderCore (làm nóng hàng đợi ngoài transaction, F3)", async () => {
-    createOrderCoreMock.mockResolvedValue({ orderCode: "LEAF-ABC123" });
+    createOrderCoreMock.mockResolvedValue({ orderCode: "LEAFABC123" });
 
     await createOrderAction(validInput);
 

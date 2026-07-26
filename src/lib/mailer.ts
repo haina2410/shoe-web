@@ -6,6 +6,7 @@ export type MailMessage = {
   subject: string;
   html: string;
   text: string;
+  idempotencyKey?: string;
 };
 
 /** Abstraction gửi mail — cho phép Task 2/3 (worker pg-boss) dùng mà không biết
@@ -21,14 +22,17 @@ export interface Mailer {
  */
 interface ResendLikeClient {
   emails: {
-    send(payload: {
-      from: string;
-      to: string;
-      subject: string;
-      html: string;
-      text: string;
-      replyTo?: string;
-    }): Promise<{ data: unknown; error: { message: string; name: string } | null }>;
+    send(
+      payload: {
+        from: string;
+        to: string;
+        subject: string;
+        html: string;
+        text: string;
+        replyTo?: string;
+      },
+      options?: { idempotencyKey?: string },
+    ): Promise<{ data: unknown; error: { message: string; name: string } | null }>;
   };
 }
 
@@ -65,14 +69,19 @@ export function createResendMailer(
   return {
     async send(message: MailMessage): Promise<void> {
       const to = config.toOverride ?? message.to;
-      const { error } = await client.emails.send({
+      const payload = {
         from: config.from,
         to,
         subject: message.subject,
         html: message.html,
         text: message.text,
         ...(config.replyTo ? { replyTo: config.replyTo } : {}),
-      });
+      };
+      const { error } = message.idempotencyKey
+        ? await client.emails.send(payload, {
+            idempotencyKey: message.idempotencyKey,
+          })
+        : await client.emails.send(payload);
 
       if (error) {
         throw new Error(`Gửi email thất bại (${error.name}): ${scrubEmailAddresses(error.message)}`);

@@ -4,9 +4,25 @@
 
 **Goal:** Add authenticated SePay webhooks, durable reconciliation, atomic stock deduction, payment confirmation email, owner-only manual confirmation, unpaid-order expiry, and observable order payment status.
 
-**Architecture:** Persist each SePay event in `BankTransaction` before reconciliation, then use a shared transactional payment primitive to conditionally move an order from `PENDING_PAYMENT` to `PAID`, decrement stock, create `Payment`, update the event, and enqueue email atomically. Keep HTTP/Server Action layers thin; pg-boss continues to run in a separate worker.
+**Architecture:** Persist each validated SePay event in `BankTransaction`
+before queue initialization, then reconcile only from those persisted columns.
+Use a shared transactional payment primitive to conditionally claim the bank
+event, move an order from `PENDING_PAYMENT` to `PAID`, decrement stock, create
+`Payment`, update the event, and enqueue email atomically. Keep HTTP/Server
+Action layers thin; pg-boss continues to run in a separate worker.
 
 **Tech Stack:** Next.js 16.2.11 App Router, TypeScript 5, Prisma 7.9/PostgreSQL, Zod 4, pg-boss 12.26, React Email, Resend, Vitest 4, Playwright 1.61.
+
+## Approved final provider-contract correction
+
+The user approved one canonical payment/order-code format for the whole
+system: `LEAFXXXXXX`, matching `^LEAF[A-Z0-9]{6}$`. There is no separator in
+generated codes, URLs, VietQR content, emails, admin UI, webhook matching,
+fixtures, seed/demo data, or current documentation.
+
+The final migration converts historical values to the contiguous form without
+changing `Order.id`, preserving uniqueness and relations. SePay payment-code
+configuration must use prefix `LEAF` and a six-character alphanumeric suffix.
 
 ## Global Constraints
 
@@ -14,6 +30,9 @@
 - Follow strict RED → verify failure → GREEN → verify pass → REFACTOR for every behavior change.
 - Never log raw SePay payloads, signatures, email, phone, address, bank account number, or job payload PII.
 - Use `String(payload.id)` as SePay idempotency key; never invent a `transactionId` field in the provider payload.
+- Persist the validated provider code and original parsed JSON object before
+  queue warm-up; a retry must never replace canonical code/amount with a later
+  request body.
 - Verify HMAC against the exact raw body before JSON parsing; accept timestamp drift no greater than 300 seconds.
 - A successful SePay acknowledgement is HTTP 200 with exact JSON `{"success":true}`; duplicate and business mismatch are successes only after durable persistence.
 - Only `owner` may manually confirm payment. `staff` remains able to update ordinary order state later, but cannot perform this money-sensitive action.
@@ -51,7 +70,7 @@ it("stores an unmatched SePay event without an order and enforces provider id un
     accountNumber: "0000000000",
     transferType: "in",
     amount: 350_000,
-    content: "LEAF-ABC123",
+    content: "LEAFABC123",
     referenceCode: "FT24123",
     occurredAt: new Date("2026-07-25T03:00:00.000Z"),
     rawPayload: { id: 987654 },
@@ -95,6 +114,7 @@ model BankTransaction {
   accountNumber         String
   transferType          String
   amount                Int
+  paymentCode           String?
   content               String
   referenceCode         String?
   occurredAt            DateTime
@@ -158,7 +178,7 @@ Use a complete official-shape literal payload. Include tests that catch:
 
 ```ts
 expect(sePayWebhookPayloadSchema.parse(validPayload).id).toBe(123456);
-expect(orderCodeFromSePay({ ...validPayload, code: " leaf-abc123 " })).toBe("LEAF-ABC123");
+expect(orderCodeFromSePay({ ...validPayload, code: " leaf-abc123 " })).toBe("LEAFABC123");
 expect(orderCodeFromSePay({ ...validPayload, code: null })).toBeNull();
 expect(() => sePayWebhookPayloadSchema.parse({ ...validPayload, transferAmount: 0 })).toThrow();
 ```
@@ -190,8 +210,10 @@ The Zod schema must include `id`, `gateway`, `transactionDate`,
 `accountNumber`, `subAccount`, `code`, `content`, `transferType`,
 `description`, `transferAmount`, `accumulated`, and `referenceCode`.
 `transferType` must be `"in"` and `transferAmount` a positive integer.
-Parse `transactionDate` as Vietnam local time (`+07:00`) when mapping it to
-`occurredAt`.
+Accept empty `description` and `referenceCode`. Validate `transactionDate` as
+exactly `YYYY-MM-DD HH:mm:ss`, reject impossible calendar dates by component
+round-trip, and parse it as Vietnam local time (`+07:00`) when mapping it to
+`occurredAt`. `orderCodeFromSePay` returns only canonical contiguous codes.
 
 - [ ] **Step 4: Add the documented secret**
 
@@ -248,9 +270,9 @@ Assert that:
 
 ```ts
 expect(paymentConfirmedJobSchema.parse({
-  orderCode: "LEAF-ABC123",
+  orderCode: "LEAFABC123",
   email: "must-not-persist@example.com",
-})).toEqual({ orderCode: "LEAF-ABC123" });
+})).toEqual({ orderCode: "LEAFABC123" });
 ```
 
 The rendered email must contain the literal order code, formatted total and
@@ -279,7 +301,9 @@ if (!jobId) throw new Error("Ghi job xác nhận thanh toán thất bại.");
 ```
 
 The handler loads the order and items by `orderCode`; the job itself contains
-no email/address/phone. The worker registration must iterate all jobs and
+no email/address/phone. Payment-confirmation sends use Resend request option
+`{ idempotencyKey: "payment-confirmed:<orderCode>" }`; order-confirmation
+behavior is unchanged. The worker registration must iterate all jobs and
 rethrow handler errors after a non-PII log.
 
 - [ ] **Step 4: Verify GREEN**
@@ -361,7 +385,7 @@ const claimed = await tx.order.updateMany({
 });
 if (claimed.count !== 1) throw new PaymentBusinessError("ORDER_NOT_PENDING");
 
-for (const item of order.items) {
+for (const item of aggregateByVariantIdAndSortAscending(order.items)) {
   const decremented = await tx.variant.updateMany({
     where: { id: item.variantId, stock: { gte: item.quantity } },
     data: { stock: { decrement: item.quantity } },
@@ -372,10 +396,14 @@ for (const item of order.items) {
 }
 ```
 
-Enforce exact integer amount against `order.total` before claiming. Create
-`Payment`, mark `BankTransaction` matched when provided, then enqueue. Do not
-catch infrastructure errors. `markOrderPaidManuallyCore` loads the immutable
-order total from DB and calls the same transactional path with
+Enforce exact integer amount against `order.total` before claiming. When a
+bank event is present, first conditionally claim it by exact event ID,
+`providerTransactionId === transactionId`, and `status === RECEIVED`; require
+one row. Aggregate quantity by `variantId` and process IDs in ascending order
+to keep row-lock acquisition consistent. Create `Payment`, mark the claimed
+`BankTransaction` matched, then enqueue. Do not catch infrastructure errors.
+`markOrderPaidManuallyCore` loads the immutable order total from DB and calls
+the same transactional path with
 `provider="manual"` and `transactionId="manual:<orderId>"`.
 
 If a concurrent attempt loses the conditional order claim, re-query by the
@@ -392,6 +420,10 @@ Add:
   one paid order and stock `0`, never `-1`;
 - two different transaction IDs for one order result in one paid order;
 - insufficient stock and amount mismatch make no partial changes.
+- a concurrent terminal bank-event transition wins cleanly, rolls back every
+  payment side effect, and is classified from the persisted winner state;
+- deterministic row-lock/barrier tests prove both payment-versus-expiry
+  winners and exact job counts.
 
 Run the file until all cases pass.
 
@@ -422,6 +454,8 @@ type ReconcileResult =
   | { kind: "duplicate" }
   | { kind: "review-required"; reason: ReviewReason };
 
+persistSePayEventCore(db, payload, rawPayload): Promise<BankTransaction>
+reconcilePersistedSePayEventCore(db, eventId, deps?): Promise<ReconcileResult>
 reconcileSePayCore(db, payload, deps?): Promise<ReconcileResult>
 ```
 
@@ -432,8 +466,11 @@ longer pending, and insufficient stock. Each accepted inbound
 event must exist in `bank_transaction`; mismatch must not create `Payment`,
 change order, decrement stock or enqueue.
 
-For duplicate `RECEIVED`, call reconciliation again and prove it resumes.
-For duplicate terminal events, prove it returns without side effects.
+For duplicate `RECEIVED`, call reconciliation again with changed request
+code/amount and prove it resumes from the original persisted event. For
+duplicate terminal events, prove it returns without side effects. Add
+simultaneous duplicate coverage and prove unknown provider fields survive in
+stored `rawPayload`.
 
 - [ ] **Step 2: Run and verify RED**
 
@@ -443,8 +480,10 @@ Expected: FAIL because reconciler is absent.
 
 - [ ] **Step 3: Implement persist-then-reconcile**
 
-Insert the event first. Catch only Prisma unique conflict `P2002`, then load
-the existing event. Map event data without logging raw payload.
+Insert the event first with canonical `paymentCode`, canonical amount/IDs, and
+the original parsed JSON object (not Zod's stripped object). Catch only Prisma
+unique conflict `P2002`, then load the existing event. Reconcile `RECEIVED`
+rows only from persisted columns and never from a later request body.
 
 Use stable reason strings:
 
@@ -474,12 +513,18 @@ Mock only the external DB/queue boundary. Assert:
 - valid matched, duplicate and review results → exact HTTP 200 body;
 - infrastructure error → 500 generic body;
 - signature is calculated from the exact raw request bytes.
+- valid input persists before `getBoss()`; queue warm-up failure leaves exactly
+  one durable `RECEIVED` event;
+- terminal duplicates skip queue warm-up;
+- invalid HMAC/schema/account writes no event;
+- unknown raw JSON fields are passed to persistence unchanged.
 
 - [ ] **Step 5: Implement the thin route and verify GREEN**
 
 The route must export `runtime = "nodejs"`, call `request.text()` once, validate
 HMAC, parse JSON/Zod, compare trimmed `accountNumber` with
-`VIETQR_ACCOUNT_NO`, warm `getBoss()` before reconciliation, and return:
+`VIETQR_ACCOUNT_NO`, persist/load the event, acknowledge terminal duplicates,
+then warm `getBoss()` before persisted-event reconciliation, and return:
 
 ```ts
 return Response.json({ success: true }, { status: 200 });

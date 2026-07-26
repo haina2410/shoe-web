@@ -1,20 +1,54 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 
+const ORDER_CODE_PATTERN = /^LEAF[A-Z0-9]{6}$/;
+const TRANSACTION_DATE_PATTERN =
+  /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/;
+
+function isValidTransactionDate(value: string): boolean {
+  const match = TRANSACTION_DATE_PATTERN.exec(value);
+  if (!match) return false;
+
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText] =
+    match;
+  const [year, month, day, hour, minute, second] = [
+    yearText,
+    monthText,
+    dayText,
+    hourText,
+    minuteText,
+    secondText,
+  ].map(Number);
+  const candidate = new Date(0);
+  candidate.setUTCFullYear(year, month - 1, day);
+  candidate.setUTCHours(hour, minute, second, 0);
+
+  return (
+    candidate.getUTCFullYear() === year &&
+    candidate.getUTCMonth() === month - 1 &&
+    candidate.getUTCDate() === day &&
+    candidate.getUTCHours() === hour &&
+    candidate.getUTCMinutes() === minute &&
+    candidate.getUTCSeconds() === second
+  );
+}
+
 /** Payload SePay gửi tới endpoint webhook khi có giao dịch vào. */
 export const sePayWebhookPayloadSchema = z.object({
   id: z.number().int().positive(),
   gateway: z.string().min(1),
-  transactionDate: z.string().min(1),
+  transactionDate: z
+    .string()
+    .refine(isValidTransactionDate, "Invalid SePay transactionDate"),
   accountNumber: z.string().min(1),
   subAccount: z.string().nullable(),
   code: z.string().nullable(),
   content: z.string().min(1),
   transferType: z.literal("in"),
-  description: z.string().min(1),
+  description: z.string(),
   transferAmount: z.number().int().positive(),
   accumulated: z.number(),
-  referenceCode: z.string().min(1),
+  referenceCode: z.string(),
 });
 
 export type SePayWebhookPayload = z.infer<typeof sePayWebhookPayloadSchema>;
@@ -62,7 +96,7 @@ export function verifySePaySignature(input: {
 /** Trích mã đơn canonical từ trường `code` của SePay. */
 export function orderCodeFromSePay(payload: SePayWebhookPayload): string | null {
   const code = payload.code?.trim().toUpperCase();
-  return code || null;
+  return code && ORDER_CODE_PATTERN.test(code) ? code : null;
 }
 
 /** Chuyển timestamp không timezone của SePay thành thời điểm Vietnam (+07:00). */

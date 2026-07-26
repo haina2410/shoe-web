@@ -33,5 +33,11 @@ export async function handleSendPaymentConfirmed(
     orderUrl,
   });
 
-  await deps.mailer.send({ to: order.email, subject, html, text });
+  await deps.mailer.send({
+    to: order.email,
+    subject,
+    html,
+    text,
+    idempotencyKey: `payment-confirmed:${order.orderCode}`,
+  });
 }

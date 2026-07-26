@@ -18,7 +18,7 @@ import AdminPendingOrdersPage from "./page";
 
 const pendingOrder = {
   id: "order-1",
-  orderCode: "LEAF-ABC123",
+  orderCode: "LEAFABC123",
   createdAt: new Date("2026-07-25T08:00:00.000Z"),
   total: 425_000,
 };
@@ -41,7 +41,7 @@ describe("AdminPendingOrdersPage", () => {
 
     render(await AdminPendingOrdersPage());
 
-    expect(screen.getByText("LEAF-ABC123")).toBeInTheDocument();
+    expect(screen.getByText("LEAFABC123")).toBeInTheDocument();
     expect(screen.getByText("425.000 ₫")).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Xác nhận thanh toán" }),

@@ -26,7 +26,7 @@ describe("createResendMailer()", () => {
 
     await mailer.send({
       to: "khach@example.com",
-      subject: "Đơn hàng LEAF-AB12CD — leafshoes Việt Nam",
+      subject: "Đơn hàng LEAFAB12CD — leafshoes Việt Nam",
       html: "<p>Xin chào</p>",
       text: "Xin chào",
     });
@@ -34,10 +34,37 @@ describe("createResendMailer()", () => {
     expect(client.emails.send).toHaveBeenCalledWith({
       from: "no-reply@leafshoes.vn",
       to: "khach@example.com",
-      subject: "Đơn hàng LEAF-AB12CD — leafshoes Việt Nam",
+      subject: "Đơn hàng LEAFAB12CD — leafshoes Việt Nam",
       html: "<p>Xin chào</p>",
       text: "Xin chào",
     });
+  });
+
+  it("passes an optional idempotency key through the Resend request options", async () => {
+    const client = fakeClient({ data: { id: "email_123" } });
+    const mailer = createResendMailer(
+      { apiKey: "re_test_key", from: "no-reply@leafshoes.vn" },
+      { client },
+    );
+
+    await mailer.send({
+      to: "khach@example.com",
+      subject: "Thanh toán đã xác nhận",
+      html: "<p>Đã nhận thanh toán</p>",
+      text: "Đã nhận thanh toán",
+      idempotencyKey: "payment-confirmed:LEAFABC123",
+    });
+
+    expect(client.emails.send).toHaveBeenCalledWith(
+      {
+        from: "no-reply@leafshoes.vn",
+        to: "khach@example.com",
+        subject: "Thanh toán đã xác nhận",
+        html: "<p>Đã nhận thanh toán</p>",
+        text: "Đã nhận thanh toán",
+      },
+      { idempotencyKey: "payment-confirmed:LEAFABC123" },
+    );
   });
 
   it("truyền replyTo cho resend.emails.send khi có cấu hình", async () => {

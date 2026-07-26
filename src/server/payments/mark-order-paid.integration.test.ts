@@ -29,7 +29,7 @@ async function createPendingOrderFixture() {
   const [firstVariant, secondVariant] = product.variants;
   const order = await testPrisma.order.create({
     data: {
-      orderCode: `LEAF-${crypto.randomUUID().slice(0, 8)}`,
+      orderCode: `LEAF${crypto.randomUUID().replaceAll("-", "").slice(0, 6).toUpperCase()}`,
       email: "paid@example.com",
       customerName: "Nguyễn Thanh Toán",
       phone: "0900000000",
@@ -105,7 +105,7 @@ async function createSharedStockFixture() {
   async function createOrder(label: string) {
     return testPrisma.order.create({
       data: {
-        orderCode: `LEAF-${label}-${crypto.randomUUID().slice(0, 6)}`,
+        orderCode: `LEAF${label}${crypto.randomUUID().replaceAll("-", "").slice(0, 5).toUpperCase()}`,
         email: `${label.toLowerCase()}@example.com`,
         customerName: `Khách ${label}`,
         phone: "0900000000",
@@ -150,7 +150,7 @@ describe("markOrderPaidCore", () => {
       {
         orderId: fixture.order.id,
         provider: "sepay",
-        transactionId: "sepay:happy-path",
+        transactionId: fixture.bankTransaction.providerTransactionId,
         amount: fixture.order.total,
         bankTransactionId: fixture.bankTransaction.id,
       },
@@ -177,7 +177,7 @@ describe("markOrderPaidCore", () => {
     expect(payments[0]).toMatchObject({
       orderId: fixture.order.id,
       provider: "sepay",
-      transactionId: "sepay:happy-path",
+      transactionId: fixture.bankTransaction.providerTransactionId,
       amount: 830_000,
     });
     expect(bankTransaction).toMatchObject({
@@ -203,7 +203,7 @@ describe("markOrderPaidCore", () => {
         {
           orderId: fixture.order.id,
           provider: "sepay",
-          transactionId: "sepay:queue-rollback",
+          transactionId: fixture.bankTransaction.providerTransactionId,
           amount: fixture.order.total,
           bankTransactionId: fixture.bankTransaction.id,
         },
@@ -232,6 +232,64 @@ describe("markOrderPaidCore", () => {
       processedAt: null,
     });
     expect(enqueuePaymentConfirmed).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not overwrite a bank event that another terminal transition already won", async () => {
+    const fixture = await createPendingOrderFixture();
+    await testPrisma.bankTransaction.update({
+      where: { id: fixture.bankTransaction.id },
+      data: {
+        status: BankTransactionStatus.REVIEW_REQUIRED,
+        reviewReason: "ORDER_NOT_FOUND",
+      },
+    });
+    const enqueuePaymentConfirmed = vi.fn().mockResolvedValue(undefined);
+
+    await expect(
+      markOrderPaidCore(
+        testPrisma,
+        {
+          orderId: fixture.order.id,
+          provider: "sepay",
+          transactionId: fixture.bankTransaction.providerTransactionId,
+          amount: fixture.order.total,
+          bankTransactionId: fixture.bankTransaction.id,
+        },
+        { enqueuePaymentConfirmed },
+      ),
+    ).rejects.toMatchObject({
+      name: "BankEventClaimError",
+    });
+
+    const [order, firstVariant, secondVariant, paymentCount, bankTransaction] =
+      await Promise.all([
+        testPrisma.order.findUniqueOrThrow({ where: { id: fixture.order.id } }),
+        testPrisma.variant.findUniqueOrThrow({
+          where: { id: fixture.firstVariant.id },
+        }),
+        testPrisma.variant.findUniqueOrThrow({
+          where: { id: fixture.secondVariant.id },
+        }),
+        testPrisma.payment.count({ where: { orderId: fixture.order.id } }),
+        testPrisma.bankTransaction.findUniqueOrThrow({
+          where: { id: fixture.bankTransaction.id },
+        }),
+      ]);
+
+    expect(order).toMatchObject({
+      status: OrderStatus.PENDING_PAYMENT,
+      paidAt: null,
+    });
+    expect(firstVariant.stock).toBe(7);
+    expect(secondVariant.stock).toBe(9);
+    expect(paymentCount).toBe(0);
+    expect(bankTransaction).toMatchObject({
+      status: BankTransactionStatus.REVIEW_REQUIRED,
+      reviewReason: "ORDER_NOT_FOUND",
+      orderId: null,
+      processedAt: null,
+    });
+    expect(enqueuePaymentConfirmed).not.toHaveBeenCalled();
   });
 
   it("repeated manual confirmation returns duplicate with one decrement, payment and enqueue", async () => {
@@ -444,7 +502,7 @@ describe("markOrderPaidCore", () => {
         {
           orderId: fixture.order.id,
           provider: "sepay",
-          transactionId: "sepay:insufficient",
+          transactionId: fixture.bankTransaction.providerTransactionId,
           amount: fixture.order.total,
           bankTransactionId: fixture.bankTransaction.id,
         },

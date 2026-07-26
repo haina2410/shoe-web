@@ -6,6 +6,7 @@ import {
   deleteProductCore,
   updateVariantStockCore,
 } from "@/server/products";
+import { markOrderPaidCore } from "@/server/payments/mark-order-paid";
 import { normalizeText } from "@/lib/normalize";
 import type {
   CreateProductInput,
@@ -35,6 +36,54 @@ function baseCreateInput(
     ],
     images: [],
   };
+}
+
+async function payOneUnit(input: {
+  product: Awaited<ReturnType<typeof createProductCore>>;
+  variantId: string;
+}) {
+  const variant = input.product.variants.find(
+    (candidate) => candidate.id === input.variantId,
+  );
+  if (!variant) throw new Error("Test fixture variant not found");
+
+  const order = await testPrisma.order.create({
+    data: {
+      orderCode: `LEAF${crypto.randomUUID().replaceAll("-", "").slice(0, 6).toUpperCase()}`,
+      email: "buyer@example.com",
+      customerName: "Khách thử nghiệm",
+      phone: "0900000000",
+      province: "Hà Nội",
+      ward: "Phường Hoàn Kiếm",
+      addressLine: "1 Tràng Tiền",
+      subtotal: input.product.basePrice,
+      shippingFee: 0,
+      total: input.product.basePrice,
+      items: {
+        create: {
+          variantId: variant.id,
+          productName: input.product.name,
+          size: variant.size,
+          color: variant.color,
+          unitPrice: input.product.basePrice,
+          quantity: 1,
+        },
+      },
+    },
+  });
+
+  await markOrderPaidCore(
+    testPrisma,
+    {
+      orderId: order.id,
+      provider: "sepay",
+      transactionId: `payment:${order.id}`,
+      amount: order.total,
+    },
+    { enqueuePaymentConfirmed: async () => undefined },
+  );
+
+  return order;
 }
 
 describe("createProductCore", () => {
@@ -196,11 +245,41 @@ describe("updateVariantStockCore", () => {
     const product = await createProductCore(testPrisma, baseCreateInput({}, category.id));
     const variant = product.variants[0];
 
-    const updated = await updateVariantStockCore(testPrisma, variant.id, 99);
+    const updated = await updateVariantStockCore(
+      testPrisma,
+      variant.id,
+      99,
+      variant.stock,
+    );
 
     expect(updated.stock).toBe(99);
     const persisted = await testPrisma.variant.findUnique({ where: { id: variant.id } });
     expect(persisted?.stock).toBe(99);
+  });
+
+  it("từ chối quick edit stale sau khi thanh toán đã bán một đơn vị", async () => {
+    const category = await makeCategory();
+    const product = await createProductCore(
+      testPrisma,
+      baseCreateInput({}, category.id),
+    );
+    const variant = product.variants[0];
+    const observedStock = variant.stock;
+
+    await payOneUnit({ product, variantId: variant.id });
+
+    await expect(
+      updateVariantStockCore(testPrisma, variant.id, 99, observedStock),
+    ).rejects.toMatchObject({
+      name: "ProductBusinessError",
+      code: "STALE_STOCK",
+    });
+    await expect(
+      testPrisma.variant.findUniqueOrThrow({
+        where: { id: variant.id },
+        select: { stock: true },
+      }),
+    ).resolves.toEqual({ stock: observedStock - 1 });
   });
 });
 
@@ -226,6 +305,7 @@ describe("updateProductCore", () => {
         // giữ lại 1 biến thể cũ (có id), đổi stock
         {
           id: keepVariant.id,
+          expectedStock: keepVariant.stock,
           size: keepVariant.size,
           color: keepVariant.color,
           sku: keepVariant.sku,
@@ -271,7 +351,7 @@ describe("updateProductCore", () => {
     const [keepVariant, orderedVariant] = product.variants;
     await testPrisma.order.create({
       data: {
-        orderCode: "LEAF-FK0001",
+        orderCode: "LEAFFK0001",
         email: "buyer@example.com",
         customerName: "Khách thử nghiệm",
         phone: "0900000000",
@@ -305,6 +385,7 @@ describe("updateProductCore", () => {
       variants: [
         {
           id: keepVariant.id,
+          expectedStock: keepVariant.stock,
           size: keepVariant.size,
           color: keepVariant.color,
           sku: keepVariant.sku,
@@ -362,6 +443,7 @@ describe("updateProductCore", () => {
       },
       variants: product.variants.map((v) => ({
         id: v.id,
+        expectedStock: v.stock,
         size: v.size,
         color: v.color,
         sku: v.sku,
@@ -385,5 +467,85 @@ describe("updateProductCore", () => {
       "/api/uploads/products/new-1.jpg",
       "/api/uploads/products/new-2.jpg",
     ]);
+  });
+
+  it("rollback toàn bộ full-form stale sau khi thanh toán đã bán một đơn vị", async () => {
+    const category = await makeCategory();
+    const product = await createProductCore(
+      testPrisma,
+      baseCreateInput({}, category.id),
+    );
+    const [soldVariant, untouchedVariant] = product.variants;
+    const observedStock = soldVariant.stock;
+
+    await payOneUnit({ product, variantId: soldVariant.id });
+
+    const staleUpdate: UpdateProductInput = {
+      product: {
+        name: "Tên stale không được persist",
+        description: "Mô tả stale không được persist",
+        categoryId: category.id,
+        basePrice: 999_000,
+        status: "ARCHIVED",
+      },
+      variants: [
+        {
+          id: soldVariant.id,
+          expectedStock: observedStock,
+          size: soldVariant.size,
+          color: soldVariant.color,
+          sku: soldVariant.sku,
+          priceOverride: soldVariant.priceOverride,
+          stock: 77,
+        },
+        {
+          id: untouchedVariant.id,
+          expectedStock: untouchedVariant.stock,
+          size: untouchedVariant.size,
+          color: untouchedVariant.color,
+          sku: untouchedVariant.sku,
+          priceOverride: untouchedVariant.priceOverride,
+          stock: 66,
+        },
+        {
+          size: "44",
+          color: "Xanh",
+          sku: "STALE-NEW-VARIANT",
+          priceOverride: null,
+          stock: 5,
+        },
+      ],
+      images: [{ url: "/api/uploads/products/stale.jpg", position: 0 }],
+    };
+
+    await expect(
+      updateProductCore(testPrisma, product.id, staleUpdate),
+    ).rejects.toMatchObject({
+      name: "ProductBusinessError",
+      code: "STALE_STOCK",
+    });
+
+    const persisted = await testPrisma.product.findUniqueOrThrow({
+      where: { id: product.id },
+      include: { variants: true, images: true },
+    });
+    expect(persisted).toMatchObject({
+      name: product.name,
+      description: product.description,
+      basePrice: product.basePrice,
+      status: product.status,
+    });
+    expect(
+      persisted.variants.find((variant) => variant.id === soldVariant.id)
+        ?.stock,
+    ).toBe(observedStock - 1);
+    expect(
+      persisted.variants.find((variant) => variant.id === untouchedVariant.id)
+        ?.stock,
+    ).toBe(untouchedVariant.stock);
+    expect(
+      persisted.variants.some((variant) => variant.sku === "STALE-NEW-VARIANT"),
+    ).toBe(false);
+    expect(persisted.images).toHaveLength(0);
   });
 });

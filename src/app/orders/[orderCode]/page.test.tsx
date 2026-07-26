@@ -22,7 +22,7 @@ import OrderConfirmationPage from "./page";
 
 const order = {
   id: "order-1",
-  orderCode: "LEAF-ABC123",
+  orderCode: "LEAFABC123",
   email: "guest@example.com",
   customerName: "Nguyễn Văn A",
   phone: "0901234567",

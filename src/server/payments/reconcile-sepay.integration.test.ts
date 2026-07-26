@@ -3,8 +3,13 @@ import {
   BankTransactionStatus,
   OrderStatus,
 } from "@/generated/prisma/enums";
+import type { PrismaClient } from "@/generated/prisma/client";
 import type { SePayWebhookPayload } from "@/lib/sepay";
-import { reconcileSePayCore } from "@/server/payments/reconcile-sepay";
+import {
+  persistSePayEventCore,
+  reconcilePersistedSePayEventCore,
+  reconcileSePayCore,
+} from "@/server/payments/reconcile-sepay";
 import { resetDb, testPrisma } from "@/test/db";
 
 let nextEventId = 910_000;
@@ -45,7 +50,7 @@ async function createOrderFixture() {
   const [firstVariant, secondVariant] = product.variants;
   const order = await testPrisma.order.create({
     data: {
-      orderCode: `LEAF-${crypto.randomUUID().slice(0, 6).toUpperCase()}`,
+      orderCode: `LEAF${crypto.randomUUID().replaceAll("-", "").slice(0, 6).toUpperCase()}`,
       email: "reconcile@example.com",
       customerName: "Nguyễn Đối Soát",
       phone: "0900000000",
@@ -185,6 +190,7 @@ describe("reconcileSePayCore", () => {
     expect(event).toMatchObject({
       provider: "sepay",
       providerTransactionId: String(payload.id),
+      paymentCode: fixture.order.orderCode,
       gateway: payload.gateway,
       accountNumber: payload.accountNumber,
       transferType: "in",
@@ -234,7 +240,7 @@ describe("reconcileSePayCore", () => {
 
   it("persists an unknown order for review without payment side effects", async () => {
     const fixture = await createOrderFixture();
-    const payload = payloadFor("LEAF-UNKNOWN");
+    const payload = payloadFor("LEAFZZZZZZ");
     const enqueuePaymentConfirmed = vi.fn().mockResolvedValue(undefined);
 
     const result = await reconcileSePayCore(testPrisma, payload, {
@@ -343,6 +349,7 @@ describe("reconcileSePayCore", () => {
         accountNumber: payload.accountNumber,
         transferType: payload.transferType,
         amount: payload.transferAmount,
+        paymentCode: fixture.order.orderCode,
         content: payload.content,
         referenceCode: payload.referenceCode,
         occurredAt: new Date("2026-07-25T07:30:45.000Z"),
@@ -372,6 +379,146 @@ describe("reconcileSePayCore", () => {
     expect(enqueuePaymentConfirmed).toHaveBeenCalledTimes(1);
   });
 
+  it("retries a RECEIVED event from persisted code and amount, ignoring a changed later body", async () => {
+    const fixture = await createOrderFixture();
+    const originalPayload = payloadFor(fixture.order.orderCode);
+    const failedEnqueue = vi
+      .fn()
+      .mockRejectedValue(new Error("simulated queue write failure"));
+
+    await expect(
+      reconcileSePayCore(testPrisma, originalPayload, {
+        enqueuePaymentConfirmed: failedEnqueue,
+      }),
+    ).rejects.toThrow("simulated queue write failure");
+
+    const changedRetryBody: SePayWebhookPayload = {
+      ...originalPayload,
+      code: "LEAFZZZZZZ",
+      transferAmount: originalPayload.transferAmount + 1,
+      content: "later request body must not become canonical",
+    };
+    const enqueuePaymentConfirmed = vi.fn().mockResolvedValue(undefined);
+
+    const result = await reconcileSePayCore(
+      testPrisma,
+      changedRetryBody,
+      { enqueuePaymentConfirmed },
+    );
+
+    expect(result).toEqual({ kind: "matched" });
+    const event = await testPrisma.bankTransaction.findUniqueOrThrow({
+      where: { providerTransactionId: String(originalPayload.id) },
+    });
+    expect(event).toMatchObject({
+      paymentCode: fixture.order.orderCode,
+      amount: originalPayload.transferAmount,
+      content: originalPayload.content,
+      status: BankTransactionStatus.MATCHED,
+      orderId: fixture.order.id,
+    });
+    expect(enqueuePaymentConfirmed).toHaveBeenCalledTimes(1);
+  });
+
+  it("classifies simultaneous deliveries of one provider event as matched and duplicate", async () => {
+    const fixture = await createOrderFixture();
+    const payload = payloadFor(fixture.order.orderCode);
+    const enqueuePaymentConfirmed = vi.fn().mockResolvedValue(undefined);
+
+    const results = await Promise.all([
+      reconcileSePayCore(testPrisma, payload, { enqueuePaymentConfirmed }),
+      reconcileSePayCore(testPrisma, payload, { enqueuePaymentConfirmed }),
+    ]);
+
+    expect(results.map((result) => result.kind).sort()).toEqual([
+      "duplicate",
+      "matched",
+    ]);
+    const [eventCount, paymentCount, firstVariant, secondVariant] =
+      await Promise.all([
+        testPrisma.bankTransaction.count({
+          where: { providerTransactionId: String(payload.id) },
+        }),
+        testPrisma.payment.count({ where: { orderId: fixture.order.id } }),
+        testPrisma.variant.findUniqueOrThrow({
+          where: { id: fixture.firstVariant.id },
+        }),
+        testPrisma.variant.findUniqueOrThrow({
+          where: { id: fixture.secondVariant.id },
+        }),
+      ]);
+    expect(eventCount).toBe(1);
+    expect(paymentCount).toBe(1);
+    expect(firstVariant.stock).toBe(3);
+    expect(secondVariant.stock).toBe(2);
+    expect(enqueuePaymentConfirmed).toHaveBeenCalledTimes(1);
+  });
+
+  it("classifies a concurrent terminal bank-event winner without payment side effects", async () => {
+    const fixture = await createOrderFixture();
+    const payload = payloadFor(fixture.order.orderCode);
+    const event = await persistSePayEventCore(testPrisma, payload);
+    let transitioned = false;
+    const controlledDb = new Proxy(testPrisma, {
+      get(target, property, receiver) {
+        if (property === "order") {
+          return new Proxy(target.order, {
+            get(orderDelegate, orderProperty, orderReceiver) {
+              if (orderProperty !== "findUnique") {
+                return Reflect.get(
+                  orderDelegate,
+                  orderProperty,
+                  orderReceiver,
+                );
+              }
+              return async (...args: Parameters<typeof orderDelegate.findUnique>) => {
+                const order = await orderDelegate.findUnique(...args);
+                if (!transitioned) {
+                  transitioned = true;
+                  await testPrisma.bankTransaction.update({
+                    where: { id: event.id },
+                    data: {
+                      status: BankTransactionStatus.REVIEW_REQUIRED,
+                      reviewReason: "ORDER_NOT_FOUND",
+                    },
+                  });
+                }
+                return order;
+              };
+            },
+          });
+        }
+
+        const value = Reflect.get(target, property, receiver);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) as PrismaClient;
+    const enqueuePaymentConfirmed = vi.fn().mockResolvedValue(undefined);
+
+    const result = await reconcilePersistedSePayEventCore(
+      controlledDb,
+      event.id,
+      { enqueuePaymentConfirmed },
+    );
+
+    expect(result).toEqual({ kind: "duplicate" });
+    await expectNoPaymentSideEffects({
+      orderId: fixture.order.id,
+      firstVariantId: fixture.firstVariant.id,
+      secondVariantId: fixture.secondVariant.id,
+    });
+    await expect(
+      testPrisma.bankTransaction.findUniqueOrThrow({
+        where: { id: event.id },
+        select: { status: true, reviewReason: true },
+      }),
+    ).resolves.toEqual({
+      status: BankTransactionStatus.REVIEW_REQUIRED,
+      reviewReason: "ORDER_NOT_FOUND",
+    });
+    expect(enqueuePaymentConfirmed).not.toHaveBeenCalled();
+  });
+
   it.each([
     BankTransactionStatus.MATCHED,
     BankTransactionStatus.REVIEW_REQUIRED,
@@ -386,6 +533,7 @@ describe("reconcileSePayCore", () => {
         accountNumber: payload.accountNumber,
         transferType: payload.transferType,
         amount: payload.transferAmount,
+        paymentCode: fixture.order.orderCode,
         content: payload.content,
         referenceCode: payload.referenceCode,
         occurredAt: new Date("2026-07-25T07:30:45.000Z"),

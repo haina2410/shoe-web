@@ -53,6 +53,7 @@ export type CreateProductInput = z.infer<typeof createProductInputSchema>;
 export const updateVariantStockSchema = z.object({
   variantId: z.string().min(1),
   stock: z.number().int().min(0),
+  expectedStock: z.number().int().min(0),
 });
 
 export type UpdateVariantStockInput = z.infer<typeof updateVariantStockSchema>;
@@ -65,6 +66,15 @@ export type UpdateVariantStockInput = z.infer<typeof updateVariantStockSchema>;
  */
 export const variantSyncInputSchema = variantInputSchema.extend({
   id: z.string().min(1).optional(),
+  expectedStock: z.number().int().min(0).optional(),
+}).superRefine((variant, ctx) => {
+  if (variant.id !== undefined && variant.expectedStock === undefined) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["expectedStock"],
+      message: "Existing variants require expectedStock",
+    });
+  }
 });
 
 export type VariantSyncInput = z.infer<typeof variantSyncInputSchema>;

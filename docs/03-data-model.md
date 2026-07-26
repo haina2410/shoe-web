@@ -66,7 +66,7 @@ model Variant {
 
 model Order {
   id           String      @id @default(cuid())
-  orderCode    String      @unique      // VD "LEAF-8F3K2P" — dùng làm nội dung CK
+  orderCode    String      @unique      // VD "LEAF8F3K2P" — dùng làm nội dung CK
   email        String
   customerName String
   phone        String

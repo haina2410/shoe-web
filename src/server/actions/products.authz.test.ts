@@ -27,7 +27,9 @@ const {
   ProductBusinessErrorMock: class ProductBusinessError extends Error {
     constructor(public readonly code: string) {
       super(
-        "Không thể xoá phân loại đã phát sinh đơn hàng. Hãy đặt tồn kho về 0.",
+        code === "STALE_STOCK"
+          ? "Tồn kho đã thay đổi. Hãy tải lại trang và thử lại."
+          : "Không thể xoá phân loại đã phát sinh đơn hàng. Hãy đặt tồn kho về 0.",
       );
       this.name = "ProductBusinessError";
     }
@@ -129,7 +131,11 @@ describe("product actions — authz (role staff bị chặn)", () => {
     requireAdminMock.mockResolvedValue(sessionWithRole("staff"));
 
     await expect(
-      updateVariantStockAction({ variantId: "v1", stock: 5 }),
+      updateVariantStockAction({
+        variantId: "v1",
+        stock: 5,
+        expectedStock: 4,
+      }),
     ).rejects.toThrow("REDIRECT:/");
 
     expect(updateVariantStockCoreMock).not.toHaveBeenCalled();
@@ -179,6 +185,27 @@ describe("product actions — authz (role staff bị chặn)", () => {
       ok: false,
       error:
         "Không thể xoá phân loại đã phát sinh đơn hàng. Hãy đặt tồn kho về 0.",
+    });
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it("updateVariantStockAction: trả lỗi stale an toàn và không redirect", async () => {
+    requireAdminMock.mockResolvedValue(sessionWithRole("owner"));
+    updateVariantStockCoreMock.mockRejectedValue(
+      new ProductBusinessError("STALE_STOCK"),
+    );
+
+    const result = await updateVariantStockAction({
+      variantId: "v1",
+      stock: 8,
+      expectedStock: 10,
+    });
+
+    expect(updateVariantStockCoreMock).toHaveBeenCalledWith({}, "v1", 8, 10);
+    expect(result).toEqual({
+      ok: false,
+      error: "Tồn kho đã thay đổi. Hãy tải lại trang và thử lại.",
     });
     expect(revalidatePathMock).not.toHaveBeenCalled();
     expect(redirectMock).not.toHaveBeenCalled();

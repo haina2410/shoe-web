@@ -3,6 +3,7 @@ import {
   variantInputSchema,
   productInputSchema,
   createProductInputSchema,
+  updateProductInputSchema,
   updateVariantStockSchema,
 } from "@/lib/validation/product";
 
@@ -189,28 +190,94 @@ describe("createProductInputSchema", () => {
 describe("updateVariantStockSchema", () => {
   it("chấp nhận payload hợp lệ", () => {
     expect(
+      updateVariantStockSchema.safeParse({
+        variantId: "v1",
+        stock: 5,
+        expectedStock: 4,
+      }).success,
+    ).toBe(true);
+  });
+
+  it("từ chối quick edit thiếu stock đã quan sát", () => {
+    expect(
       updateVariantStockSchema.safeParse({ variantId: "v1", stock: 5 })
         .success,
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("từ chối variantId rỗng", () => {
     expect(
-      updateVariantStockSchema.safeParse({ variantId: "", stock: 5 }).success,
+      updateVariantStockSchema.safeParse({
+        variantId: "",
+        stock: 5,
+        expectedStock: 4,
+      }).success,
     ).toBe(false);
   });
 
   it("từ chối stock âm", () => {
     expect(
-      updateVariantStockSchema.safeParse({ variantId: "v1", stock: -1 })
-        .success,
+      updateVariantStockSchema.safeParse({
+        variantId: "v1",
+        stock: -1,
+        expectedStock: 4,
+      }).success,
     ).toBe(false);
   });
 
   it("từ chối stock không nguyên", () => {
     expect(
-      updateVariantStockSchema.safeParse({ variantId: "v1", stock: 1.5 })
-        .success,
+      updateVariantStockSchema.safeParse({
+        variantId: "v1",
+        stock: 1.5,
+        expectedStock: 4,
+      }).success,
     ).toBe(false);
+  });
+});
+
+describe("updateProductInputSchema optimistic stock contract", () => {
+  const product = {
+    name: "Giày Thử Nghiệm",
+    categoryId: "cat-1",
+    basePrice: 250_000,
+    status: "ACTIVE" as const,
+  };
+  const variant = {
+    size: "42",
+    color: "Đen",
+    sku: "SKU-001",
+    priceOverride: null,
+    stock: 8,
+  };
+
+  it("requires the originally observed stock for an existing variant", () => {
+    expect(
+      updateProductInputSchema.safeParse({
+        product,
+        variants: [{ ...variant, id: "variant-1" }],
+        images: [],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts expectedStock for an existing variant", () => {
+    expect(
+      updateProductInputSchema.safeParse({
+        product,
+        variants: [{ ...variant, id: "variant-1", expectedStock: 10 }],
+        images: [],
+      }).success,
+    ).toBe(true);
+  });
+
+  it("does not require expectedStock for a new variant", () => {
+    expect(
+      updateProductInputSchema.safeParse({
+        product,
+        variants: [variant],
+        images: [],
+      }).success,
+    ).toBe(true);
   });
 });

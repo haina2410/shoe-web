@@ -2,8 +2,16 @@ import { createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SePayWebhookPayload } from "@/lib/sepay";
 
-const { getBossMock, reconcileSePayCoreMock, prismaMock } = vi.hoisted(() => ({
+const {
+  getBossMock,
+  persistSePayEventCoreMock,
+  reconcilePersistedSePayEventCoreMock,
+  reconcileSePayCoreMock,
+  prismaMock,
+} = vi.hoisted(() => ({
   getBossMock: vi.fn(),
+  persistSePayEventCoreMock: vi.fn(),
+  reconcilePersistedSePayEventCoreMock: vi.fn(),
   reconcileSePayCoreMock: vi.fn(),
   prismaMock: { boundary: "test-prisma" },
 }));
@@ -17,6 +25,8 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 vi.mock("@/server/payments/reconcile-sepay", () => ({
+  persistSePayEventCore: persistSePayEventCoreMock,
+  reconcilePersistedSePayEventCore: reconcilePersistedSePayEventCoreMock,
   reconcileSePayCore: reconcileSePayCoreMock,
 }));
 
@@ -32,13 +42,13 @@ const validPayload = {
   transactionDate: "2026-07-25 14:30:45",
   accountNumber: "0000000000",
   subAccount: null,
-  code: "LEAF-ABC123",
-  content: "Thanh toan don LEAF-ABC123",
+  code: "LEAFABC123",
+  content: "Thanh toan don LEAFABC123",
   transferType: "in",
-  description: "MBVCB.1234567890.LEAF-ABC123",
+  description: "",
   transferAmount: 630_000,
   accumulated: 1_000_000,
-  referenceCode: "FT26072512345678",
+  referenceCode: "",
 } satisfies SePayWebhookPayload;
 
 function signatureFor(rawBody: string): string {
@@ -80,6 +90,11 @@ describe("POST /api/webhooks/sepay", () => {
     process.env.SEPAY_WEBHOOK_SECRET = SECRET;
     process.env.VIETQR_ACCOUNT_NO = "0000000000";
     getBossMock.mockResolvedValue(undefined);
+    persistSePayEventCoreMock.mockResolvedValue({
+      id: "bank-event-1",
+      status: "RECEIVED",
+    });
+    reconcilePersistedSePayEventCoreMock.mockResolvedValue({ kind: "matched" });
     reconcileSePayCoreMock.mockResolvedValue({ kind: "matched" });
   });
 
@@ -101,6 +116,8 @@ describe("POST /api/webhooks/sepay", () => {
 
       expect(response.status).toBe(401);
       expect(getBossMock).not.toHaveBeenCalled();
+      expect(persistSePayEventCoreMock).not.toHaveBeenCalled();
+      expect(reconcilePersistedSePayEventCoreMock).not.toHaveBeenCalled();
       expect(reconcileSePayCoreMock).not.toHaveBeenCalled();
     },
   );
@@ -116,6 +133,8 @@ describe("POST /api/webhooks/sepay", () => {
 
     expect(response.status).toBe(401);
     expect(textSpy).toHaveBeenCalledTimes(1);
+    expect(persistSePayEventCoreMock).not.toHaveBeenCalled();
+    expect(reconcilePersistedSePayEventCoreMock).not.toHaveBeenCalled();
     expect(reconcileSePayCoreMock).not.toHaveBeenCalled();
   });
 
@@ -129,9 +148,33 @@ describe("POST /api/webhooks/sepay", () => {
     expect(response.status).toBe(200);
     expect(await response.text()).toBe('{"success":true}');
     expect(textSpy).toHaveBeenCalledTimes(1);
-    expect(reconcileSePayCoreMock).toHaveBeenCalledWith(
+    expect(persistSePayEventCoreMock).toHaveBeenCalledWith(
       prismaMock,
       validPayload,
+      validPayload,
+    );
+    expect(reconcilePersistedSePayEventCoreMock).toHaveBeenCalledWith(
+      prismaMock,
+      "bank-event-1",
+    );
+    expect(reconcileSePayCoreMock).not.toHaveBeenCalled();
+  });
+
+  it("persists the original parsed JSON object so unknown provider fields survive", async () => {
+    const rawPayload = {
+      ...validPayload,
+      futureProviderField: {
+        trace: "future-value",
+      },
+    };
+
+    const response = await POST(webhookRequest(JSON.stringify(rawPayload)));
+
+    expect(response.status).toBe(200);
+    expect(persistSePayEventCoreMock).toHaveBeenCalledWith(
+      prismaMock,
+      validPayload,
+      rawPayload,
     );
   });
 
@@ -146,6 +189,8 @@ describe("POST /api/webhooks/sepay", () => {
 
     expect(response.status).toBe(400);
     expect(getBossMock).not.toHaveBeenCalled();
+    expect(persistSePayEventCoreMock).not.toHaveBeenCalled();
+    expect(reconcilePersistedSePayEventCoreMock).not.toHaveBeenCalled();
     expect(reconcileSePayCoreMock).not.toHaveBeenCalled();
   });
 
@@ -158,6 +203,8 @@ describe("POST /api/webhooks/sepay", () => {
 
     expect(response.status).toBe(400);
     expect(getBossMock).not.toHaveBeenCalled();
+    expect(persistSePayEventCoreMock).not.toHaveBeenCalled();
+    expect(reconcilePersistedSePayEventCoreMock).not.toHaveBeenCalled();
     expect(reconcileSePayCoreMock).not.toHaveBeenCalled();
   });
 
@@ -166,31 +213,40 @@ describe("POST /api/webhooks/sepay", () => {
     { kind: "duplicate" },
     { kind: "review-required", reason: "AMOUNT_MISMATCH" },
   ])("acknowledges persisted reconciliation result $kind exactly", async (result) => {
-    reconcileSePayCoreMock.mockResolvedValue(result);
+    reconcilePersistedSePayEventCoreMock.mockResolvedValue(result);
 
     const response = await POST(webhookRequest(JSON.stringify(validPayload)));
 
     expect(response.status).toBe(200);
     expect(await response.text()).toBe('{"success":true}');
     expect(getBossMock).toHaveBeenCalledTimes(1);
-    expect(reconcileSePayCoreMock).toHaveBeenCalledTimes(1);
+    expect(persistSePayEventCoreMock).toHaveBeenCalledTimes(1);
+    expect(reconcilePersistedSePayEventCoreMock).toHaveBeenCalledTimes(1);
+    expect(
+      persistSePayEventCoreMock.mock.invocationCallOrder[0],
+    ).toBeLessThan(getBossMock.mock.invocationCallOrder[0]);
     expect(getBossMock.mock.invocationCallOrder[0]).toBeLessThan(
-      reconcileSePayCoreMock.mock.invocationCallOrder[0],
+      reconcilePersistedSePayEventCoreMock.mock.invocationCallOrder[0],
     );
   });
 
-  it("returns a generic 500 when queue warmup fails and does not reconcile", async () => {
+  it("returns a generic 500 when queue warmup fails after durable persistence and does not reconcile", async () => {
     getBossMock.mockRejectedValue(new Error("queue connection leaked detail"));
 
     const response = await POST(webhookRequest(JSON.stringify(validPayload)));
 
     expect(response.status).toBe(500);
     expect(await response.text()).toBe('{"success":false}');
+    expect(persistSePayEventCoreMock).toHaveBeenCalledTimes(1);
+    expect(
+      persistSePayEventCoreMock.mock.invocationCallOrder[0],
+    ).toBeLessThan(getBossMock.mock.invocationCallOrder[0]);
+    expect(reconcilePersistedSePayEventCoreMock).not.toHaveBeenCalled();
     expect(reconcileSePayCoreMock).not.toHaveBeenCalled();
   });
 
   it("returns a generic 500 when reconciliation has an infrastructure failure", async () => {
-    reconcileSePayCoreMock.mockRejectedValue(
+    reconcilePersistedSePayEventCoreMock.mockRejectedValue(
       new Error("database query leaked detail"),
     );
 
@@ -199,6 +255,23 @@ describe("POST /api/webhooks/sepay", () => {
     expect(response.status).toBe(500);
     expect(await response.text()).toBe('{"success":false}');
   });
+
+  it.each(["MATCHED", "REVIEW_REQUIRED"])(
+    "acknowledges a terminal duplicate %s without queue warmup",
+    async (status) => {
+      persistSePayEventCoreMock.mockResolvedValue({
+        id: "bank-event-1",
+        status,
+      });
+
+      const response = await POST(webhookRequest(JSON.stringify(validPayload)));
+
+      expect(response.status).toBe(200);
+      expect(persistSePayEventCoreMock).toHaveBeenCalledTimes(1);
+      expect(getBossMock).not.toHaveBeenCalled();
+      expect(reconcilePersistedSePayEventCoreMock).not.toHaveBeenCalled();
+    },
+  );
 
   it("uses the Node.js runtime required by HMAC and database dependencies", () => {
     expect(runtime).toBe("nodejs");

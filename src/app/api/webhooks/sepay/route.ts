@@ -1,10 +1,14 @@
 import { getBoss } from "@/jobs/queue";
+import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   sePayWebhookPayloadSchema,
   verifySePaySignature,
 } from "@/lib/sepay";
-import { reconcileSePayCore } from "@/server/payments/reconcile-sepay";
+import {
+  persistSePayEventCore,
+  reconcilePersistedSePayEventCore,
+} from "@/server/payments/reconcile-sepay";
 
 export const runtime = "nodejs";
 
@@ -51,8 +55,17 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
+    const event = await persistSePayEventCore(
+      prisma,
+      parsed.data,
+      json as Prisma.InputJsonValue,
+    );
+    if (event.status !== "RECEIVED") {
+      return Response.json({ success: true }, { status: 200 });
+    }
+
     await getBoss();
-    await reconcileSePayCore(prisma, parsed.data);
+    await reconcilePersistedSePayEventCore(prisma, event.id);
     return Response.json({ success: true }, { status: 200 });
   } catch {
     return failure(500);

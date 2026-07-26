@@ -14,13 +14,13 @@ const validPayload = {
   transactionDate: "2026-07-25 14:30:45",
   accountNumber: "0123456789",
   subAccount: null,
-  code: "LEAF-ABC123",
-  content: "Thanh toan don LEAF-ABC123",
+  code: "LEAFABC123",
+  content: "Thanh toan don LEAFABC123",
   transferType: "in",
-  description: "MBVCB.1234567890.LEAF-ABC123",
+  description: "",
   transferAmount: 630000,
   accumulated: 1000000,
-  referenceCode: "FT26072512345678",
+  referenceCode: "",
 } satisfies SePayWebhookPayload;
 
 function sign(rawBody: string, timestamp: string, secret: string): string {
@@ -31,7 +31,11 @@ function sign(rawBody: string, timestamp: string, secret: string): string {
 
 describe("sePayWebhookPayloadSchema", () => {
   it("accepts the complete official webhook payload shape", () => {
-    expect(sePayWebhookPayloadSchema.parse(validPayload).id).toBe(123456);
+    expect(sePayWebhookPayloadSchema.parse(validPayload)).toMatchObject({
+      id: 123456,
+      description: "",
+      referenceCode: "",
+    });
   });
 
   it("rejects a non-positive inbound transfer", () => {
@@ -39,17 +43,57 @@ describe("sePayWebhookPayloadSchema", () => {
       sePayWebhookPayloadSchema.parse({ ...validPayload, transferAmount: 0 }),
     ).toThrow();
   });
+
+  it.each([
+    "2026/07/25 14:30:45",
+    "2026-07-25T14:30:45",
+    "2026-7-25 14:30:45",
+    "2026-07-25 14:30",
+  ])("rejects malformed transactionDate %s", (transactionDate) => {
+    expect(() =>
+      sePayWebhookPayloadSchema.parse({ ...validPayload, transactionDate }),
+    ).toThrow();
+  });
+
+  it("rejects an impossible February 30 date", () => {
+    expect(() =>
+      sePayWebhookPayloadSchema.parse({
+        ...validPayload,
+        transactionDate: "2026-02-30 14:30:45",
+      }),
+    ).toThrow();
+  });
+
+  it("accepts a valid leap date", () => {
+    expect(
+      sePayWebhookPayloadSchema.parse({
+        ...validPayload,
+        transactionDate: "2028-02-29 23:59:59",
+      }).transactionDate,
+    ).toBe("2028-02-29 23:59:59");
+  });
 });
 
 describe("orderCodeFromSePay", () => {
-  it("trims and uppercases the SePay order code", () => {
+  it("trims and uppercases a canonical SePay order code", () => {
     expect(
-      orderCodeFromSePay({ ...validPayload, code: " leaf-abc123 " }),
-    ).toBe("LEAF-ABC123");
+      orderCodeFromSePay({ ...validPayload, code: " leafabc123 " }),
+    ).toBe("LEAFABC123");
   });
 
   it("returns null when the SePay payload has no code", () => {
     expect(orderCodeFromSePay({ ...validPayload, code: null })).toBeNull();
+  });
+
+  it.each([
+    "",
+    "LEAF ABC123",
+    "LEAFABC12",
+    "LEAFABC1234",
+    "LEAFABC_12",
+    "OTHERABC123",
+  ])("returns null for non-canonical code %j", (code) => {
+    expect(orderCodeFromSePay({ ...validPayload, code })).toBeNull();
   });
 });
 
@@ -57,6 +101,12 @@ describe("occurredAtFromSePay", () => {
   it("interprets transactionDate in Vietnam local time", () => {
     expect(occurredAtFromSePay("2026-07-25 14:30:45").toISOString()).toBe(
       "2026-07-25T07:30:45.000Z",
+    );
+  });
+
+  it("maps a valid leap date from Vietnam local time", () => {
+    expect(occurredAtFromSePay("2028-02-29 23:59:59").toISOString()).toBe(
+      "2028-02-29T16:59:59.000Z",
     );
   });
 });

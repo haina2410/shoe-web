@@ -10,7 +10,7 @@ Khách chuyển khoản qua **VietQR**. Hệ thống đối soát **tự động
 2. Trong 1 transaction:
    - Kiểm tra tồn kho từng biến thể (`stock >= quantity`).
    - Tính `subtotal` (từ giá biến thể), `shippingFee` (theo tỉnh → zone), `total`.
-   - Sinh `orderCode` duy nhất (VD `LEAF-8F3K2P`).
+   - Sinh `orderCode` duy nhất (VD `LEAF8F3K2P`).
    - Tạo `Order` (status=`PENDING_PAYMENT`) + `OrderItem` (snapshot tên/giá).
    - **Enqueue job `send-order-confirmation`** (cùng transaction → không mất job).
 3. Trả về trang thanh toán hiển thị **mã VietQR**.
@@ -18,6 +18,10 @@ Khách chuyển khoản qua **VietQR**. Hệ thống đối soát **tự động
 ## Sinh mã VietQR
 
 - Nội dung chuyển khoản = **`orderCode`** (chốt để đối soát).
+- `orderCode` có đúng định dạng liền nhau `LEAFXXXXXX`,
+  regex `^LEAF[A-Z0-9]{6}$`.
+- Phía SePay cấu hình payment code với prefix `LEAF` và suffix 6 ký tự
+  alphanumeric.
 - Số tiền = `total`.
 - Dùng thông tin tài khoản ngân hàng nhận tiền (từ env). Sinh ảnh QR theo chuẩn VietQR (qua `img.vietqr.io` hoặc endpoint QR của SePay).
 - Trang hiển thị: QR, số TK, chủ TK, số tiền, nội dung CK, hướng dẫn "ghi đúng nội dung `orderCode`".
@@ -44,7 +48,12 @@ Khách CK ─► Ngân hàng ─► SePay phát hiện GD vào ─► POST /api/
 ### Quy tắc quan trọng
 - **HMAC trên bytes gốc:** cấu hình `SEPAY_WEBHOOK_SECRET`; yêu cầu header `X-SePay-Timestamp` (Unix seconds) và `X-SePay-Signature: sha256=<hex>`. Chữ ký HMAC-SHA256 được tính trên đúng `<timestamp>.<raw request body>`, với cửa sổ thời gian 5 phút. Không stringify lại JSON trước khi verify.
 - **Idempotency:** chuỗi của `payload.id` là `BankTransaction.providerTransactionId` và `Payment.transactionId` unique. Webhook lặp cùng `payload.id` là no-op an toàn.
-- **Persist trước, match sau:** mọi event đã xác thực và hợp lệ được lưu trước khi đối soát. Thiếu/sai mã đơn, lệch tiền, đơn không pending hoặc thiếu tồn kho được đánh dấu `REVIEW_REQUIRED`, không bị mất, để Ngày 8 xử lý.
+- **Persist trước queue và match:** mọi event đã xác thực/hợp lệ được lưu cùng
+  canonical `paymentCode`, amount và original JSON trước khi khởi tạo queue.
+  Queue warm-up lỗi vẫn để lại đúng một event `RECEIVED`. Retry chỉ dùng các
+  cột đã persist; body đến sau không thể đổi code/amount. Thiếu/sai mã đơn,
+  lệch tiền, đơn không pending hoặc thiếu tồn kho được đánh dấu
+  `REVIEW_REQUIRED`, không bị mất, để Ngày 8 xử lý.
 - **Khớp số tiền nghiêm ngặt:** `transferAmount` phải bằng chính xác `Order.total`; nếu lệch thì không auto-confirm.
 - **Acknowledge chính xác:** matched, duplicate và review-required đều trả HTTP 200 với body `{"success":true}`. Email được đẩy vào job; lỗi authentication/validation/hạ tầng trả failure tương ứng thay vì giả thành success.
 
@@ -68,6 +77,8 @@ Khách CK ─► Ngân hàng ─► SePay phát hiện GD vào ─► POST /api/
 
 - **Đặt hàng thành công**: mã đơn, danh sách sản phẩm, tổng tiền, thông tin CK + QR, hướng dẫn.
 - **Đã thanh toán**: xác nhận đã nhận tiền, tóm tắt đơn, bước tiếp theo.
+- Email **đã thanh toán** dùng Resend idempotency key
+  `payment-confirmed:<orderCode>` để provider retry không gửi trùng.
 - (Tuỳ chọn sau) **Đã giao/hoàn tất**.
 
 ## Vòng đời trạng thái đơn

@@ -185,7 +185,7 @@ describe("createOrderCore", () => {
     expect(await testPrisma.order.count()).toBe(0);
   });
 
-  it("2 đơn liên tiếp → orderCode khác nhau, đều khớp định dạng LEAF-XXXXXX", async () => {
+  it("2 đơn liên tiếp → orderCode khác nhau, đều khớp định dạng LEAFXXXXXX", async () => {
     await makeShippingZone();
     const category = await makeCategory();
     const { variant } = await makeProductWithVariant({
@@ -204,8 +204,8 @@ describe("createOrderCore", () => {
       noEnqueueDeps(),
     );
 
-    expect(order1.orderCode).toMatch(/^LEAF-[A-Z0-9]{6}$/);
-    expect(order2.orderCode).toMatch(/^LEAF-[A-Z0-9]{6}$/);
+    expect(order1.orderCode).toMatch(/^LEAF[A-Z0-9]{6}$/);
+    expect(order2.orderCode).toMatch(/^LEAF[A-Z0-9]{6}$/);
     expect(order1.orderCode).not.toBe(order2.orderCode);
   });
 

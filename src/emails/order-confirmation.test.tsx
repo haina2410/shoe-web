@@ -5,7 +5,7 @@ import type { OrderConfirmationEmailProps } from "@/emails/order-confirmation";
 
 function sampleProps(): OrderConfirmationEmailProps {
   return {
-    orderCode: "LEAF-AB12CD",
+    orderCode: "LEAFAB12CD",
     customerName: "Nguyễn Văn A",
     items: [
       {
@@ -32,20 +32,20 @@ function sampleProps(): OrderConfirmationEmailProps {
       addressLine: "12 Nguyễn Huệ",
     },
     qrImageUrl:
-      "https://img.vietqr.io/image/MB-0000000000-compact2.png?amount=2300000&addInfo=LEAF-AB12CD&accountName=LEAFSHOES%20VIETNAM",
+      "https://img.vietqr.io/image/MB-0000000000-compact2.png?amount=2300000&addInfo=LEAFAB12CD&accountName=LEAFSHOES%20VIETNAM",
     bank: {
       bankCode: "MB",
       accountNo: "0000000000",
       accountName: "LEAFSHOES VIETNAM",
     },
-    orderUrl: "https://leafshoes.vn/orders/LEAF-AB12CD",
+    orderUrl: "https://leafshoes.vn/orders/LEAFAB12CD",
   };
 }
 
 describe("renderOrderConfirmationEmail()", () => {
   it("subject đúng định dạng 'Đơn hàng <mã> — leafshoes Việt Nam'", async () => {
     const { subject } = await renderOrderConfirmationEmail(sampleProps());
-    expect(subject).toBe("Đơn hàng LEAF-AB12CD — leafshoes Việt Nam");
+    expect(subject).toBe("Đơn hàng LEAFAB12CD — leafshoes Việt Nam");
   });
 
   it("html chứa mã đơn, tổng tiền đã format, ảnh QR, tên từng sản phẩm", async () => {
@@ -68,7 +68,7 @@ describe("renderOrderConfirmationEmail()", () => {
 
   it("text (plainText) chứa mã đơn", async () => {
     const { text } = await renderOrderConfirmationEmail(sampleProps());
-    expect(text).toContain("LEAF-AB12CD");
+    expect(text).toContain("LEAFAB12CD");
     expect(text.length).toBeGreaterThan(0);
   });
 

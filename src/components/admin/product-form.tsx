@@ -38,6 +38,7 @@ export type ProductFormVariant = {
   sku: string;
   priceOverride: string; // giữ dạng chuỗi để input điều khiển được, parse lúc submit
   stock: string;
+  expectedStock?: number;
 };
 
 export type ProductFormImage = {
@@ -126,6 +127,7 @@ export function ProductForm({
           sku: v.sku,
           priceOverride: v.priceOverride === null ? "" : String(v.priceOverride),
           stock: String(v.stock),
+          expectedStock: v.stock,
         }))
       : [emptyVariantRow()],
   );
@@ -216,6 +218,7 @@ export function ProductForm({
 
     const variantsPayload = variants.map((v) => ({
       ...(v.id ? { id: v.id } : {}),
+      ...(v.id ? { expectedStock: v.expectedStock } : {}),
       size: v.size,
       color: v.color,
       sku: v.sku,

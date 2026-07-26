@@ -18,6 +18,13 @@ export class PaymentBusinessError extends Error {
   }
 }
 
+export class BankEventClaimError extends Error {
+  constructor() {
+    super("Bank event is no longer claimable.");
+    this.name = "BankEventClaimError";
+  }
+}
+
 export type MarkOrderPaidInput = {
   orderId: string;
   provider: "sepay" | "manual";
@@ -59,6 +66,28 @@ function isUniqueConstraintError(error: unknown): boolean {
   );
 }
 
+function aggregateStockRequirements(
+  items: ReadonlyArray<{ variantId: string; quantity: number }>,
+): Array<{ variantId: string; quantity: number }> {
+  const quantityByVariant = new Map<string, number>();
+  for (const item of items) {
+    quantityByVariant.set(
+      item.variantId,
+      (quantityByVariant.get(item.variantId) ?? 0) + item.quantity,
+    );
+  }
+
+  return [...quantityByVariant]
+    .map(([variantId, quantity]) => ({ variantId, quantity }))
+    .sort((left, right) =>
+      left.variantId < right.variantId
+        ? -1
+        : left.variantId > right.variantId
+          ? 1
+          : 0,
+    );
+}
+
 export async function markOrderPaidCore(
   db: PrismaClient,
   input: MarkOrderPaidInput,
@@ -79,6 +108,20 @@ export async function markOrderPaidCore(
       }
 
       const now = new Date();
+      if (input.bankTransactionId) {
+        const bankEventClaim = await tx.bankTransaction.updateMany({
+          where: {
+            id: input.bankTransactionId,
+            providerTransactionId: input.transactionId,
+            status: BankTransactionStatus.RECEIVED,
+          },
+          data: { updatedAt: now },
+        });
+        if (bankEventClaim.count !== 1) {
+          throw new BankEventClaimError();
+        }
+      }
+
       const claimed = await tx.order.updateMany({
         where: { id: order.id, status: OrderStatus.PENDING_PAYMENT },
         data: { status: OrderStatus.PAID, paidAt: now },
@@ -87,7 +130,7 @@ export async function markOrderPaidCore(
         throw new PaymentBusinessError("ORDER_NOT_PENDING");
       }
 
-      for (const item of order.items) {
+      for (const item of aggregateStockRequirements(order.items)) {
         const decremented = await tx.variant.updateMany({
           where: { id: item.variantId, stock: { gte: item.quantity } },
           data: { stock: { decrement: item.quantity } },

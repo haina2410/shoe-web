@@ -14,7 +14,7 @@ describe("BankTransaction", () => {
       accountNumber: "0000000000",
       transferType: "in",
       amount: 350_000,
-      content: "LEAF-ABC123",
+      content: "LEAFABC123",
       referenceCode: "FT24123",
       occurredAt: new Date("2026-07-25T03:00:00.000Z"),
       rawPayload: { id: 987654 },
@@ -55,7 +55,7 @@ describe("BankTransaction", () => {
     });
     const order = await testPrisma.order.create({
       data: {
-        orderCode: "LEAF-MATCHED",
+        orderCode: "LEAFMATCHD",
         email: "matched@example.com",
         customerName: "Nguyễn Văn A",
         phone: "0900000000",
@@ -102,7 +102,7 @@ describe("BankTransaction", () => {
     expect(persisted).toMatchObject({
       status: "MATCHED",
       orderId: order.id,
-      order: { id: order.id, orderCode: "LEAF-MATCHED" },
+      order: { id: order.id, orderCode: "LEAFMATCHD" },
     });
   });
 });

@@ -125,7 +125,7 @@ describe("handleSendOrderConfirmation", () => {
     const mailer = fakeMailer();
 
     await expect(
-      handleSendOrderConfirmation({ db: testPrisma, mailer }, { orderCode: "LEAF-KHONGCO" }),
+      handleSendOrderConfirmation({ db: testPrisma, mailer }, { orderCode: "LEAFKHNGCO" }),
     ).rejects.toThrow();
 
     expect(mailer.send).not.toHaveBeenCalled();

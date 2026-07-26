@@ -221,6 +221,7 @@ model BankTransaction {
   accountNumber         String
   transferType          String
   amount                Int
+  paymentCode           String?
   content               String
   referenceCode         String?
   occurredAt            DateTime

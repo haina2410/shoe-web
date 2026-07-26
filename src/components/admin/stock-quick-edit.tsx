@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 
 /**
  * Control chỉnh tồn kho nhanh cho một biến thể (variant): input số + nút lưu,
- * gọi `updateVariantStockAction({ variantId, stock })`.
+ * gọi `updateVariantStockAction({ variantId, stock, expectedStock })` để CAS
+ * trên đúng tồn kho mà admin đã quan sát.
  *
  * Đặt độc lập (chưa gắn vào bảng danh sách): mỗi sản phẩm có thể có nhiều
  * biến thể trong khi bảng danh sách chỉ hiển thị "Tổng tồn" gộp — gắn control
@@ -21,6 +22,7 @@ export function StockQuickEdit({
   initialStock: number;
 }) {
   const [stock, setStock] = useState(initialStock);
+  const [expectedStock, setExpectedStock] = useState(initialStock);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -29,11 +31,16 @@ export function StockQuickEdit({
     setError(null);
     setSaved(false);
     startTransition(async () => {
-      const result = await updateVariantStockAction({ variantId, stock });
+      const result = await updateVariantStockAction({
+        variantId,
+        stock,
+        expectedStock,
+      });
       if (result && !result.ok) {
         setError(result.error);
         return;
       }
+      setExpectedStock(stock);
       setSaved(true);
     });
   }

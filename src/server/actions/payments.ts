@@ -60,8 +60,7 @@ export async function confirmPaymentManuallyAction(
     }
 
     console.error(
-      "[payments] Không thể xác nhận thanh toán thủ công:",
-      error instanceof Error ? error.message : String(error),
+      "[payments] operation=confirm-manual-payment category=infrastructure",
     );
     return { ok: false, error: genericError };
   }

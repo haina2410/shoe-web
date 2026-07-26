@@ -15,6 +15,17 @@ Ngày 7 bổ sung đường thanh toán hoàn chỉnh cho MVP:
 Phạm vi này nối tiếp Ngày 5–6. Checkout vẫn chỉ kiểm tra kho và tạo
 `PENDING_PAYMENT`; worker/email hiện có tiếp tục chạy ở process riêng.
 
+## Quyết định provider contract đã được phê duyệt
+
+Toàn bộ hệ thống dùng mã thanh toán liền nhau `LEAFXXXXXX`, khớp chính xác
+`^LEAF[A-Z0-9]{6}$`. Generator, database, URL, VietQR, email, admin, webhook,
+test và dữ liệu demo đều dùng cùng định dạng này.
+
+Trong SePay phải cấu hình payment code với prefix `LEAF` và suffix đúng 6 ký
+tự chữ hoa hoặc chữ số. Migration hardening Ngày 7 chuyển các mã lịch sử sang
+dạng liền nhau mà không đổi `Order.id`, nên uniqueness và mọi relation được
+giữ nguyên.
+
 ## Các phương án đã cân nhắc
 
 ### A. `BankTransaction` riêng, `Payment` chỉ chứa thanh toán đã khớp — chọn
@@ -66,6 +77,7 @@ model BankTransaction {
   accountNumber         String
   transferType          String
   amount                Int
+  paymentCode           String?
   content               String
   referenceCode         String?
   occurredAt            DateTime
@@ -109,9 +121,12 @@ Payload được validate bằng Zod với các trường chính thức của Se
 - `transferAmount` là số nguyên VND dương;
 - `accountNumber` trùng `VIETQR_ACCOUNT_NO`;
 - `id` là ID event hợp lệ.
+- `description` và `referenceCode` là chuỗi, kể cả chuỗi rỗng;
+- `transactionDate` đúng `YYYY-MM-DD HH:mm:ss`, là ngày lịch hợp lệ, rồi được
+  ánh xạ từ giờ Việt Nam `+07:00`.
 
 Mã đơn được lấy từ `payload.code`, normalize uppercase/trim và phải khớp chính
-xác `^LEAF-[A-Z0-9]{6}$`. Không tự động đoán từ nội dung tự do trong Ngày 7;
+xác `^LEAF[A-Z0-9]{6}$`. Không tự động đoán từ nội dung tự do trong Ngày 7;
 `code` thiếu hoặc không hợp lệ được lưu `REVIEW_REQUIRED`.
 
 Phản hồi thành công, kể cả duplicate hay chưa khớp:
@@ -130,18 +145,25 @@ Xử lý có hai ranh giới transaction:
 1. Persist event:
    - insert `BankTransaction(status=RECEIVED)` bằng
      `providerTransactionId = String(payload.id)`;
+   - lưu `paymentCode` đã normalize/validate và giữ nguyên object JSON ban đầu
+     trong `rawPayload`, kể cả field provider bổ sung mà Zod chưa biết;
    - nếu unique conflict, load bản ghi hiện có;
-   - duplicate `MATCHED` hoặc `REVIEW_REQUIRED` trả thành công;
+   - duplicate `MATCHED` hoặc `REVIEW_REQUIRED` trả thành công mà không khởi
+     tạo queue;
    - duplicate còn `RECEIVED` tiếp tục reconciliation, nhờ đó crash sau insert
      không làm event bị kẹt mãi.
-2. Reconcile event `RECEIVED`:
-   - tìm `Order` theo mã chính xác;
-   - yêu cầu `order.total === transferAmount`;
+2. Sau khi event đã bền vững, làm nóng queue; nếu bước này lỗi, trả 500 nhưng
+   giữ đúng một event `RECEIVED`.
+3. Reconcile event `RECEIVED` chỉ từ các cột đã lưu, không đọc lại request:
+   - tìm `Order` theo `paymentCode`;
+   - yêu cầu `order.total === event.amount`;
    - yêu cầu đơn đang `PENDING_PAYMENT`;
+   - claim bank event bằng conditional update trên `id`,
+     `providerTransactionId` và `status = RECEIVED`;
    - chuyển đơn bằng conditional update
      `where id = ? and status = PENDING_PAYMENT`;
-   - với từng `OrderItem`, decrement bằng conditional update
-     `where id = ? and stock >= quantity`;
+   - gộp quantity theo `variantId`, sort `variantId` tăng dần rồi decrement
+     bằng conditional update `where id = ? and stock >= quantity`;
    - tạo `Payment(provider="sepay")`;
    - cập nhật `BankTransaction` thành `MATCHED`;
    - enqueue `send-payment-confirmed` qua `fromPrisma(tx)`;
@@ -156,11 +178,13 @@ conditional stock/order mutation thất bại giữa transaction, toàn bộ tra
 reconciliation rollback trước; sau đó một transaction ngắn riêng chỉ chuyển
 event còn `RECEIVED` sang `REVIEW_REQUIRED`. Không giữ lại decrement dở dang.
 
-Nếu enqueue lỗi, transaction reconciliation rollback và event vẫn `RECEIVED`.
-Webhook trả 500 để lần retry tiếp tục xử lý. Nếu hai event khác nhau cùng nhắm
-vào một đơn, chỉ conditional transition đầu tiên được quyền trừ kho. Nếu hai
-đơn cạnh tranh số kho cuối cùng, conditional stock decrement bảo đảm tồn kho
-không âm; transaction thua được đưa sang review.
+Nếu queue warm-up hoặc enqueue lỗi, event đã persist vẫn `RECEIVED`; riêng
+enqueue nằm trong payment transaction nên order/payment/stock/job cùng
+rollback. Webhook trả 500 để lần retry tiếp tục xử lý từ chính event đã lưu.
+Một request retry thay đổi code/amount không thể thay đổi nguồn sự thật. Nếu
+hai event khác nhau cùng nhắm vào một đơn, chỉ conditional transition đầu tiên
+được quyền trừ kho. Nếu hai đơn cạnh tranh số kho cuối cùng, conditional stock
+decrement bảo đảm tồn kho không âm; transaction thua được đưa sang review.
 
 ## Xác nhận thanh toán thủ công
 
@@ -186,9 +210,11 @@ Nếu thiếu kho, action trả thông báo nghiệp vụ an toàn và không th
 Thêm queue `send-payment-confirmed` với cùng retry/backoff email hiện có.
 Payload chỉ chứa `{ orderCode }`.
 
-Worker load đơn từ DB, render React Email và gửi qua Mailer hiện có. Template
-xác nhận đã nhận tiền, mã đơn, tổng tiền và thông báo cửa hàng sẽ xử lý đơn;
-không đưa dữ liệu thừa vào log.
+Worker load đơn từ DB, render React Email và gửi qua Mailer hiện có. Email xác
+nhận thanh toán dùng Resend idempotency key ổn định
+`payment-confirmed:<orderCode>`; email xác nhận đặt hàng giữ hành vi hiện có.
+Template xác nhận đã nhận tiền, mã đơn, tổng tiền và thông báo cửa hàng sẽ xử
+lý đơn; không đưa dữ liệu thừa vào log hoặc idempotency key.
 
 Thêm queue `expire-unpaid`. Worker đăng ký schedule ổn định:
 
@@ -217,7 +243,8 @@ email worker trong Playwright.
 ## Lỗi và observability
 
 - Không log raw webhook, email, số điện thoại, địa chỉ hoặc số tài khoản.
-- Log server chỉ gồm event ID, order ID/code khi đã biết và reason code.
+- Log lỗi xác nhận tay chỉ gồm operation/category ổn định; không log
+  `error.message`, `String(error)`, payload hoặc PII.
 - Business mismatch trả HTTP 200 sau khi đã lưu `REVIEW_REQUIRED`.
 - Authentication/validation failure không ghi DB.
 - Infrastructure failure không được giả thành success.
@@ -234,6 +261,9 @@ SEPAY_WEBHOOK_SECRET=
 `VIETQR_ACCOUNT_NO` tiếp tục là nguồn sự thật cho tài khoản nhận tiền.
 Production bắt buộc HTTPS; IP allowlist là lớp bổ sung ở reverse proxy/firewall,
 không hardcode trong application vì danh sách có thể thay đổi.
+
+Ngoài biến môi trường của app, cấu hình payment code phía SePay bắt buộc dùng
+prefix `LEAF` và suffix 6 ký tự alphanumeric.
 
 ## Chiến lược test
 

@@ -20,10 +20,12 @@ export type ProductWithVariants = Product & { variants: Variant[] };
 
 export const VARIANT_IN_USE_ERROR =
   "Không thể xoá phân loại đã phát sinh đơn hàng. Hãy đặt tồn kho về 0.";
+export const STALE_STOCK_ERROR =
+  "Tồn kho đã thay đổi. Hãy tải lại trang và thử lại.";
 
 export class ProductBusinessError extends Error {
-  constructor(public readonly code: "VARIANT_IN_USE") {
-    super(VARIANT_IN_USE_ERROR);
+  constructor(public readonly code: "VARIANT_IN_USE" | "STALE_STOCK") {
+    super(code === "STALE_STOCK" ? STALE_STOCK_ERROR : VARIANT_IN_USE_ERROR);
     this.name = "ProductBusinessError";
   }
 }
@@ -152,7 +154,17 @@ export async function updateProductCore(
     for (const v of input.variants) {
       const data = variantWriteData(v);
       if (v.id !== undefined && existingIds.has(v.id)) {
-        await tx.variant.update({ where: { id: v.id }, data });
+        const updated = await tx.variant.updateMany({
+          where: {
+            id: v.id,
+            productId: id,
+            stock: v.expectedStock,
+          },
+          data,
+        });
+        if (updated.count !== 1) {
+          throw new ProductBusinessError("STALE_STOCK");
+        }
       } else {
         await tx.variant.create({ data: { ...data, productId: id } });
       }
@@ -204,6 +216,16 @@ export async function updateVariantStockCore(
   db: PrismaClient,
   variantId: string,
   stock: number,
+  expectedStock: number,
 ): Promise<Variant> {
-  return db.variant.update({ where: { id: variantId }, data: { stock } });
+  return db.$transaction(async (tx) => {
+    const updated = await tx.variant.updateMany({
+      where: { id: variantId, stock: expectedStock },
+      data: { stock },
+    });
+    if (updated.count !== 1) {
+      throw new ProductBusinessError("STALE_STOCK");
+    }
+    return tx.variant.findUniqueOrThrow({ where: { id: variantId } });
+  });
 }
