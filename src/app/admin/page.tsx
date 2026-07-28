@@ -23,6 +23,30 @@ export default function AdminDashboardPage() {
             Xem, thêm, sửa, xoá sản phẩm và cập nhật tồn kho.
           </p>
         </Link>
+        <Link
+          href="/admin/orders"
+          className="block rounded-lg border p-4 transition-colors hover:bg-[var(--sage)]/40"
+          style={{ borderColor: "var(--line)" }}
+        >
+          <h2 className="font-semibold" style={{ color: "var(--evergreen)" }}>
+            Quản lý đơn hàng
+          </h2>
+          <p className="mt-1 text-sm text-neutral-600">
+            Theo dõi đơn hàng, thanh toán và hoàn tiền.
+          </p>
+        </Link>
+        <Link
+          href="/admin/bank-transactions/review"
+          className="block rounded-lg border p-4 transition-colors hover:bg-[var(--sage)]/40"
+          style={{ borderColor: "var(--line)" }}
+        >
+          <h2 className="font-semibold" style={{ color: "var(--evergreen)" }}>
+            Duyệt giao dịch ngân hàng
+          </h2>
+          <p className="mt-1 text-sm text-neutral-600">
+            Kiểm tra các giao dịch cần ghép thủ công.
+          </p>
+        </Link>
       </div>
     </div>
   );

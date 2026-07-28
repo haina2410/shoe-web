@@ -1,60 +1,17 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
-const { findManyMock, requireAdminMock } = vi.hoisted(() => ({
-  findManyMock: vi.fn(),
-  requireAdminMock: vi.fn(),
-}));
+const { redirectMock } = vi.hoisted(() => ({ redirectMock: vi.fn() }));
 
-vi.mock("@/lib/auth-guard", () => ({ requireAdmin: requireAdminMock }));
-vi.mock("@/lib/prisma", () => ({
-  prisma: { order: { findMany: findManyMock } },
-}));
-vi.mock("@/server/actions/payments", () => ({
-  confirmPaymentManuallyAction: vi.fn(),
-}));
+vi.mock("next/navigation", () => ({ redirect: redirectMock }));
 
 import AdminPendingOrdersPage from "./page";
 
-const pendingOrder = {
-  id: "order-1",
-  orderCode: "LEAFABC123",
-  createdAt: new Date("2026-07-25T08:00:00.000Z"),
-  total: 425_000,
-};
-
-function sessionWithRole(role: string) {
-  return {
-    user: { id: "user-1", email: "admin@example.com", role },
-    session: { id: "session-1" },
-  };
-}
-
 describe("AdminPendingOrdersPage", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    findManyMock.mockResolvedValue([pendingOrder]);
-  });
+  it("redirects to the pending-payment order filter", () => {
+    AdminPendingOrdersPage();
 
-  it("staff xem được danh sách chờ thanh toán và có nút xác nhận", async () => {
-    requireAdminMock.mockResolvedValue(sessionWithRole("staff"));
-
-    render(await AdminPendingOrdersPage());
-
-    expect(screen.getByText("LEAFABC123")).toBeInTheDocument();
-    expect(screen.getByText("425.000 ₫")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Xác nhận thanh toán" }),
-    ).toBeInTheDocument();
-  });
-
-  it("owner thấy nút xác nhận của từng đơn pending", async () => {
-    requireAdminMock.mockResolvedValue(sessionWithRole("owner"));
-
-    render(await AdminPendingOrdersPage());
-
-    expect(
-      screen.getByRole("button", { name: "Xác nhận thanh toán" }),
-    ).toBeInTheDocument();
+    expect(redirectMock).toHaveBeenCalledWith(
+      "/admin/orders?status=PENDING_PAYMENT",
+    );
   });
 });
