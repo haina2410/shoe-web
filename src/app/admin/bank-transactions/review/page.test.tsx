@@ -83,6 +83,9 @@ describe("ReviewedBankTransactionsPage", () => {
     expect(screen.getByText("150.000 ₫")).toBeInTheDocument();
     expect(screen.getByRole("form", { name: "Ghép review-oldest" })).toBeInTheDocument();
     expect(screen.getByRole("form", { name: "Ghép review-newer" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Danh sách giao dịch cần đối soát" }),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/RAW PAYLOAD MUST NOT RENDER/)).not.toBeInTheDocument();
   });
 
@@ -92,7 +95,7 @@ describe("ReviewedBankTransactionsPage", () => {
     render(await ReviewedBankTransactionsPage());
 
     expect(
-      screen.getByText("Không có giao dịch nào cần đối soát."),
+      screen.getByRole("heading", { name: "Không có giao dịch cần đối soát" }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });

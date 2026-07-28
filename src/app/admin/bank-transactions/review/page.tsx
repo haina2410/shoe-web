@@ -1,4 +1,5 @@
 import { MatchTransactionForm } from "@/components/admin/match-transaction-form";
+import { EmptyState } from "@/components/empty-state";
 import { requireAdmin } from "@/lib/auth-guard";
 import { formatVnd } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
@@ -24,12 +25,16 @@ export default async function ReviewedBankTransactionsPage() {
       </p>
 
       {transactions.length === 0 ? (
-        <p className="mt-6 text-neutral-600">
-          Không có giao dịch nào cần đối soát.
-        </p>
+        <EmptyState
+          action={{ href: "/admin/orders", label: "Xem danh sách đơn hàng" }}
+          description="Các giao dịch chưa xác định sẽ xuất hiện tại đây để ghép thủ công."
+          title="Không có giao dịch cần đối soát"
+        />
       ) : (
         <div
+          aria-label="Danh sách giao dịch cần đối soát"
           className="mt-6 overflow-x-auto rounded-lg border"
+          role="region"
           style={{ borderColor: "var(--line)" }}
         >
           <table className="w-full min-w-max text-left text-sm">

@@ -163,6 +163,15 @@ describe("AdminOrderDetailPage", () => {
     expect(screen.getByText("30.000 ₫")).toBeInTheDocument();
     expect(screen.getAllByText("280.000 ₫").length).toBeGreaterThan(0);
     expect(screen.getByText("Hoàn tiền một phần")).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Sản phẩm trong đơn hàng" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Lịch sử thanh toán" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Giao dịch ngân hàng liên kết" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Nhân viên Lá")).toBeInTheDocument();
     expect(screen.getByText("staff@example.com")).toBeInTheDocument();
     expect(screen.getByText("BANK-REF-80")).toBeInTheDocument();

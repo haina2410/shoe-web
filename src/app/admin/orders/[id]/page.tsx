@@ -141,7 +141,9 @@ export default async function AdminOrderDetailPage({
       <section>
         <h2 className="text-lg font-semibold">Sản phẩm</h2>
         <div
+          aria-label="Sản phẩm trong đơn hàng"
           className="mt-3 overflow-x-auto rounded-lg border"
+          role="region"
           style={{ borderColor: "var(--line)" }}
         >
           <table className="w-full min-w-max text-left text-sm">
@@ -210,7 +212,7 @@ export default async function AdminOrderDetailPage({
         {order.payments.length === 0 ? (
           <p className="text-sm text-neutral-600">Chưa có giao dịch thanh toán.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div aria-label="Lịch sử thanh toán" className="overflow-x-auto" role="region">
             <table className="w-full min-w-max text-left text-sm">
               <thead>
                 <tr className="border-b" style={{ borderColor: "var(--line)" }}>
@@ -279,7 +281,9 @@ export default async function AdminOrderDetailPage({
           </p>
         ) : (
           <div
+            aria-label="Giao dịch ngân hàng liên kết"
             className="mt-3 overflow-x-auto rounded-lg border"
+            role="region"
             style={{ borderColor: "var(--line)" }}
           >
             <table className="w-full min-w-max text-left text-sm">

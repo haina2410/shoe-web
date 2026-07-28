@@ -87,7 +87,12 @@ describe("AdminOrdersPage", () => {
       "href",
       "/admin/orders/full-order",
     );
-    expect(screen.getByRole("form")).toHaveAttribute("method", "get");
+    expect(
+      screen.getByRole("form", { name: "Bộ lọc đơn hàng" }),
+    ).toHaveAttribute("method", "get");
+    expect(
+      screen.getByRole("region", { name: "Danh sách đơn hàng" }),
+    ).toBeInTheDocument();
   });
 
   it("shows an empty state when no orders match", async () => {
@@ -100,7 +105,7 @@ describe("AdminOrdersPage", () => {
     );
 
     expect(
-      screen.getByText("Không tìm thấy đơn hàng phù hợp."),
+      screen.getByRole("heading", { name: "Không tìm thấy đơn hàng" }),
     ).toBeInTheDocument();
   });
 

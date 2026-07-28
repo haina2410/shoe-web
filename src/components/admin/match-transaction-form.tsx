@@ -58,8 +58,8 @@ export function MatchTransactionForm({
           type="text"
         />
       </label>
-      <div>
-        <Button disabled={isPending} size="sm" type="submit">
+      <div className="flex">
+        <Button className="w-full sm:w-auto" disabled={isPending} size="sm" type="submit">
           {isPending ? "Đang ghép…" : "Ghép giao dịch"}
         </Button>
       </div>

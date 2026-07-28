@@ -103,8 +103,8 @@ export function RefundForm({ orderId }: { orderId: string }) {
           style={{ borderColor: "var(--line)" }}
         />
       </label>
-      <div>
-        <Button disabled={isPending} size="sm" type="submit">
+      <div className="flex">
+        <Button className="w-full sm:w-auto" disabled={isPending} size="sm" type="submit">
           {isPending ? "Đang ghi nhận…" : "Ghi nhận hoàn tiền"}
         </Button>
       </div>

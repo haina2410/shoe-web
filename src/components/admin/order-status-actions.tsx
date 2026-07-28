@@ -51,7 +51,7 @@ export function OrderStatusActions({
 
   return (
     <div className="grid gap-2">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         {targets.map((target) => {
           const label = ACTION_LABEL[target];
           if (!label) return null;
@@ -63,6 +63,7 @@ export function OrderStatusActions({
               onClick={() => updateStatus(target)}
               size="sm"
               type="button"
+              className="w-full sm:w-auto"
             >
               {isPending && activeTarget === target ? "Đang cập nhật…" : label}
             </Button>

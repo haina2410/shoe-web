@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { OrderStatus } from "@/generated/prisma/enums";
+import { EmptyState } from "@/components/empty-state";
 import { requireAdmin } from "@/lib/auth-guard";
 import { formatVnd } from "@/lib/money";
 import { ORDER_STATUS_LABEL } from "@/lib/order-status";
@@ -110,10 +111,16 @@ export default async function AdminOrdersPage({
       </form>
 
       {orders.length === 0 ? (
-        <p className="mt-6 text-neutral-600">Không tìm thấy đơn hàng phù hợp.</p>
+        <EmptyState
+          action={{ href: "/admin/orders", label: "Xem tất cả đơn hàng" }}
+          description="Thử thay đổi bộ lọc hoặc xem lại tất cả đơn hàng."
+          title="Không tìm thấy đơn hàng"
+        />
       ) : (
         <div
+          aria-label="Danh sách đơn hàng"
           className="mt-6 overflow-x-auto rounded-lg border"
+          role="region"
           style={{ borderColor: "var(--line)" }}
         >
           <table className="w-full min-w-max text-left text-sm">
@@ -144,9 +151,25 @@ export default async function AdminOrdersPage({
                     {createdAtFormatter.format(order.createdAt)}
                   </td>
                   <td className="px-4 py-3">{formatVnd(order.total)}</td>
-                  <td className="px-4 py-3">{ORDER_STATUS_LABEL[order.status]}</td>
                   <td className="px-4 py-3">
-                    <span className="rounded-full bg-[var(--sage)] px-2 py-1 text-xs font-medium">
+                    <span
+                      className="rounded-full px-2 py-1 text-xs font-medium"
+                      style={{
+                        backgroundColor: "var(--sage)",
+                        color: "var(--evergreen)",
+                      }}
+                    >
+                      {ORDER_STATUS_LABEL[order.status]}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className="rounded-full px-2 py-1 text-xs font-medium"
+                      style={{
+                        backgroundColor: "var(--sage)",
+                        color: "var(--evergreen)",
+                      }}
+                    >
                       {refundLabel(order)}
                     </span>
                   </td>

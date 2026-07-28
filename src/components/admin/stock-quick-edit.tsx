@@ -46,7 +46,7 @@ export function StockQuickEdit({
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
       <label className="sr-only" htmlFor={`stock-${variantId}`}>
         Tồn kho
       </label>
@@ -60,7 +60,7 @@ export function StockQuickEdit({
           setSaved(false);
           setStock(Number(e.target.value));
         }}
-        className="w-20 rounded-md border px-2 py-1 text-sm outline-none focus:ring-2"
+        className="w-full rounded-md border px-2 py-1 text-sm outline-none focus:ring-2 sm:w-20"
         style={{
           borderColor: "var(--line)",
           backgroundColor: "var(--paper)",

@@ -60,6 +60,9 @@ describe("ProductForm — biến thể inline", () => {
 
   it("bắt đầu với đúng 1 dòng biến thể", () => {
     render(<ProductForm mode="create" categories={categories} />);
+    expect(
+      screen.getByRole("region", { name: "Danh sách biến thể" }),
+    ).toBeInTheDocument();
     expect(screen.getAllByTestId("variant-row")).toHaveLength(1);
   });
 

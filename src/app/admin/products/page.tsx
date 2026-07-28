@@ -49,7 +49,7 @@ export default async function AdminProductsPage({
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: "var(--evergreen)" }}>
             Sản phẩm
@@ -61,7 +61,7 @@ export default async function AdminProductsPage({
         <Button render={<Link href="/admin/products/new" />}>Thêm sản phẩm</Button>
       </div>
 
-      <div className="mt-4 flex items-center gap-3 text-sm">
+      <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
         <span className="text-neutral-600">Sắp xếp:</span>
         <Link
           href="/admin/products?sort=createdAt"
@@ -95,7 +95,12 @@ export default async function AdminProductsPage({
           </p>
         </div>
       ) : (
-        <div className="mt-6 overflow-x-auto rounded-lg border" style={{ borderColor: "var(--line)" }}>
+        <div
+          aria-label="Danh sách sản phẩm"
+          className="mt-6 overflow-x-auto rounded-lg border"
+          role="region"
+          style={{ borderColor: "var(--line)" }}
+        >
           <table className="w-full min-w-max text-left text-sm">
             <thead>
               <tr className="border-b" style={{ borderColor: "var(--line)" }}>

@@ -255,7 +255,7 @@ export function ProductForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-6 space-y-8">
+    <form onSubmit={handleSubmit} className="mt-6 space-y-6 sm:space-y-8">
       <section className="space-y-4">
         <h2 className="text-lg font-semibold" style={{ color: "var(--evergreen)" }}>
           Thông tin sản phẩm
@@ -349,7 +349,7 @@ export function ProductForm({
       </section>
 
       <section className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
           <h2 className="text-lg font-semibold" style={{ color: "var(--evergreen)" }}>
             Biến thể
           </h2>
@@ -358,7 +358,12 @@ export function ProductForm({
           </Button>
         </div>
 
-        <div className="overflow-x-auto rounded-lg border" style={{ borderColor: "var(--line)" }}>
+        <div
+          aria-label="Danh sách biến thể"
+          className="overflow-x-auto rounded-lg border"
+          role="region"
+          style={{ borderColor: "var(--line)" }}
+        >
           <table className="w-full min-w-max text-left text-sm" data-testid="variant-table">
             <thead>
               <tr className="border-b" style={{ borderColor: "var(--line)" }}>
@@ -507,11 +512,16 @@ export function ProductForm({
         </p>
       )}
 
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={isPending}>
+      <div className="flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center">
+        <Button className="w-full sm:w-auto" type="submit" disabled={isPending}>
           {isPending ? "Đang lưu…" : mode === "create" ? "Tạo sản phẩm" : "Lưu thay đổi"}
         </Button>
-        <Button type="button" variant="outline" onClick={() => router.push("/admin/products")}>
+        <Button
+          className="w-full sm:w-auto"
+          type="button"
+          variant="outline"
+          onClick={() => router.push("/admin/products")}
+        >
           Huỷ
         </Button>
       </div>
