@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OrderStatus } from "@/generated/prisma/enums";
 
 const {
@@ -50,6 +50,10 @@ describe("updateOrderStatusAction", () => {
       orderCode: "LEAFABC123",
       status: OrderStatus.FULFILLED,
     });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("lets requireAdmin reject anonymous callers before validation or core work", async () => {
@@ -113,6 +117,49 @@ describe("updateOrderStatusAction", () => {
       `/admin/orders/${VALID_ORDER_ID}`,
     );
     expect(revalidatePathMock).toHaveBeenNthCalledWith(3, "/orders/LEAFABC123");
+  });
+
+  it("keeps a committed status update successful and attempts every path when revalidation throws", async () => {
+    requireAdminMock.mockResolvedValue(sessionWithRole("staff"));
+    const sentinels = [
+      "private-customer@example.com",
+      "0909123456",
+      "LEAFABC123",
+    ];
+    revalidatePathMock.mockImplementationOnce(() => {
+      throw new Error(sentinels.join(" | "));
+    });
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    await expect(
+      updateOrderStatusAction(VALID_ORDER_ID, "FULFILLED"),
+    ).resolves.toEqual({ ok: true, status: OrderStatus.FULFILLED });
+
+    expect(updateOrderStatusCoreMock).toHaveBeenCalledTimes(1);
+    expect(revalidatePathMock).toHaveBeenCalledTimes(3);
+    expect(revalidatePathMock).toHaveBeenNthCalledWith(1, "/admin/orders");
+    expect(revalidatePathMock).toHaveBeenNthCalledWith(
+      2,
+      `/admin/orders/${VALID_ORDER_ID}`,
+    );
+    expect(revalidatePathMock).toHaveBeenNthCalledWith(
+      3,
+      "/orders/LEAFABC123",
+    );
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "[orders] operation=update-status-revalidate category=infrastructure",
+    );
+    for (const call of consoleErrorSpy.mock.calls) {
+      for (const argument of call) {
+        const logged =
+          typeof argument === "string" ? argument : JSON.stringify(argument);
+        for (const sentinel of sentinels) {
+          expect(logged).not.toContain(sentinel);
+        }
+      }
+    }
   });
 
   it.each([

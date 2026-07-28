@@ -45,16 +45,12 @@ export async function updateOrderStatusAction(
     return { ok: false, error: "Trạng thái đơn hàng không hợp lệ." };
   }
 
+  let result: Awaited<ReturnType<typeof updateOrderStatusCore>>;
   try {
-    const result = await updateOrderStatusCore(prisma, {
+    result = await updateOrderStatusCore(prisma, {
       orderId: parsedOrderId.data,
       targetStatus: parsedTargetStatus.data,
     });
-
-    revalidatePath("/admin/orders");
-    revalidatePath(`/admin/orders/${parsedOrderId.data}`);
-    revalidatePath(`/orders/${result.orderCode}`);
-    return { ok: true, status: result.status };
   } catch (error: unknown) {
     if (error instanceof UpdateOrderStatusError) {
       return { ok: false, error: businessErrorMessage[error.code] };
@@ -63,4 +59,21 @@ export async function updateOrderStatusAction(
     console.error("[orders] operation=update-status category=infrastructure");
     return { ok: false, error: genericError };
   }
+
+  const paths = [
+    "/admin/orders",
+    `/admin/orders/${parsedOrderId.data}`,
+    `/orders/${result.orderCode}`,
+  ];
+  for (const path of paths) {
+    try {
+      revalidatePath(path);
+    } catch {
+      console.error(
+        "[orders] operation=update-status-revalidate category=infrastructure",
+      );
+    }
+  }
+
+  return { ok: true, status: result.status };
 }

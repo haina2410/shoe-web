@@ -47,7 +47,7 @@ const VALID_ORDER_ID = "cm12345678901234567890123";
 
 const baseOrder = {
   id: VALID_ORDER_ID,
-  orderCode: "LEAF-DETAIL-1",
+  orderCode: "LEAFDETAIL1",
   email: "khach@example.com",
   customerName: "Nguyễn Khách",
   phone: "0901234567",
@@ -148,7 +148,7 @@ describe("AdminOrderDetailPage", () => {
       getAdminOrderDetailMock.mock.invocationCallOrder[0],
     );
     expect(
-      screen.getByRole("heading", { name: "Đơn hàng LEAF-DETAIL-1" }),
+      screen.getByRole("heading", { name: "Đơn hàng LEAFDETAIL1" }),
     ).toBeInTheDocument();
     expect(screen.getByText(/^Đã thanh toán · Tạo lúc/)).toBeInTheDocument();
     expect(screen.getByText("Nguyễn Khách")).toBeInTheDocument();

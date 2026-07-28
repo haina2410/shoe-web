@@ -19,7 +19,7 @@ import AdminOrdersPage from "./page";
 const listedOrders = [
   {
     id: "partial-order",
-    orderCode: "LEAF-PARTIAL",
+    orderCode: "LEAFPARTIAL",
     customerName: "Nguyễn An",
     createdAt: new Date("2026-07-25T08:00:00.000Z"),
     total: 100_000,
@@ -31,7 +31,7 @@ const listedOrders = [
   },
   {
     id: "full-order",
-    orderCode: "LEAF-FULL",
+    orderCode: "LEAFFULL",
     customerName: "Trần Bình",
     createdAt: new Date("2026-07-24T08:00:00.000Z"),
     total: 200_000,
@@ -56,7 +56,7 @@ describe("AdminOrdersPage", () => {
         searchParams: Promise.resolve({
           status: OrderStatus.PENDING_PAYMENT,
           refund: "with",
-          query: "leaf-partial",
+          query: "leafpartial",
         }),
       }),
     );
@@ -68,18 +68,22 @@ describe("AdminOrdersPage", () => {
       "with",
     );
     expect(screen.getByRole("searchbox", { name: "Mã đơn" })).toHaveValue(
-      "LEAF-PARTIAL",
+      "LEAFPARTIAL",
+    );
+    expect(screen.getByRole("searchbox", { name: "Mã đơn" })).toHaveAttribute(
+      "placeholder",
+      "Ví dụ: LEAFABC123",
     );
     expect(screen.getByRole("cell", { name: "Đã thanh toán" })).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "Đang giao" })).toBeInTheDocument();
     expect(screen.getByText("Hoàn tiền một phần")).toBeInTheDocument();
     expect(screen.getByText("Đã hoàn tiền toàn bộ")).toBeInTheDocument();
     expect(screen.getByText("100.000 ₫")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "LEAF-PARTIAL" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "LEAFPARTIAL" })).toHaveAttribute(
       "href",
       "/admin/orders/partial-order",
     );
-    expect(screen.getByRole("link", { name: "LEAF-FULL" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "LEAFFULL" })).toHaveAttribute(
       "href",
       "/admin/orders/full-order",
     );

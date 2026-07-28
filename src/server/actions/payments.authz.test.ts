@@ -141,6 +141,50 @@ describe("confirmPaymentManuallyAction", () => {
     );
   });
 
+  it("keeps a committed manual payment successful and attempts every path when revalidation throws", async () => {
+    requireAdminMock.mockResolvedValue(sessionWithRole("staff"));
+    const sentinels = [
+      "private-customer@example.com",
+      "0909123456",
+      "LEAFABC123",
+      "BANK-REF-123",
+    ];
+    revalidatePathMock.mockImplementationOnce(() => {
+      throw new Error(sentinels.join(" | "));
+    });
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    await expect(confirmPaymentManuallyAction(VALID_ORDER_ID)).resolves.toEqual({
+      ok: true,
+    });
+
+    expect(markOrderPaidManuallyCoreMock).toHaveBeenCalledTimes(1);
+    expect(revalidatePathMock).toHaveBeenCalledTimes(3);
+    expect(revalidatePathMock).toHaveBeenNthCalledWith(1, "/admin/orders");
+    expect(revalidatePathMock).toHaveBeenNthCalledWith(
+      2,
+      `/admin/orders/${VALID_ORDER_ID}`,
+    );
+    expect(revalidatePathMock).toHaveBeenNthCalledWith(
+      3,
+      "/orders/LEAFABC123",
+    );
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "[payments] operation=confirm-manual-payment-revalidate category=infrastructure",
+    );
+    for (const call of consoleErrorSpy.mock.calls) {
+      for (const argument of call) {
+        const logged =
+          typeof argument === "string" ? argument : JSON.stringify(argument);
+        for (const sentinel of sentinels) {
+          expect(logged).not.toContain(sentinel);
+        }
+      }
+    }
+  });
+
   it.each([
     ["ORDER_NOT_FOUND", "Không tìm thấy đơn hàng."],
     [

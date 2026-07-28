@@ -92,7 +92,7 @@ export default async function AdminOrdersPage({
             defaultValue={filters.query}
             maxLength={32}
             name="query"
-            placeholder="Ví dụ: LEAF-ABC123"
+            placeholder="Ví dụ: LEAFABC123"
             style={{ borderColor: "var(--line)" }}
             type="search"
           />

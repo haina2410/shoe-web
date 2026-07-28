@@ -27,8 +27,8 @@ describe("parseAdminOrderFilters", () => {
 
   it("trims, uppercases, and caps a scalar query at 32 characters", () => {
     expect(
-      parseAdminOrderFilters({ query: "  leaf-abcd-1234  " }).query,
-    ).toBe("LEAF-ABCD-1234");
+      parseAdminOrderFilters({ query: "  leafabcd1234  " }).query,
+    ).toBe("LEAFABCD1234");
     expect(
       parseAdminOrderFilters({ query: `  ${"a".repeat(40)}  ` }).query,
     ).toBe("A".repeat(32));

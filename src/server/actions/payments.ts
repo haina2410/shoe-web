@@ -41,20 +41,16 @@ export async function confirmPaymentManuallyAction(
     return { ok: false, error: "Mã đơn hàng không hợp lệ." };
   }
 
+  let result: Awaited<ReturnType<typeof markOrderPaidManuallyCore>>;
   try {
     // Kết nối queue phải sẵn sàng trước khi core mở payment transaction, vì
     // job xác nhận email được ghi atomically trong chính transaction đó.
     await getBoss();
-    const result = await markOrderPaidManuallyCore(
+    result = await markOrderPaidManuallyCore(
       prisma,
       parsed.data,
       session.user.id,
     );
-
-    revalidatePath("/admin/orders");
-    revalidatePath(`/admin/orders/${parsed.data}`);
-    revalidatePath(`/orders/${result.orderCode}`);
-    return { ok: true };
   } catch (error: unknown) {
     if (error instanceof PaymentBusinessError) {
       return { ok: false, error: businessErrorMessage[error.code] };
@@ -65,4 +61,21 @@ export async function confirmPaymentManuallyAction(
     );
     return { ok: false, error: genericError };
   }
+
+  const paths = [
+    "/admin/orders",
+    `/admin/orders/${parsed.data}`,
+    `/orders/${result.orderCode}`,
+  ];
+  for (const path of paths) {
+    try {
+      revalidatePath(path);
+    } catch {
+      console.error(
+        "[payments] operation=confirm-manual-payment-revalidate category=infrastructure",
+      );
+    }
+  }
+
+  return { ok: true };
 }

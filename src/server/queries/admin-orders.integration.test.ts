@@ -53,12 +53,12 @@ describe("listAdminOrders", () => {
 
   it("filters by status, order code, and refunds while returning newest orders first", async () => {
     const noRefund = await createOrderFixture({
-      orderCode: "LEAF-NO-REFUND",
+      orderCode: "LEAFNOREFUND",
       status: OrderStatus.PENDING_PAYMENT,
       createdAt: new Date("2026-07-20T08:00:00.000Z"),
     });
     const partialRefund = await createOrderFixture({
-      orderCode: "LEAF-PARTIAL-REFUND",
+      orderCode: "LEAFPARTIALREFUND",
       status: OrderStatus.PAID,
       createdAt: new Date("2026-07-21T08:00:00.000Z"),
       payments: [
@@ -67,7 +67,7 @@ describe("listAdminOrders", () => {
       ],
     });
     const fullRefund = await createOrderFixture({
-      orderCode: "LEAF-FULL-REFUND",
+      orderCode: "LEAFFULLREFUND",
       status: OrderStatus.FULFILLED,
       createdAt: new Date("2026-07-22T08:00:00.000Z"),
       payments: [
@@ -96,8 +96,8 @@ describe("listAdminOrders", () => {
     ]);
     expect(allOrders[0]).toMatchObject({
       id: fullRefund.id,
-      orderCode: "LEAF-FULL-REFUND",
-      customerName: "Khách LEAF-FULL-REFUND",
+      orderCode: "LEAFFULLREFUND",
+      customerName: "Khách LEAFFULLREFUND",
       createdAt: new Date("2026-07-22T08:00:00.000Z"),
       total: 100_000,
       status: OrderStatus.FULFILLED,
@@ -117,7 +117,7 @@ describe("listAdminOrders", () => {
     await expect(
       listAdminOrders(testPrisma, {
         refund: "all",
-        query: "LEAF-PARTIAL",
+        query: "LEAFPARTIAL",
       }),
     ).resolves.toMatchObject([{ id: partialRefund.id }]);
     await expect(
@@ -328,7 +328,7 @@ describe("getAdminOrderDetail", () => {
     });
     const order = await testPrisma.order.create({
       data: {
-        orderCode: `LEAF-DETAIL-${suffix}`,
+        orderCode: `LEAFDETAIL${suffix.replaceAll("-", "")}`,
         email: "khach@example.com",
         customerName: "Nguyễn Khách",
         phone: "0901234567",
@@ -468,7 +468,7 @@ describe("getAdminOrderDetail", () => {
 
   it("removes fulfillment from a fully refunded paid order", async () => {
     const order = await createOrderFixture({
-      orderCode: `LEAF-FULL-DETAIL-${crypto.randomUUID()}`,
+      orderCode: `LEAFFULLDETAIL${crypto.randomUUID().replaceAll("-", "")}`,
       status: OrderStatus.PAID,
       createdAt: new Date("2026-07-28T09:00:00.000Z"),
       payments: [

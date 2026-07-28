@@ -12,7 +12,7 @@ import { resetDb, testPrisma } from "@/test/db";
 async function createOrderFixture(status: OrderStatus, label: string) {
   return testPrisma.order.create({
     data: {
-      orderCode: `LEAF-${label}-${crypto.randomUUID()}`,
+      orderCode: `LEAF${label}${crypto.randomUUID().replaceAll("-", "")}`,
       email: `${label.toLowerCase()}@example.com`,
       customerName: `Khách ${label}`,
       phone: "0900000000",
