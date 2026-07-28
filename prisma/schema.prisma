@@ -13,19 +13,20 @@ datasource db {
 }
 
 model User {
-  id            String    @id
-  name          String
-  email         String
-  emailVerified Boolean   @default(false)
-  image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  role          String?
-  banned        Boolean?  @default(false)
-  banReason     String?
-  banExpires    DateTime?
-  sessions      Session[]
-  accounts      Account[]
+  id               String    @id
+  name             String
+  email            String
+  emailVerified    Boolean   @default(false)
+  image            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  role             String?
+  banned           Boolean?  @default(false)
+  banReason        String?
+  banExpires       DateTime?
+  sessions         Session[]
+  accounts         Account[]
+  recordedPayments Payment[] @relation("RecordedPayments")
 
   @@unique([email])
   @@map("user")
@@ -154,6 +155,11 @@ enum OrderStatus {
   EXPIRED
 }
 
+enum PaymentDirection {
+  IN
+  OUT
+}
+
 enum BankTransactionStatus {
   RECEIVED
   MATCHED
@@ -175,6 +181,7 @@ model Order {
   total            Int
   status           OrderStatus       @default(PENDING_PAYMENT)
   paidAt           DateTime?
+  lastRefundAt     DateTime?
   items            OrderItem[]
   payments         Payment[]
   bankTransactions BankTransaction[]
@@ -201,15 +208,22 @@ model OrderItem {
 }
 
 model Payment {
-  id            String   @id @default(cuid())
-  orderId       String
-  order         Order    @relation(fields: [orderId], references: [id])
-  provider      String   // "sepay" | "manual"
-  transactionId String   @unique
-  amount        Int
-  rawPayload    Json?
-  matchedAt     DateTime @default(now())
+  id                String           @id @default(cuid())
+  orderId           String
+  order             Order            @relation(fields: [orderId], references: [id])
+  provider          String           // "sepay" | "manual"
+  transactionId     String           @unique
+  amount            Int
+  rawPayload        Json?
+  matchedAt         DateTime         @default(now())
+  direction         PaymentDirection @default(IN)
+  externalReference String?
+  note              String?
+  recordedByUserId  String?
+  recordedBy        User?            @relation("RecordedPayments", fields: [recordedByUserId], references: [id], onDelete: SetNull)
   @@index([orderId])
+  @@index([orderId, direction])
+  @@index([recordedByUserId])
   @@map("payment")
 }
 
