@@ -4,6 +4,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { SHIPPING_ZONES, PROVINCE_ZONES } from "./data/provinces";
 import { auth } from "../src/lib/auth";
 import { normalizeText } from "../src/lib/normalize";
+import { SEEDED_PRODUCT_IMAGE_BY_SLUG } from "../src/lib/storefront-assets";
 
 type Db = PrismaClient;
 
@@ -56,7 +57,7 @@ const PRODUCTS: ProductSeed[] = [
     description: "Sneaker cổ thấp, chất liệu vải canvas thoáng khí.",
     basePrice: 890000,
     categorySlug: "giay-sneaker",
-    images: ["/products/sneaker-la-xanh-co-thap-1.jpg"],
+    images: [SEEDED_PRODUCT_IMAGE_BY_SLUG["sneaker-la-xanh-co-thap"]],
     variants: makeVariants("SNK-LX"),
   },
   {
@@ -65,7 +66,7 @@ const PRODUCTS: ProductSeed[] = [
     description: "Thiết kế trẻ trung, phù hợp đi phố mỗi ngày.",
     basePrice: 950000,
     categorySlug: "giay-sneaker",
-    images: ["/products/sneaker-do-thi-nang-dong-1.jpg"],
+    images: [SEEDED_PRODUCT_IMAGE_BY_SLUG["sneaker-do-thi-nang-dong"]],
     variants: makeVariants("SNK-DT"),
   },
   {
@@ -74,7 +75,7 @@ const PRODUCTS: ProductSeed[] = [
     description: "Đệm êm, trọng lượng nhẹ, phù hợp chạy đường dài.",
     basePrice: 1250000,
     categorySlug: "giay-chay-bo",
-    images: ["/products/giay-chay-bo-em-nhe-1.jpg"],
+    images: [SEEDED_PRODUCT_IMAGE_BY_SLUG["giay-chay-bo-em-nhe"]],
     variants: makeVariants("RUN-EN"),
   },
   {
@@ -83,7 +84,7 @@ const PRODUCTS: ProductSeed[] = [
     description: "Đế bám tốt, phù hợp chạy trail và địa hình gồ ghề.",
     basePrice: 1450000,
     categorySlug: "giay-chay-bo",
-    images: ["/products/giay-chay-bo-dia-hinh-1.jpg"],
+    images: [SEEDED_PRODUCT_IMAGE_BY_SLUG["giay-chay-bo-dia-hinh"]],
     variants: makeVariants("RUN-DH"),
   },
   {
@@ -92,7 +93,7 @@ const PRODUCTS: ProductSeed[] = [
     description: "Sandal thoáng mát, quai ngang chắc chắn cho ngày hè.",
     basePrice: 450000,
     categorySlug: "giay-sandal",
-    images: ["/products/sandal-quai-ngang-mua-he-1.jpg"],
+    images: [SEEDED_PRODUCT_IMAGE_BY_SLUG["sandal-quai-ngang-mua-he"]],
     variants: makeVariants("SDL-QN"),
   },
   {
@@ -101,7 +102,7 @@ const PRODUCTS: ProductSeed[] = [
     description: "Đế chống trượt, phù hợp đi biển và dã ngoại.",
     basePrice: 400000,
     categorySlug: "giay-sandal",
-    images: ["/products/sandal-di-bien-chong-truot-1.jpg"],
+    images: [SEEDED_PRODUCT_IMAGE_BY_SLUG["sandal-di-bien-chong-truot"]],
     variants: makeVariants("SDL-DB"),
   },
 ];

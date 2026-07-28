@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { testPrisma, resetDb } from "@/test/db";
 import { seed } from "./seed";
 import { PROVINCE_ZONES } from "./data/provinces";
+import { SEEDED_PRODUCT_IMAGE_BY_SLUG } from "@/lib/storefront-assets";
 
 describe("seed()", () => {
   beforeEach(async () => {
@@ -36,5 +37,33 @@ describe("seed()", () => {
     await seed(testPrisma);
     const c2 = await testPrisma.provinceZone.count();
     expect(c2).toBe(c1);
+  });
+
+  it("gắn đúng ảnh storefront cho từng sản phẩm mẫu", async () => {
+    await seed(testPrisma);
+
+    const products = await testPrisma.product.findMany({
+      select: {
+        slug: true,
+        images: {
+          select: { url: true },
+          orderBy: { position: "asc" },
+        },
+      },
+    });
+
+    expect(products).toHaveLength(
+      Object.keys(SEEDED_PRODUCT_IMAGE_BY_SLUG).length,
+    );
+    for (const product of products) {
+      const expectedImage =
+        SEEDED_PRODUCT_IMAGE_BY_SLUG[
+          product.slug as keyof typeof SEEDED_PRODUCT_IMAGE_BY_SLUG
+        ];
+      expect(expectedImage).toBeDefined();
+      expect(product.images.map((image) => image.url)).toEqual([
+        expectedImage,
+      ]);
+    }
   });
 });
