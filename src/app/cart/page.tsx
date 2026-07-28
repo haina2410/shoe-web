@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCart, useCartHydrated, type CartItem } from "@/lib/cart";
 import { formatVnd } from "@/lib/money";
 import { cartSubtotal } from "@/lib/cart-math";
+import { EmptyState } from "@/components/empty-state";
 
 /**
  * `/cart` — trang giỏ hàng.
@@ -24,28 +25,24 @@ export default function CartPage() {
 
   if (!hasHydrated) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-8">
-        <h1
-          className="text-2xl font-bold"
-          style={{ color: "var(--evergreen)" }}
-        >
-          Giỏ hàng
-        </h1>
+      <div className="mx-auto max-w-3xl px-4 py-8" role="status" aria-label="Đang tải giỏ hàng">
+        <div className="h-8 w-32 animate-pulse rounded bg-[var(--sage)]" aria-hidden="true" />
+        <div className="mt-6 h-28 animate-pulse rounded-xl bg-[var(--sage)]" aria-hidden="true" />
       </div>
     );
   }
 
   if (items.length === 0) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-16 text-center">
-        <p className="text-lg font-medium">Giỏ hàng trống</p>
-        <Link
-          href="/products"
-          className="mt-4 inline-block underline"
-          style={{ color: "var(--evergreen)" }}
-        >
-          Tiếp tục xem sản phẩm
-        </Link>
+      <div className="mx-auto max-w-3xl px-4 py-8">
+        <h1 className="text-2xl font-bold" style={{ color: "var(--evergreen)" }}>
+          Giỏ hàng
+        </h1>
+        <EmptyState
+          title="Giỏ hàng trống"
+          description="Hãy chọn một đôi giày phù hợp để bắt đầu đơn hàng của bạn."
+          action={{ href: "/products", label: "Tiếp tục xem sản phẩm" }}
+        />
       </div>
     );
   }
@@ -65,7 +62,7 @@ export default function CartPage() {
         {items.map((item) => (
           <li
             key={item.variantId}
-            className="flex items-center gap-4 border-b pb-4"
+            className="flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-center"
             style={{ borderColor: "var(--line)" }}
           >
             <div
@@ -90,7 +87,7 @@ export default function CartPage() {
               )}
             </div>
 
-            <div className="flex-1">
+            <div className="min-w-0 flex-1">
               <Link href={`/products/${item.slug}`} className="font-medium hover:underline">
                 {item.name}
               </Link>
@@ -100,40 +97,42 @@ export default function CartPage() {
               <p className="text-sm font-semibold">{formatVnd(item.unitPrice)}</p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-4 sm:justify-start">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  aria-label={`Giảm số lượng ${item.name} (${item.size}, ${item.color})`}
+                  className="flex h-8 w-8 items-center justify-center rounded-md border text-sm"
+                  style={{ borderColor: "var(--line)" }}
+                  onClick={() => setQuantity(item.variantId, item.quantity - 1)}
+                >
+                  −
+                </button>
+                <QuantityInput
+                  item={item}
+                  onCommit={(quantity) => setQuantity(item.variantId, quantity)}
+                />
+                <button
+                  type="button"
+                  aria-label={`Tăng số lượng ${item.name} (${item.size}, ${item.color})`}
+                  className="flex h-8 w-8 items-center justify-center rounded-md border text-sm"
+                  style={{ borderColor: "var(--line)" }}
+                  onClick={() => setQuantity(item.variantId, item.quantity + 1)}
+                >
+                  +
+                </button>
+              </div>
+
               <button
                 type="button"
-                aria-label={`Giảm số lượng ${item.name} (${item.size}, ${item.color})`}
-                className="flex h-7 w-7 items-center justify-center rounded-md border text-sm"
-                style={{ borderColor: "var(--line)" }}
-                onClick={() => setQuantity(item.variantId, item.quantity - 1)}
+                aria-label={`Xoá ${item.name} (${item.size}, ${item.color}) khỏi giỏ hàng`}
+                className="text-sm font-medium underline"
+                style={{ color: "var(--ink)" }}
+                onClick={() => removeItem(item.variantId)}
               >
-                −
-              </button>
-              <QuantityInput
-                item={item}
-                onCommit={(quantity) => setQuantity(item.variantId, quantity)}
-              />
-              <button
-                type="button"
-                aria-label={`Tăng số lượng ${item.name} (${item.size}, ${item.color})`}
-                className="flex h-7 w-7 items-center justify-center rounded-md border text-sm"
-                style={{ borderColor: "var(--line)" }}
-                onClick={() => setQuantity(item.variantId, item.quantity + 1)}
-              >
-                +
+                Xoá
               </button>
             </div>
-
-            <button
-              type="button"
-              aria-label={`Xoá ${item.name} (${item.size}, ${item.color}) khỏi giỏ hàng`}
-              className="text-sm font-medium underline"
-              style={{ color: "var(--ink)" }}
-              onClick={() => removeItem(item.variantId)}
-            >
-              Xoá
-            </button>
           </li>
         ))}
       </ul>
@@ -206,7 +205,7 @@ function QuantityInput({
       value={text}
       onChange={(event) => setText(event.target.value)}
       onBlur={handleBlur}
-      className="w-14 rounded-md border px-2 py-1 text-center text-sm"
+      className="w-14 rounded-md border px-2 py-1.5 text-center text-sm"
       style={{ borderColor: "var(--line)" }}
     />
   );

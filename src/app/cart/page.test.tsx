@@ -60,13 +60,19 @@ describe("CartPage", () => {
 
     expect(screen.queryByText("Giỏ hàng trống")).not.toBeInTheDocument();
     expect(screen.queryByText("Giày A")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("status", { name: "Đang tải giỏ hàng" }),
+    ).toBeInTheDocument();
   });
 
   it("đã hydrate, giỏ rỗng → hiện 'Giỏ hàng trống' + link tới /products", () => {
     mockState = { items: [], hasHydrated: true, setQuantity, removeItem };
     render(<CartPage />);
 
-    expect(screen.getByText("Giỏ hàng trống")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Giỏ hàng trống" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/chọn một đôi giày/i)).toBeInTheDocument();
     const link = screen.getByRole("link", { name: /sản phẩm/i });
     expect(link).toHaveAttribute("href", "/products");
   });

@@ -24,13 +24,14 @@ vi.mock("@/server/actions/checkout", () => ({
 type MockCartState = {
   items: CartItem[];
   clear: typeof clearMock;
+  hasHydrated: boolean;
 };
 
 let mockState: MockCartState;
 
 vi.mock("@/lib/cart", () => ({
   useCart: (selector: (state: MockCartState) => unknown) => selector(mockState),
-  useCartHydrated: () => true,
+  useCartHydrated: () => mockState.hasHydrated,
 }));
 
 // Import SAU khi mock đã đăng ký để component nhận bản mock của "@/lib/cart".
@@ -52,7 +53,7 @@ beforeEach(() => {
   createOrderActionMock.mockClear();
   pushMock.mockClear();
   clearMock.mockClear();
-  mockState = { items: [item], clear: clearMock };
+  mockState = { items: [item], clear: clearMock, hasHydrated: true };
 });
 
 describe("CheckoutPage", () => {
@@ -65,13 +66,26 @@ describe("CheckoutPage", () => {
   });
 
   it("giỏ hàng rỗng → hiện 'Giỏ hàng trống' + link /products, KHÔNG hiện form", () => {
-    mockState = { items: [], clear: clearMock };
+    mockState = { items: [], clear: clearMock, hasHydrated: true };
     render(<CheckoutPage />);
 
-    expect(screen.getByText("Giỏ hàng trống")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Giỏ hàng trống" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/chọn một đôi giày/i)).toBeInTheDocument();
     expect(screen.queryByLabelText(/họ tên/i)).not.toBeInTheDocument();
     const link = screen.getByRole("link", { name: /sản phẩm/i });
     expect(link).toHaveAttribute("href", "/products");
+  });
+
+  it("chưa hydrate xong → hiện trạng thái tải ổn định", () => {
+    mockState = { items: [item], clear: clearMock, hasHydrated: false };
+    render(<CheckoutPage />);
+
+    expect(
+      screen.getByRole("status", { name: "Đang tải giỏ hàng" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText(/họ tên/i)).not.toBeInTheDocument();
   });
 
   it("submit form hợp lệ → gọi createOrderAction với items map đúng (chỉ variantId+quantity)", async () => {
@@ -132,7 +146,9 @@ describe("CheckoutPage", () => {
     await user.type(screen.getByLabelText(/địa chỉ/i), "123 Đường Láng");
     await user.click(screen.getByRole("button", { name: /đặt hàng/i }));
 
-    expect(await screen.findByText("Sản phẩm đã hết hàng.")).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Sản phẩm đã hết hàng.",
+    );
     expect(clearMock).not.toHaveBeenCalled();
     expect(pushMock).not.toHaveBeenCalled();
   });
@@ -149,7 +165,7 @@ describe("CheckoutPage", () => {
       imageUrl: null,
       quantity: 1,
     };
-    mockState = { items: [item, itemB], clear: clearMock };
+    mockState = { items: [item, itemB], clear: clearMock, hasHydrated: true };
     render(<CheckoutPage />);
 
     // Tạm tính = 500000*2 + 300000*1 = 1.300.000, khác với mọi dòng lẻ

@@ -80,6 +80,12 @@ describe("OrderConfirmationPage payment state", () => {
     expect(screen.getByTestId("order-status")).toHaveTextContent(
       "Chờ thanh toán",
     );
+    expect(screen.getByTestId("order-status")).toHaveAccessibleName(
+      /trạng thái đơn hàng/i,
+    );
+    expect(
+      screen.getByRole("region", { name: "Tóm tắt đơn hàng" }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("img", { name: "Mã QR chuyển khoản VietQR" }),
     ).toBeInTheDocument();

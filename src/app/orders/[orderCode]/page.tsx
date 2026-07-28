@@ -104,7 +104,17 @@ export default async function OrderConfirmationPage({
           {order.orderCode}
         </span>{" "}
         — Trạng thái:{" "}
-        <span data-testid="order-status" className="font-semibold">
+        <span
+          data-testid="order-status"
+          aria-label={`Trạng thái đơn hàng: ${statusPresentation.label}`}
+          className={
+            statusPresentation.kind === "pending"
+              ? "inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800"
+              : statusPresentation.kind === "paid"
+                ? "inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800"
+                : "inline-flex rounded-full bg-neutral-200 px-2 py-0.5 text-xs font-semibold text-neutral-700"
+          }
+        >
           {statusPresentation.label}
         </span>
       </p>
@@ -116,8 +126,9 @@ export default async function OrderConfirmationPage({
             total={order.total}
           />
         ) : statusPresentation.kind === "paid" ? (
-          <section>
+          <section aria-labelledby="payment-confirmed-heading">
             <h2
+              id="payment-confirmed-heading"
               className="text-lg font-semibold"
               style={{ color: "var(--evergreen)" }}
             >
@@ -128,8 +139,9 @@ export default async function OrderConfirmationPage({
             </p>
           </section>
         ) : (
-          <section>
+          <section aria-labelledby="inactive-order-heading">
             <h2
+              id="inactive-order-heading"
               className="text-lg font-semibold"
               style={{ color: "var(--evergreen)" }}
             >
@@ -141,8 +153,8 @@ export default async function OrderConfirmationPage({
           </section>
         )}
 
-        <section>
-          <h2 className="text-lg font-semibold" style={{ color: "var(--evergreen)" }}>
+        <section aria-labelledby="order-summary-heading" className="rounded-xl border p-5" style={{ borderColor: "var(--line)" }}>
+          <h2 id="order-summary-heading" className="text-lg font-semibold" style={{ color: "var(--evergreen)" }}>
             Tóm tắt đơn hàng
           </h2>
 
@@ -204,8 +216,9 @@ function PendingPaymentSection({
   });
 
   return (
-    <section>
+    <section aria-labelledby="payment-instructions-heading" className="rounded-xl border p-5" style={{ borderColor: "var(--line)" }}>
       <h2
+        id="payment-instructions-heading"
         className="text-lg font-semibold"
         style={{ color: "var(--evergreen)" }}
       >
@@ -244,7 +257,9 @@ function PendingPaymentSection({
         style={{ color: "var(--destructive)" }}
       >
         Vui lòng ghi đúng nội dung chuyển khoản:{" "}
-        <span data-testid="order-transfer-content">{orderCode}</span>
+        <span data-testid="order-transfer-content" className="select-all break-all rounded bg-red-50 px-1">
+          {orderCode}
+        </span>
       </p>
     </section>
   );

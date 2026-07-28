@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition, type FormEvent } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart, useCartHydrated } from "@/lib/cart";
 import { cartSubtotal } from "@/lib/cart-math";
@@ -9,6 +8,7 @@ import { formatVnd } from "@/lib/money";
 import { PROVINCES, type Province } from "@/lib/provinces";
 import { createOrderAction } from "@/server/actions/checkout";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/empty-state";
 
 /**
  * `/checkout` — trang đặt hàng (guest checkout, KHÔNG cần đăng nhập).
@@ -55,25 +55,24 @@ export default function CheckoutPage() {
 
   if (!hasHydrated) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-8">
-        <h1 className="text-2xl font-bold" style={{ color: "var(--evergreen)" }}>
-          Thanh toán
-        </h1>
+      <div className="mx-auto max-w-3xl px-4 py-8" role="status" aria-label="Đang tải giỏ hàng">
+        <div className="h-8 w-32 animate-pulse rounded bg-[var(--sage)]" aria-hidden="true" />
+        <div className="mt-6 h-80 animate-pulse rounded-xl bg-[var(--sage)]" aria-hidden="true" />
       </div>
     );
   }
 
   if (items.length === 0) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-16 text-center">
-        <p className="text-lg font-medium">Giỏ hàng trống</p>
-        <Link
-          href="/products"
-          className="mt-4 inline-block underline"
-          style={{ color: "var(--evergreen)" }}
-        >
-          Tiếp tục xem sản phẩm
-        </Link>
+      <div className="mx-auto max-w-3xl px-4 py-8">
+        <h1 className="text-2xl font-bold" style={{ color: "var(--evergreen)" }}>
+          Thanh toán
+        </h1>
+        <EmptyState
+          title="Giỏ hàng trống"
+          description="Hãy chọn một đôi giày phù hợp trước khi thanh toán."
+          action={{ href: "/products", label: "Tiếp tục xem sản phẩm" }}
+        />
       </div>
     );
   }
@@ -114,8 +113,15 @@ export default function CheckoutPage() {
         Thanh toán
       </h1>
 
-      <form onSubmit={handleSubmit} className="mt-6 grid gap-8 md:grid-cols-2">
-        <div className="flex flex-col gap-4">
+      <form onSubmit={handleSubmit} className="mt-6 grid gap-6 md:grid-cols-2">
+        <section
+          aria-labelledby="delivery-details-heading"
+          className="flex flex-col gap-4 rounded-xl border p-5 shadow-sm"
+          style={{ borderColor: "var(--line)", backgroundColor: "var(--paper)" }}
+        >
+          <h2 id="delivery-details-heading" className="text-lg font-semibold" style={{ color: "var(--evergreen)" }}>
+            Thông tin giao hàng
+          </h2>
           <div className="space-y-1.5">
             <label htmlFor="customerName" className="text-sm font-medium" style={{ color: "var(--ink)" }}>
               Họ tên
@@ -223,7 +229,7 @@ export default function CheckoutPage() {
           </div>
 
           {error && (
-            <p className="text-sm" style={{ color: "var(--destructive)" }}>
+            <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm" style={{ color: "var(--destructive)" }}>
               {error}
             </p>
           )}
@@ -231,10 +237,14 @@ export default function CheckoutPage() {
           <Button type="submit" disabled={isPending} className="w-fit">
             {isPending ? "Đang đặt hàng…" : "Đặt hàng"}
           </Button>
-        </div>
+        </section>
 
-        <div>
-          <h2 className="text-lg font-semibold" style={{ color: "var(--evergreen)" }}>
+        <section
+          aria-labelledby="checkout-summary-heading"
+          className="h-fit rounded-xl border p-5 shadow-sm"
+          style={{ borderColor: "var(--line)", backgroundColor: "var(--paper)" }}
+        >
+          <h2 id="checkout-summary-heading" className="text-lg font-semibold" style={{ color: "var(--evergreen)" }}>
             Đơn hàng của bạn
           </h2>
 
@@ -268,7 +278,7 @@ export default function CheckoutPage() {
             Phí vận chuyển và tổng cộng sẽ hiển thị ở trang xác nhận sau khi đặt
             hàng thành công.
           </p>
-        </div>
+        </section>
       </form>
     </div>
   );
