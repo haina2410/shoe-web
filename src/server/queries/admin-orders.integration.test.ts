@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  BankTransactionStatus,
   OrderStatus,
   PaymentDirection,
 } from "@/generated/prisma/enums";
 import {
   getAdminOrderDetail,
   listAdminOrders,
+  listReviewedBankTransactions,
 } from "@/server/queries/admin-orders";
 import { resetDb, testPrisma } from "@/test/db";
 
@@ -124,6 +126,168 @@ describe("listAdminOrders", () => {
         query: "",
       }),
     ).resolves.toMatchObject([{ id: fullRefund.id }, { id: partialRefund.id }]);
+  });
+});
+
+describe("listReviewedBankTransactions", () => {
+  beforeEach(async () => {
+    await resetDb();
+  });
+
+  it("returns the oldest review-required events with masked accounts and safe reason labels", async () => {
+    const suffix = crypto.randomUUID();
+    const older = await testPrisma.bankTransaction.create({
+      data: {
+        provider: "sepay",
+        providerTransactionId: `review-older-${suffix}`,
+        gateway: "VCB",
+        accountNumber: "0123456789",
+        transferType: "in",
+        amount: 120_000,
+        paymentCode: "LEAFABC123",
+        content: "Thanh toan LEAFABC123",
+        occurredAt: new Date("2026-07-20T08:00:00.000Z"),
+        createdAt: new Date("2026-07-20T08:01:00.000Z"),
+        rawPayload: { secret: "older-raw-payload" },
+        status: BankTransactionStatus.REVIEW_REQUIRED,
+        reviewReason: "MISSING_ORDER_CODE",
+      },
+    });
+    const unknownReason = await testPrisma.bankTransaction.create({
+      data: {
+        provider: "sepay",
+        providerTransactionId: `review-unknown-${suffix}`,
+        gateway: "ACB",
+        accountNumber: "1234",
+        transferType: "in",
+        amount: 150_000,
+        paymentCode: null,
+        content: "Chuyen khoan can kiem tra",
+        occurredAt: new Date("2026-07-20T09:00:00.000Z"),
+        createdAt: new Date("2026-07-20T09:01:00.000Z"),
+        rawPayload: { secret: "unknown-raw-payload" },
+        status: BankTransactionStatus.REVIEW_REQUIRED,
+        reviewReason: "UNEXPECTED_PERSISTED_REASON",
+      },
+    });
+    const nullReason = await testPrisma.bankTransaction.create({
+      data: {
+        provider: "sepay",
+        providerTransactionId: `review-null-${suffix}`,
+        gateway: "MB",
+        accountNumber: "99887766",
+        transferType: "in",
+        amount: 200_000,
+        paymentCode: "LEAFDEF456",
+        content: "Thanh toan LEAFDEF456",
+        occurredAt: new Date("2026-07-20T10:00:00.000Z"),
+        createdAt: new Date("2026-07-20T10:01:00.000Z"),
+        rawPayload: { secret: "null-raw-payload" },
+        status: BankTransactionStatus.REVIEW_REQUIRED,
+        reviewReason: null,
+      },
+    });
+    await testPrisma.bankTransaction.createMany({
+      data: [
+        {
+          provider: "sepay",
+          providerTransactionId: `received-${suffix}`,
+          gateway: "VCB",
+          accountNumber: "0111222333",
+          transferType: "in",
+          amount: 100_000,
+          content: "Giao dich moi",
+          occurredAt: new Date("2026-07-20T07:00:00.000Z"),
+          createdAt: new Date("2026-07-20T07:01:00.000Z"),
+          rawPayload: { secret: "received-raw-payload" },
+          status: BankTransactionStatus.RECEIVED,
+        },
+        {
+          provider: "sepay",
+          providerTransactionId: `matched-${suffix}`,
+          gateway: "VCB",
+          accountNumber: "0444555666",
+          transferType: "in",
+          amount: 100_000,
+          content: "Da ghep",
+          occurredAt: new Date("2026-07-20T11:00:00.000Z"),
+          createdAt: new Date("2026-07-20T11:01:00.000Z"),
+          rawPayload: { secret: "matched-raw-payload" },
+          status: BankTransactionStatus.MATCHED,
+        },
+      ],
+    });
+
+    const transactions = await listReviewedBankTransactions(testPrisma);
+
+    expect(transactions.map((transaction) => transaction.id)).toEqual([
+      older.id,
+      unknownReason.id,
+      nullReason.id,
+    ]);
+    expect(transactions).toEqual([
+      expect.objectContaining({
+        id: older.id,
+        maskedAccountNumber: "•••• 6789",
+        reviewReason: "MISSING_ORDER_CODE",
+        reviewReasonLabel: "Không tìm thấy mã đơn trong giao dịch",
+      }),
+      expect.objectContaining({
+        id: unknownReason.id,
+        maskedAccountNumber: "••••",
+        reviewReason: "UNEXPECTED_PERSISTED_REASON",
+        reviewReasonLabel: "Cần kiểm tra thủ công",
+      }),
+      expect.objectContaining({
+        id: nullReason.id,
+        maskedAccountNumber: "•••• 7766",
+        reviewReason: null,
+        reviewReasonLabel: "Cần kiểm tra thủ công",
+      }),
+    ]);
+    expect(Object.keys(transactions[0]).sort()).toEqual([
+      "amount",
+      "content",
+      "gateway",
+      "id",
+      "maskedAccountNumber",
+      "occurredAt",
+      "paymentCode",
+      "reviewReason",
+      "reviewReasonLabel",
+    ]);
+    expect(JSON.stringify(transactions)).not.toContain("raw-payload");
+  });
+
+  it.each([
+    ["ORDER_NOT_FOUND", "Mã đơn không tồn tại"],
+    ["AMOUNT_MISMATCH", "Số tiền không khớp"],
+    ["ORDER_NOT_PENDING", "Đơn không còn chờ thanh toán"],
+    ["INSUFFICIENT_STOCK", "Không đủ tồn kho"],
+  ])("maps %s to its Vietnamese review label", async (reviewReason, label) => {
+    const transaction = await testPrisma.bankTransaction.create({
+      data: {
+        provider: "sepay",
+        providerTransactionId: `review-reason-${crypto.randomUUID()}`,
+        gateway: "VCB",
+        accountNumber: "0123456789",
+        transferType: "in",
+        amount: 100_000,
+        content: "Thanh toan can kiem tra",
+        occurredAt: new Date("2026-07-20T08:00:00.000Z"),
+        rawPayload: { secret: "reason-raw-payload" },
+        status: BankTransactionStatus.REVIEW_REQUIRED,
+        reviewReason,
+      },
+    });
+
+    await expect(listReviewedBankTransactions(testPrisma)).resolves.toEqual([
+      expect.objectContaining({
+        id: transaction.id,
+        reviewReason,
+        reviewReasonLabel: label,
+      }),
+    ]);
   });
 });
 

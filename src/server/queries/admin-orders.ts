@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import {
+  BankTransactionStatus,
   OrderStatus,
   PaymentDirection,
   type BankTransactionStatus as BankTransactionStatusValue,
@@ -93,7 +94,34 @@ export type AdminOrderDetail = {
   nextOrderStatuses: OrderStatusValue[];
 };
 
+export type ReviewedBankTransactionListItem = {
+  id: string;
+  occurredAt: Date;
+  gateway: string;
+  maskedAccountNumber: string;
+  amount: number;
+  content: string;
+  paymentCode: string | null;
+  reviewReason: string | null;
+  reviewReasonLabel: string;
+};
+
 const ORDER_STATUSES = new Set<string>(Object.values(OrderStatus));
+
+const REVIEW_REASON_LABELS: Record<string, string> = {
+  MISSING_ORDER_CODE: "Không tìm thấy mã đơn trong giao dịch",
+  ORDER_NOT_FOUND: "Mã đơn không tồn tại",
+  AMOUNT_MISMATCH: "Số tiền không khớp",
+  ORDER_NOT_PENDING: "Đơn không còn chờ thanh toán",
+  INSUFFICIENT_STOCK: "Không đủ tồn kho",
+};
+
+const REVIEW_REASON_FALLBACK_LABEL = "Cần kiểm tra thủ công";
+
+function maskAccountNumber(accountNumber: string): string {
+  if (accountNumber.length <= 4) return "••••";
+  return `•••• ${accountNumber.slice(-4)}`;
+}
 
 export function parseAdminOrderFilters(input: {
   status?: string | string[];
@@ -145,6 +173,40 @@ export async function listAdminOrders(
       },
     },
   });
+}
+
+export async function listReviewedBankTransactions(
+  db: PrismaClient,
+): Promise<ReviewedBankTransactionListItem[]> {
+  const transactions = await db.bankTransaction.findMany({
+    where: { status: BankTransactionStatus.REVIEW_REQUIRED },
+    orderBy: { createdAt: "asc" },
+    take: 100,
+    select: {
+      id: true,
+      occurredAt: true,
+      gateway: true,
+      accountNumber: true,
+      amount: true,
+      content: true,
+      paymentCode: true,
+      reviewReason: true,
+    },
+  });
+
+  return transactions.map((transaction) => ({
+    id: transaction.id,
+    occurredAt: transaction.occurredAt,
+    gateway: transaction.gateway,
+    maskedAccountNumber: maskAccountNumber(transaction.accountNumber),
+    amount: transaction.amount,
+    content: transaction.content,
+    paymentCode: transaction.paymentCode,
+    reviewReason: transaction.reviewReason,
+    reviewReasonLabel:
+      REVIEW_REASON_LABELS[transaction.reviewReason ?? ""] ??
+      REVIEW_REASON_FALLBACK_LABEL,
+  }));
 }
 
 export async function getAdminOrderDetail(
