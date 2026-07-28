@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Image from "next/image";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getProductBySlug } from "@/server/queries/catalog";
@@ -48,19 +50,41 @@ export default async function ProductDetailPage({
   const [mainImage, ...thumbnails] = product.images;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
-      <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+    <main className="mx-auto max-w-6xl px-4 py-8 sm:py-12">
+      <nav aria-label="Breadcrumb" className="mb-6 text-sm text-neutral-600">
+        <ol className="flex flex-wrap items-center gap-2">
+          <li>
+            <Link href="/" className="hover:underline">
+              Trang chủ
+            </Link>
+          </li>
+          <li aria-hidden="true">/</li>
+          <li>
+            <Link href="/products" className="hover:underline">
+              Sản phẩm
+            </Link>
+          </li>
+          <li aria-hidden="true">/</li>
+          <li aria-current="page" className="font-medium text-[var(--ink)]">
+            {product.name}
+          </li>
+        </ol>
+      </nav>
+
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:gap-12">
         <div>
           <div
-            className="aspect-square w-full overflow-hidden rounded-lg"
+            className="relative aspect-square w-full overflow-hidden rounded-2xl"
             style={{ backgroundColor: "var(--sage)" }}
           >
             {mainImage ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <Image
                 src={mainImage.url}
                 alt={product.name}
-                className="h-full w-full object-cover"
+                fill
+                sizes="(max-width: 1023px) 100vw, 54vw"
+                unoptimized={mainImage.url.startsWith("/api/uploads/")}
+                className="object-cover"
               />
             ) : (
               <div
@@ -74,18 +98,20 @@ export default async function ProductDetailPage({
           </div>
 
           {thumbnails.length > 0 && (
-            <div className="mt-3 grid grid-cols-4 gap-2">
+            <div className="mt-4 grid grid-cols-4 gap-3">
               {thumbnails.map((image) => (
                 <div
                   key={image.id}
-                  className="aspect-square overflow-hidden rounded-md"
+                  className="relative aspect-square overflow-hidden rounded-lg"
                   style={{ backgroundColor: "var(--sage)" }}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
+                  <Image
                     src={image.url}
-                    alt={product.name}
-                    className="h-full w-full object-cover"
+                    alt=""
+                    fill
+                    sizes="(max-width: 639px) 25vw, (max-width: 1023px) 20vw, 14vw"
+                    unoptimized={image.url.startsWith("/api/uploads/")}
+                    className="object-cover"
                   />
                 </div>
               ))}
@@ -93,17 +119,17 @@ export default async function ProductDetailPage({
           )}
         </div>
 
-        <div>
-          <p className="text-sm text-neutral-500">{product.category.name}</p>
+        <div className="h-fit rounded-2xl border bg-[var(--paper)] p-5 shadow-sm sm:p-7" style={{ borderColor: "var(--line)" }}>
+          <p className="text-sm font-semibold tracking-[0.12em] uppercase" style={{ color: "var(--accent)" }}>
+            {product.category.name}
+          </p>
           <h1
-            className="mt-1 text-2xl font-bold"
+            className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl"
             style={{ color: "var(--evergreen)" }}
           >
             {product.name}
           </h1>
-          <p className="mt-2 text-lg font-semibold">
-            {formatVnd(product.basePrice)}
-          </p>
+          <p className="mt-4 text-xl font-bold">{formatVnd(product.basePrice)}</p>
 
           {product.description && (
             <p className="mt-4 whitespace-pre-line text-neutral-700">
@@ -119,8 +145,14 @@ export default async function ProductDetailPage({
             name={product.name}
             imageUrl={product.images[0]?.url ?? null}
           />
+
+          <ul className="mt-8 space-y-3 border-t pt-6 text-sm" style={{ borderColor: "var(--line)" }}>
+            <li className="flex gap-3"><span aria-hidden="true">✓</span><span><strong>Thanh toán VietQR</strong><br />Xác nhận chuyển khoản nhanh chóng.</span></li>
+            <li className="flex gap-3"><span aria-hidden="true">✓</span><span><strong>Giao hàng toàn quốc</strong><br />Cửa hàng sẽ liên hệ để xác nhận đơn.</span></li>
+            <li className="flex gap-3"><span aria-hidden="true">✓</span><span><strong>Hỗ trợ qua Zalo</strong><br />Liên hệ cửa hàng khi cần tư vấn hoặc đổi trả.</span></li>
+          </ul>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

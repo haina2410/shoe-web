@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
   PRICE_RANGES,
@@ -71,14 +72,30 @@ export function Filters({
   }
 
   return (
-    <aside className="space-y-6 text-sm">
+    <aside
+      aria-label="Bộ lọc sản phẩm"
+      className="h-fit space-y-6 rounded-xl border bg-[var(--paper)] p-4 text-sm shadow-sm md:sticky md:top-24"
+      style={{ borderColor: "var(--line)" }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="font-semibold" style={{ color: "var(--evergreen)" }}>
+          Bộ lọc
+        </h2>
+        <Link
+          href="/products"
+          className="text-xs font-semibold underline underline-offset-4"
+          style={{ color: "var(--evergreen)" }}
+        >
+          Xoá bộ lọc
+        </Link>
+      </div>
       <div>
         <label htmlFor="category-select" className="mb-1 block font-medium">
           Danh mục
         </label>
         <select
           id="category-select"
-          className="w-full rounded-md border px-2 py-1.5"
+          className="min-h-10 w-full rounded-md border px-3 py-2"
           style={{ borderColor: "var(--line)" }}
           value={query.categorySlug ?? ""}
           onChange={(e) =>
@@ -98,7 +115,7 @@ export function Filters({
         <p className="mb-1 font-medium">Kích cỡ</p>
         <div className="flex flex-wrap gap-2">
           {facets.sizes.map((size) => (
-            <label key={size} className="flex items-center gap-1">
+            <label key={size} className="flex min-h-9 items-center gap-2 rounded-md px-1">
               <input
                 type="checkbox"
                 checked={(query.sizes ?? []).includes(size)}
@@ -116,7 +133,7 @@ export function Filters({
         <p className="mb-1 font-medium">Màu sắc</p>
         <div className="flex flex-wrap gap-2">
           {facets.colors.map((color) => (
-            <label key={color} className="flex items-center gap-1">
+            <label key={color} className="flex min-h-9 items-center gap-2 rounded-md px-1">
               <input
                 type="checkbox"
                 checked={(query.colors ?? []).includes(color)}
@@ -134,7 +151,7 @@ export function Filters({
         <p className="mb-1 font-medium">Khoảng giá</p>
         <div className="flex flex-col gap-1">
           {PRICE_RANGES.map((range) => (
-            <label key={range.key} className="flex items-center gap-1">
+            <label key={range.key} className="flex min-h-9 items-center gap-2 rounded-md px-1">
               <input
                 type="checkbox"
                 checked={(query.priceKeys ?? []).includes(range.key)}
@@ -159,7 +176,7 @@ export function Filters({
           id="search-input"
           type="search"
           placeholder="Tên sản phẩm..."
-          className="w-full rounded-md border px-2 py-1.5"
+          className="min-h-10 w-full rounded-md border px-3 py-2"
           style={{ borderColor: "var(--line)" }}
           value={searchValue}
           onChange={(e) => setSearchValue(e.target.value)}
@@ -178,7 +195,7 @@ export function Filters({
         </label>
         <select
           id="sort-select"
-          className="w-full rounded-md border px-2 py-1.5"
+          className="min-h-10 w-full rounded-md border px-3 py-2"
           style={{ borderColor: "var(--line)" }}
           value={query.sort ?? "moi-nhat"}
           onChange={(e) =>

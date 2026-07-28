@@ -3,6 +3,7 @@ import { listProducts, getFacets, listCategories } from "@/server/queries/catalo
 import type { CatalogQuery, CatalogSort } from "@/lib/catalog-filters";
 import { Filters } from "@/components/filters";
 import { ProductCard } from "@/components/product-card";
+import { EmptyState } from "@/components/empty-state";
 
 /**
  * `/products` — trang danh sách sản phẩm storefront (lưới + bộ lọc).
@@ -58,21 +59,23 @@ export default async function ProductsPage({
   ]);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
-      <h1 className="text-2xl font-bold" style={{ color: "var(--evergreen)" }}>
+    <main className="mx-auto max-w-6xl px-4 py-8 sm:py-12">
+      <p className="text-sm font-semibold tracking-[0.18em] uppercase" style={{ color: "var(--accent)" }}>
+        Leafshoes
+      </p>
+      <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl" style={{ color: "var(--evergreen)" }}>
         Sản phẩm
       </h1>
 
-      <div className="mt-6 grid grid-cols-1 gap-8 md:grid-cols-[220px_1fr]">
+      <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-[240px_1fr]">
         <Filters categories={categories} facets={facets} query={query} />
 
         {products.length === 0 ? (
-          <div
-            className="flex min-h-[200px] items-center justify-center rounded-lg border border-dashed text-center"
-            style={{ borderColor: "var(--line)" }}
-          >
-            <p className="text-neutral-600">Không tìm thấy sản phẩm phù hợp.</p>
-          </div>
+          <EmptyState
+            title="Không tìm thấy sản phẩm"
+            description="Hãy thử thay đổi bộ lọc hoặc xem toàn bộ danh mục."
+            action={{ href: "/products", label: "Xem tất cả sản phẩm" }}
+          />
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {products.map((product) => (
@@ -81,6 +84,6 @@ export default async function ProductsPage({
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }

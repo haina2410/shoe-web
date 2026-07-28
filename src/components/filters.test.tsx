@@ -27,6 +27,24 @@ beforeEach(() => {
 });
 
 describe("Filters", () => {
+  it("có landmark bộ lọc và liên kết xoá toàn bộ bộ lọc", () => {
+    render(
+      <Filters
+        categories={categories}
+        facets={facets}
+        query={{ categorySlug: "sneaker", sizes: ["39"] }}
+      />,
+    );
+
+    expect(
+      screen.getByRole("complementary", { name: "Bộ lọc sản phẩm" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Xoá bộ lọc" })).toHaveAttribute(
+      "href",
+      "/products",
+    );
+  });
+
   it("render danh mục từ props categories", () => {
     render(<Filters categories={categories} facets={facets} query={{}} />);
     expect(screen.getByText("Giày Sneaker")).toBeInTheDocument();

@@ -1,7 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { ProductCard } from "./product-card";
 import type { CatalogListItem } from "@/server/queries/catalog";
+
+vi.mock("next/image", () => ({
+  default: ({ src, alt, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) => (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={src} alt={alt} {...props} />
+  ),
+}));
 
 const baseItem: CatalogListItem = {
   id: "prod-1",
@@ -41,5 +48,20 @@ describe("ProductCard", () => {
     render(<ProductCard product={{ ...baseItem, imageUrl: null }} />);
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
     expect(screen.getByTestId("product-image-fallback")).toBeInTheDocument();
+  });
+
+  it("chỉ hiện nhãn hết hàng khi tổng tồn kho bằng 0", () => {
+    const { rerender } = render(
+      <ProductCard product={{ ...baseItem, totalStock: 0 }} />,
+    );
+    expect(screen.getByText("Hết hàng")).toBeInTheDocument();
+
+    rerender(<ProductCard product={{ ...baseItem, totalStock: 12 }} />);
+    expect(screen.queryByText("Hết hàng")).not.toBeInTheDocument();
+  });
+
+  it("không hiển thị nội dung giảm giá khi dữ liệu không có khuyến mãi", () => {
+    render(<ProductCard product={baseItem} />);
+    expect(screen.queryByText(/giảm|%/i)).not.toBeInTheDocument();
   });
 });
