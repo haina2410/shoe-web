@@ -24,6 +24,7 @@ Website bán giày (e-commerce) cho **leafshoes Việt Nam**. Mục tiêu 10 ng�
 | [04-payment-checkout-flow.md](04-payment-checkout-flow.md) | Luồng checkout + thanh toán VietQR + webhook |
 | [05-design-direction.md](05-design-direction.md) | Hướng thiết kế thương hiệu (tối giản, "leaf") |
 | [06-plan-10-days.md](06-plan-10-days.md) | Kế hoạch triển khai 10 ngày + phạm vi/rủi ro/test |
+| [07-post-day10-storefront-backlog.md](07-post-day10-storefront-backlog.md) | Action item storefront sau khi hoàn tất deploy Ngày 10 |
 
 ## Ngoài phạm vi demo (YAGNI)
 
