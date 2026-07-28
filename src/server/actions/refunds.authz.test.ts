@@ -185,6 +185,44 @@ describe("recordRefundAction", () => {
     expect(revalidatePathMock).toHaveBeenNthCalledWith(3, "/orders/LEAFABC123");
   });
 
+  it("keeps a committed refund successful when cache revalidation throws", async () => {
+    requireAdminMock.mockResolvedValue(sessionWithRole("owner"));
+    const sentinels = [
+      "private-customer@example.com",
+      "0909123456",
+      "GATEWAY-REF-123",
+    ];
+    revalidatePathMock.mockImplementationOnce(() => {
+      throw new Error(sentinels.join(" | "));
+    });
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    await expect(
+      recordRefundAction({
+        orderId: VALID_ORDER_ID,
+        amount: 60_000,
+        externalReference: "GATEWAY-REF-123",
+      }),
+    ).resolves.toEqual({ ok: true, summary: SUMMARY });
+
+    expect(recordRefundCoreMock).toHaveBeenCalledTimes(1);
+    expect(revalidatePathMock).toHaveBeenCalledTimes(3);
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "[payments] operation=record-refund-revalidate category=infrastructure",
+    );
+    for (const call of consoleErrorSpy.mock.calls) {
+      for (const argument of call) {
+        const logged =
+          typeof argument === "string" ? argument : JSON.stringify(argument);
+        for (const sentinel of sentinels) {
+          expect(logged).not.toContain(sentinel);
+        }
+      }
+    }
+  });
+
   it("hides infrastructure details and logs only a PII-free category", async () => {
     requireAdminMock.mockResolvedValue(sessionWithRole("owner"));
     const sentinels = [

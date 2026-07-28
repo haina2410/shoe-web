@@ -43,16 +43,12 @@ export async function recordRefundAction(input: {
     return { ok: false, error: validationError };
   }
 
+  let result: Awaited<ReturnType<typeof recordRefundCore>>;
   try {
-    const result = await recordRefundCore(prisma, {
+    result = await recordRefundCore(prisma, {
       ...parsed.data,
       recordedByUserId: session.user.id,
     });
-
-    revalidatePath("/admin/orders");
-    revalidatePath(`/admin/orders/${parsed.data.orderId}`);
-    revalidatePath(`/orders/${result.orderCode}`);
-    return { ok: true, summary: result.summary };
   } catch (error: unknown) {
     if (error instanceof RecordRefundError) {
       return { ok: false, error: businessErrorMessage[error.code] };
@@ -61,4 +57,21 @@ export async function recordRefundAction(input: {
     console.error("[payments] operation=record-refund category=infrastructure");
     return { ok: false, error: genericError };
   }
+
+  const paths = [
+    "/admin/orders",
+    `/admin/orders/${parsed.data.orderId}`,
+    `/orders/${result.orderCode}`,
+  ];
+  for (const path of paths) {
+    try {
+      revalidatePath(path);
+    } catch {
+      console.error(
+        "[payments] operation=record-refund-revalidate category=infrastructure",
+      );
+    }
+  }
+
+  return { ok: true, summary: result.summary };
 }
