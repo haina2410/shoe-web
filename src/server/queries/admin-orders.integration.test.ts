@@ -3,7 +3,10 @@ import {
   OrderStatus,
   PaymentDirection,
 } from "@/generated/prisma/enums";
-import { listAdminOrders } from "@/server/queries/admin-orders";
+import {
+  getAdminOrderDetail,
+  listAdminOrders,
+} from "@/server/queries/admin-orders";
 import { resetDb, testPrisma } from "@/test/db";
 
 async function createOrderFixture(input: {
@@ -121,5 +124,203 @@ describe("listAdminOrders", () => {
         query: "",
       }),
     ).resolves.toMatchObject([{ id: fullRefund.id }, { id: partialRefund.id }]);
+  });
+});
+
+describe("getAdminOrderDetail", () => {
+  beforeEach(async () => {
+    await resetDb();
+  });
+
+  it("returns the complete safe detail read model with newest payment and bank history first", async () => {
+    const suffix = crypto.randomUUID();
+    const actor = await testPrisma.user.create({
+      data: {
+        id: `detail-actor-${suffix}`,
+        name: "Nhân viên Lá",
+        email: `detail-actor-${suffix}@example.com`,
+      },
+    });
+    const category = await testPrisma.category.create({
+      data: { name: "Giày chi tiết", slug: `detail-category-${suffix}` },
+    });
+    const product = await testPrisma.product.create({
+      data: {
+        name: "Giày hiện tại đã đổi tên",
+        nameNormalized: "giay hien tai da doi ten",
+        slug: `detail-product-${suffix}`,
+        categoryId: category.id,
+        basePrice: 300_000,
+        variants: {
+          create: {
+            size: "42",
+            color: "Xanh",
+            sku: `DETAIL-${suffix}`,
+            stock: 5,
+          },
+        },
+      },
+      include: { variants: true },
+    });
+    const order = await testPrisma.order.create({
+      data: {
+        orderCode: `LEAF-DETAIL-${suffix}`,
+        email: "khach@example.com",
+        customerName: "Nguyễn Khách",
+        phone: "0901234567",
+        province: "Đà Nẵng",
+        ward: "Hải Châu",
+        addressLine: "12 Đường Lá",
+        note: "Giao giờ hành chính",
+        subtotal: 250_000,
+        shippingFee: 30_000,
+        total: 280_000,
+        status: OrderStatus.PAID,
+        paidAt: new Date("2026-07-27T08:00:00.000Z"),
+        items: {
+          create: {
+            variantId: product.variants[0].id,
+            productName: "Tên giày lúc đặt",
+            size: "42",
+            color: "Xanh",
+            unitPrice: 250_000,
+            quantity: 1,
+          },
+        },
+        payments: {
+          create: [
+            {
+              provider: "sepay",
+              transactionId: `detail-in-${suffix}`,
+              amount: 280_000,
+              direction: PaymentDirection.IN,
+              matchedAt: new Date("2026-07-27T08:00:00.000Z"),
+              rawPayload: { secret: "incoming-raw-payload" },
+            },
+            {
+              provider: "manual",
+              transactionId: `detail-out-${suffix}`,
+              amount: 80_000,
+              direction: PaymentDirection.OUT,
+              matchedAt: new Date("2026-07-28T08:00:00.000Z"),
+              externalReference: "BANK-REF-80",
+              note: "Hoàn một phần",
+              recordedByUserId: actor.id,
+              rawPayload: { secret: "refund-raw-payload" },
+            },
+          ],
+        },
+        bankTransactions: {
+          create: [
+            {
+              provider: "sepay",
+              providerTransactionId: `bank-older-${suffix}`,
+              gateway: "VCB",
+              accountNumber: "0123456789",
+              transferType: "in",
+              amount: 280_000,
+              content: "Thanh toan LEAF DETAIL",
+              referenceCode: "REF-OLDER",
+              occurredAt: new Date("2026-07-27T07:59:00.000Z"),
+              rawPayload: { secret: "older-bank-payload" },
+            },
+            {
+              provider: "sepay",
+              providerTransactionId: `bank-newer-${suffix}`,
+              gateway: "VCB",
+              accountNumber: "0123456789",
+              transferType: "in",
+              amount: 280_000,
+              content: "Doi soat LEAF DETAIL",
+              referenceCode: "REF-NEWER",
+              occurredAt: new Date("2026-07-27T08:01:00.000Z"),
+              rawPayload: { secret: "newer-bank-payload" },
+            },
+          ],
+        },
+      },
+    });
+
+    const detail = await getAdminOrderDetail(testPrisma, order.id);
+
+    expect(detail).toMatchObject({
+      id: order.id,
+      orderCode: order.orderCode,
+      email: "khach@example.com",
+      customerName: "Nguyễn Khách",
+      phone: "0901234567",
+      province: "Đà Nẵng",
+      ward: "Hải Châu",
+      addressLine: "12 Đường Lá",
+      note: "Giao giờ hành chính",
+      subtotal: 250_000,
+      shippingFee: 30_000,
+      total: 280_000,
+      status: OrderStatus.PAID,
+      items: [
+        {
+          productName: "Tên giày lúc đặt",
+          size: "42",
+          color: "Xanh",
+          unitPrice: 250_000,
+          quantity: 1,
+        },
+      ],
+      ledgerSummary: {
+        totalIn: 280_000,
+        totalOut: 80_000,
+        netReceived: 200_000,
+        refundState: "PARTIAL",
+      },
+      nextOrderStatuses: [OrderStatus.FULFILLED],
+    });
+    expect(detail?.payments.map((payment) => payment.direction)).toEqual([
+      PaymentDirection.OUT,
+      PaymentDirection.IN,
+    ]);
+    expect(detail?.payments[0]).toMatchObject({
+      provider: "manual",
+      transactionId: `detail-out-${suffix}`,
+      externalReference: "BANK-REF-80",
+      note: "Hoàn một phần",
+      recordedBy: {
+        name: "Nhân viên Lá",
+        email: `detail-actor-${suffix}@example.com`,
+      },
+    });
+    expect(detail?.bankTransactions.map((transaction) => transaction.referenceCode)).toEqual([
+      "REF-NEWER",
+      "REF-OLDER",
+    ]);
+    expect(detail?.bankTransactions[0]).toMatchObject({
+      gateway: "VCB",
+      accountNumber: "0123456789",
+      amount: 280_000,
+      content: "Doi soat LEAF DETAIL",
+    });
+    expect(detail?.payments[0]).not.toHaveProperty("rawPayload");
+    expect(detail?.bankTransactions[0]).not.toHaveProperty("rawPayload");
+  });
+
+  it("removes fulfillment from a fully refunded paid order", async () => {
+    const order = await createOrderFixture({
+      orderCode: `LEAF-FULL-DETAIL-${crypto.randomUUID()}`,
+      status: OrderStatus.PAID,
+      createdAt: new Date("2026-07-28T09:00:00.000Z"),
+      payments: [
+        { direction: PaymentDirection.IN, amount: 100_000 },
+        { direction: PaymentDirection.OUT, amount: 100_000 },
+      ],
+    });
+
+    await expect(getAdminOrderDetail(testPrisma, order.id)).resolves.toMatchObject({
+      ledgerSummary: {
+        totalIn: 100_000,
+        totalOut: 100_000,
+        netReceived: 0,
+        refundState: "FULL",
+      },
+      nextOrderStatuses: [],
+    });
   });
 });

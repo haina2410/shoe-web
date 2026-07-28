@@ -35,6 +35,7 @@ describe("ConfirmPaymentButton", () => {
     await user.dblClick(button);
 
     expect(confirmPaymentManuallyActionMock).toHaveBeenCalledTimes(1);
+    expect(confirmPaymentManuallyActionMock).toHaveBeenCalledWith("order-1");
     expect(button).toBeDisabled();
     expect(
       screen.getByRole("button", { name: "Đang xác nhận…" }),
@@ -58,11 +59,9 @@ describe("ConfirmPaymentButton", () => {
       screen.getByRole("button", { name: "Xác nhận thanh toán" }),
     );
 
-    expect(
-      await screen.findByText(
-        "Đơn hàng không còn ở trạng thái chờ thanh toán.",
-      ),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Đơn hàng không còn ở trạng thái chờ thanh toán.",
+    );
     expect(
       screen.getByRole("button", { name: "Xác nhận thanh toán" }),
     ).toBeEnabled();
@@ -79,11 +78,9 @@ describe("ConfirmPaymentButton", () => {
       screen.getByRole("button", { name: "Xác nhận thanh toán" }),
     );
 
-    expect(
-      await screen.findByText(
-        "Không thể xác nhận thanh toán lúc này. Vui lòng thử lại.",
-      ),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Không thể xác nhận thanh toán lúc này. Vui lòng thử lại.",
+    );
     expect(
       screen.queryByText(/Failed to find Server Action/),
     ).not.toBeInTheDocument();
