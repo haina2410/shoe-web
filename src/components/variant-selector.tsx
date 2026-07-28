@@ -119,8 +119,10 @@ export function VariantSelector({
       </fieldset>
 
       <p className="text-sm font-medium">
-        {matchedVariant == null
-          ? "Không có lựa chọn này"
+        {!selectedSize || !selectedColor
+          ? "Chọn kích cỡ và màu sắc để xem tồn kho"
+          : matchedVariant == null
+            ? "Không có lựa chọn này"
           : matchedVariant.stock > 0
             ? `Còn ${matchedVariant.stock} sản phẩm`
             : "Hết hàng"}

@@ -95,7 +95,13 @@ Nền tảng(1) → Data+RBAC(2) → Admin CRUD(3) ─┐
 ## Ngày 9 — Polish thiết kế + a11y + trạng thái rỗng/lỗi
 
 - **Mục tiêu:** giao diện chỉn chu, đáng tin, đúng hướng thiết kế.
-- **Bàn giao:** áp `docs/05` (tối giản, signature "lá"); responsive mobile→desktop; focus bàn phím; `prefers-reduced-motion`; empty/error states (giỏ trống, không kết quả, lỗi thanh toán); seed nội dung thật hơn.
+- **Trạng thái:** ✅ Hoàn thành.
+- **Bàn giao:** homepage theo thứ tự banner tĩnh tuyển chọn → danh mục → sản
+  phẩm nổi bật → dải cam kết → footer doanh nghiệp; asset banner và sáu ảnh
+  sản phẩm tạm thời, có thể thay thế; storefront và admin responsive
+  mobile→desktop; skip link, focus bàn phím và `prefers-reduced-motion`;
+  empty/error states; E2E cùng visual QA ở `390×844` và `1440×1000`.
+- **Giới hạn đã chốt:** không có giảm giá và không có carousel trong Ngày 9.
 - **Module/file chính:** `src/components/*` (tinh chỉnh), `src/app/**` (layout/spacing), asset motif lá.
 - **Trọng tâm test:** E2E happy path xanh trên viewport mobile + desktop; kiểm tra thủ công focus/contrast.
 - **Phụ thuộc:** Ngày 3–8 (có UI để polish). | **Rủi ro:** sa đà polish → giữ trong 1 ngày, ưu tiên happy path.

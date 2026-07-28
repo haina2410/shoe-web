@@ -53,6 +53,17 @@ const variants: Variant[] = [
 ];
 
 describe("VariantSelector", () => {
+  it("trước khi chọn đủ size và màu → hướng dẫn chọn thay vì báo tổ hợp không tồn tại", () => {
+    render(
+      <VariantSelector variants={variants} basePrice={890000} {...productContext} />,
+    );
+
+    expect(
+      screen.getByText("Chọn kích cỡ và màu sắc để xem tồn kho"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Không có lựa chọn này")).not.toBeInTheDocument();
+  });
+
   it("chọn size+màu còn hàng → hiện đúng số lượng tồn kho", async () => {
     const user = userEvent.setup();
     render(

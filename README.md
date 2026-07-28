@@ -6,6 +6,26 @@ Stack: **Next.js 16** (App Router, TS strict) · **Prisma 7** + Postgres · **Be
 
 Tài liệu thiết kế: [`docs/`](docs/README.md). Kế hoạch triển khai theo ngày: [`docs/plans/`](docs/plans/README.md).
 
+## Bàn giao UI Ngày 9
+
+- Storefront có banner tĩnh, lối vào danh mục, sản phẩm nổi bật, dải cam kết
+  và footer; storefront/admin đã được kiểm tra ở mobile `390×844` và desktop
+  `1440×1000`.
+- Logo lá, banner và sáu ảnh sản phẩm hiện là asset tạm thời, có thể thay thế
+  khi cửa hàng cung cấp bộ nhận diện và ảnh thật. Ngày 9 không triển khai
+  carousel hoặc giao diện giảm giá.
+- Có skip link, focus bàn phím, reduced motion cùng các trạng thái rỗng/lỗi.
+  Các hạng mục storefront để làm sau Ngày 10 được giữ tại
+  [`docs/07-post-day10-storefront-backlog.md`](docs/07-post-day10-storefront-backlog.md).
+
+Thông tin doanh nghiệp hiển thị ở footer public:
+
+- **CÔNG TY TNHH LEAFSHOES VIỆT NAM**
+- Sản xuất giày dép, phụ liệu dép
+- Điện thoại: `0395.069.089`
+- Email: `leafshoes.vn@gmail.com`
+- Địa chỉ: Số 14, Đường Phú Sơn 3, Xã Bình Minh, TP. Đồng Nai
+
 ## Chuẩn bị
 
 - Node.js **≥ 22.12** (pg-boss 12 yêu cầu; dự án đang chạy Node 24).
