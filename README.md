@@ -1,6 +1,6 @@
 # leafshoes Việt Nam
 
-Demo thương mại điện tử bán giày (tiếng Việt): duyệt sản phẩm → giỏ hàng → checkout khách vãng lai → VietQR → email xác nhận đơn qua job nền → admin quản lý sản phẩm.
+Demo thương mại điện tử bán giày (tiếng Việt): duyệt sản phẩm → giỏ hàng → checkout khách vãng lai → VietQR → email xác nhận đơn qua job nền → admin quản lý sản phẩm và xử lý đơn hàng.
 
 Stack: **Next.js 16** (App Router, TS strict) · **Prisma 7** + Postgres · **Better Auth** (RBAC owner/staff) · **Zustand** (giỏ hàng) · **pg-boss** (job nền) · **React Email** + **Resend** · **Vitest** (unit + integration trên DB thật) · **Playwright** (E2E).
 
@@ -72,6 +72,14 @@ npm run worker
 - Cấu hình payment code phía SePay: prefix `LEAF`, suffix đúng 6 ký tự alphanumeric. Mã đơn/payment canonical là `LEAFXXXXXX` (`^LEAF[A-Z0-9]{6}$`).
 - Event dùng `payload.id` chính thức của SePay làm ID giao dịch duy nhất. Event hợp lệ cùng original JSON được lưu trước khi khởi tạo queue; retry chỉ dùng canonical code/amount đã persist. Queue warm-up lỗi vẫn giữ event `RECEIVED`; giao dịch thiếu/sai mã đơn, lệch tiền, đơn không còn pending hoặc thiếu tồn kho được giữ ở `BankTransaction.REVIEW_REQUIRED` cho màn hình xử lý Ngày 8.
 - Kết quả đã khớp, webhook lặp và giao dịch cần review đều được acknowledge HTTP 200 với body chính xác `{"success":true}`. Lỗi chữ ký/validation/hạ tầng không giả thành success.
+
+## Vận hành đơn hàng
+
+- `owner` và `staff` có quyền như nhau đối với các thao tác đơn hàng Ngày 8: xem/lọc đơn, xác nhận thanh toán, chuyển trạng thái, ghi nhận hoàn tiền và ghép giao dịch cần đối soát. Quyền CRUD sản phẩm vẫn theo RBAC riêng.
+- Chuyển trạng thái do admin chỉ gồm `PENDING_PAYMENT → CANCELLED`, `PAID → FULFILLED` và `FULFILLED → COMPLETED`. Đơn `COMPLETED`, `CANCELLED`, `EXPIRED` là trạng thái cuối; đơn đã hoàn toàn bộ không thể chuyển `PAID → FULFILLED`.
+- Sổ thanh toán dùng `Payment.direction`: `IN` là tiền nhận, `OUT` là khoản hoàn do admin ghi nhận. Trạng thái hoàn tiền được suy ra từ tổng `IN/OUT`; `Order.lastRefundAt` lưu thời điểm ghi nhận hoàn tiền gần nhất.
+- Giao dịch SePay `REVIEW_REQUIRED` được giữ trong hàng đợi đối soát. Admin nhập mã đơn thật để ghép thủ công; hệ thống vẫn kiểm tra số tiền, trạng thái pending và tồn kho trước khi dùng cùng luồng xác nhận thanh toán.
+- Ghi nhận hoàn tiền chỉ tạo bút toán `OUT`: ứng dụng **không tự chuyển tiền qua ngân hàng**, không đổi trạng thái đơn và không hoàn tồn kho.
 
 ## Email
 

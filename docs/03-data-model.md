@@ -10,6 +10,7 @@ Category 1──* Product 1──* Variant
                   1──* ProductImage
 Order 1──* OrderItem *──1 Variant (tham chiếu + snapshot)
 Order 1──* Payment
+Order 1──* BankTransaction
 ShippingZone 1──* ProvinceZone (tỉnh → zone)
 AdminUser (Better Auth: user/session/account)
 ```
@@ -80,6 +81,7 @@ model Order {
   total        Int
   status       OrderStatus @default(PENDING_PAYMENT)
   paidAt       DateTime?
+  lastRefundAt DateTime?
   items        OrderItem[]
   payments     Payment[]
   createdAt    DateTime    @default(now())
@@ -89,6 +91,7 @@ model Order {
 }
 
 enum OrderStatus { PENDING_PAYMENT PAID FULFILLED COMPLETED CANCELLED EXPIRED }
+enum PaymentDirection { IN OUT }
 
 model OrderItem {
   id          String  @id @default(cuid())
@@ -105,14 +108,19 @@ model OrderItem {
 }
 
 model Payment {
-  id            String   @id @default(cuid())
-  orderId       String
-  order         Order    @relation(fields: [orderId], references: [id])
-  provider      String   // "sepay" | "manual"
-  transactionId String   @unique   // idempotency: webhook lặp không xử lý 2 lần
-  amount        Int
-  rawPayload    Json?
-  matchedAt     DateTime @default(now())
+  id                String           @id @default(cuid())
+  orderId           String
+  order             Order            @relation(fields: [orderId], references: [id])
+  provider          String           // "sepay" | "manual"
+  transactionId     String           @unique
+  amount            Int
+  direction         PaymentDirection @default(IN)
+  externalReference String?
+  note              String?
+  recordedByUserId  String?
+  recordedBy        User?            @relation("RecordedPayments", fields: [recordedByUserId], references: [id], onDelete: SetNull)
+  rawPayload        Json?
+  matchedAt         DateTime         @default(now())
 }
 
 model ShippingZone {
@@ -137,6 +145,17 @@ model ProvinceZone {
 - **Tiền lưu số nguyên VND** (đồng) để tránh sai số dấu phẩy động.
 - **Snapshot trong OrderItem**: đơn hàng giữ tên/giá tại thời điểm mua, không phụ thuộc thay đổi sản phẩm sau này.
 - **`Payment.transactionId` unique** là chốt chặn idempotency cho webhook.
+- **Sổ tiền `IN/OUT`:** `IN` là tiền đã nhận, `OUT` là khoản hoàn đã ghi
+  nhận. Migration đặt mặc định `IN` để toàn bộ payment cũ giữ nguyên ý nghĩa.
+  Tổng hợp được suy ra, không lưu thêm cột trạng thái:
+  - chưa hoàn: `totalOut = 0`;
+  - hoàn một phần: `0 < totalOut < totalIn`;
+  - hoàn toàn bộ: `totalOut = totalIn`.
+- **`Order.lastRefundAt`** là timestamp nullable của lần hoàn tiền thành công
+  gần nhất, phục vụ lọc/sắp xếp vận hành; đây không phải nguồn tính số tiền đã
+  hoàn. Mỗi khoản `OUT` lưu người ghi nhận cùng mã tham chiếu/ghi chú tùy chọn.
+- Tổng `OUT` cộng dồn không được vượt tổng `IN`; thao tác hoàn tiền khóa đơn
+  trong transaction để hai yêu cầu đồng thời cũng không vượt số thực nhận.
 - **Tồn kho ở cấp `Variant`** (theo size+màu) đúng yêu cầu.
 - **Phí ship theo vùng**: `ProvinceZone` ánh xạ 63 tỉnh → zone; nếu tỉnh chưa map thì dùng zone mặc định.
 
@@ -145,3 +164,5 @@ model ProvinceZone {
 - Kiểm tra `stock >= quantity` tại bước checkout.
 - **Trừ tồn kho khi đơn chuyển sang `PAID`** (trong cùng transaction với webhook/xác nhận tay).
 - Job cron `expire-unpaid` huỷ đơn `PENDING_PAYMENT` quá hạn (VD 24h) — vì chưa trừ kho lúc tạo đơn nên không cần hoàn kho. (Nếu sau này muốn "giữ chỗ" tồn kho lúc tạo đơn thì bổ sung reservation + hoàn kho khi hết hạn.)
+- Ghi nhận `Payment(direction=OUT)` không đổi `Order.status` và **không tự
+  hoàn tồn kho**. Việc hoàn hàng/nhập kho lại nằm ngoài phạm vi demo.

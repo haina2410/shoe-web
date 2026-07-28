@@ -2,7 +2,7 @@
 
 ## Tổng quan
 
-Khách chuyển khoản qua **VietQR**. Hệ thống đối soát **tự động** qua webhook **SePay**, đồng thời cho owner **xác nhận tay** khi auto-match trượt.
+Khách chuyển khoản qua **VietQR**. Hệ thống đối soát **tự động** qua webhook **SePay**, đồng thời cho `owner` và `staff` **xác nhận hoặc đối soát tay** khi auto-match trượt.
 
 ## Luồng checkout (tạo đơn)
 
@@ -57,11 +57,32 @@ Khách CK ─► Ngân hàng ─► SePay phát hiện GD vào ─► POST /api/
 - **Khớp số tiền nghiêm ngặt:** `transferAmount` phải bằng chính xác `Order.total`; nếu lệch thì không auto-confirm.
 - **Acknowledge chính xác:** matched, duplicate và review-required đều trả HTTP 200 với body `{"success":true}`. Email được đẩy vào job; lỗi authentication/validation/hạ tầng trả failure tương ứng thay vì giả thành success.
 
-## Xác nhận thủ công (fallback admin)
+## Xác nhận và đối soát thủ công
 
-- Trang admin "Đơn chờ thanh toán" + trang "Giao dịch chưa khớp".
-- Admin đối chiếu sao kê → bấm **"Xác nhận đã thanh toán"** cho đơn.
-- Cùng logic transaction: tạo `Payment(provider="manual")`, `PAID`, trừ kho, enqueue email. Cũng idempotent (đơn đã PAID thì không xử lý lại).
+- `owner` và `staff` có quyền như nhau trên toàn bộ thao tác đơn hàng Ngày 8.
+- Tại chi tiết đơn pending, admin có thể bấm **"Xác nhận thanh toán"**. Cùng
+  logic transaction tạo `Payment(direction=IN, provider="manual")`, chuyển
+  `PAID`, trừ kho và enqueue email. Đơn không còn pending không bị xử lý lại.
+- Event không auto-match được giữ ở `BankTransaction.REVIEW_REQUIRED`, không
+  bị xoá. Tại `/admin/bank-transactions/review`, admin nhập mã đơn canonical
+  thật và bấm **"Ghép giao dịch"**.
+- Ghép thủ công vẫn kiểm tra event đang chờ review, đơn tồn tại và còn pending,
+  số tiền khớp chính xác, cùng tồn kho đủ. Thành công dùng lại luồng
+  `markOrderPaid`, liên kết event với đơn và bỏ hàng khỏi danh sách review.
+  Bất kỳ kiểm tra nào thất bại thì event vẫn là `REVIEW_REQUIRED` để thử lại.
+
+## Sổ thanh toán và hoàn tiền
+
+- `Payment.direction=IN` ghi tiền đã nhận; `OUT` ghi khoản hoàn. Các payment
+  có từ trước được coi là `IN`.
+- Giao diện suy ra `totalIn`, `totalOut`, `netReceived = totalIn - totalOut`
+  và tình trạng: chưa hoàn (`OUT = 0`), hoàn một phần
+  (`0 < OUT < IN`), hoàn toàn bộ (`OUT = IN`).
+- Chỉ đơn `PAID`, `FULFILLED` hoặc `COMPLETED` có tiền vào mới được ghi hoàn.
+  Tổng `OUT` cộng dồn không thể vượt `IN`, kể cả hai thao tác đồng thời.
+  `Order.lastRefundAt` chỉ cập nhật sau khoản hoàn thành công.
+- Hoàn tiền là thao tác ghi sổ thủ công: hệ thống **không thực hiện chuyển
+  khoản ngân hàng**, không thay đổi trạng thái đơn và không tự hoàn tồn kho.
 
 ## Jobs (pg-boss)
 
@@ -84,7 +105,22 @@ Khách CK ─► Ngân hàng ─► SePay phát hiện GD vào ─► POST /api/
 ## Vòng đời trạng thái đơn
 
 ```
-PENDING_PAYMENT ──(thanh toán khớp/xác nhận tay)──► PAID ──► FULFILLED ──► COMPLETED
+PENDING_PAYMENT ──(thanh toán khớp/xác nhận tay)──► PAID ──(admin)──► FULFILLED ──(admin)──► COMPLETED
        │
-       └──(quá hạn / admin huỷ)──► EXPIRED / CANCELLED
+       ├──(admin)──► CANCELLED
+       └──(job hết hạn)──► EXPIRED
 ```
+
+Ma trận chuyển trạng thái do admin:
+
+| Từ | Đích hợp lệ | Ghi chú |
+|---|---|---|
+| `PENDING_PAYMENT` | `CANCELLED` | `PAID` chỉ đến từ luồng xác nhận thanh toán |
+| `PAID` | `FULFILLED` | bị chặn nếu `netReceived = 0` (đã hoàn toàn bộ) |
+| `FULFILLED` | `COMPLETED` | hoàn tất giao hàng |
+| `COMPLETED` | không có | trạng thái cuối |
+| `CANCELLED` | không có | trạng thái cuối |
+| `EXPIRED` | không có | trạng thái cuối |
+
+Khoản hoàn một phần hoặc toàn bộ không tự chuyển trạng thái. Vì vậy một đơn đã
+`COMPLETED` vẫn giữ nguyên `COMPLETED` sau khi ghi nhận hoàn tiền.

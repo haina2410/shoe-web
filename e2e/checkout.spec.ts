@@ -1,5 +1,6 @@
 import { createHmac } from "node:crypto";
 import { test, expect } from "@playwright/test";
+import { createPendingOrderViaCheckout } from "./helpers/checkout";
 
 /**
  * Headline E2E Ngày 5: toàn bộ luồng đặt hàng GUEST (không đăng nhập) —
@@ -23,65 +24,12 @@ import { test, expect } from "@playwright/test";
 test("guest: checkout → webhook SePay có chữ ký → đơn đã thanh toán", async ({
   page,
 }) => {
-  // 1) Home → /products → mở sản phẩm.
-  await page.goto("/");
-  await page.getByRole("link", { name: "Xem tất cả" }).click();
-  await expect(page).toHaveURL(/\/products$/);
+  const { orderCode, total } = await createPendingOrderViaCheckout(
+    page,
+    `webhook-${Date.now()}`,
+  );
 
-  await page.getByText("Giày Chạy Bộ Êm Nhẹ").first().click();
-  await expect(page).toHaveURL(/\/products\/giay-chay-bo-em-nhe$/);
-
-  // 2) Chọn size + màu còn hàng → Thêm vào giỏ.
-  const sizeGroup = page.getByRole("radiogroup", { name: "Kích cỡ" });
-  const colorGroup = page.getByRole("radiogroup", { name: "Màu sắc" });
-  await sizeGroup.getByRole("radio", { name: "40" }).click();
-  await colorGroup.getByRole("radio", { name: "Đen" }).click();
-  await expect(page.getByText(/Còn \d+ sản phẩm/)).toBeVisible();
-
-  await page.getByRole("button", { name: "Thêm vào giỏ" }).click();
-
-  // 3) /cart — thấy item vừa thêm + tạm tính.
-  await page.getByRole("link", { name: "Giỏ hàng", exact: true }).click();
-  await expect(page).toHaveURL(/\/cart$/);
-  await expect(page.getByText("Giày Chạy Bộ Êm Nhẹ")).toBeVisible();
-  await expect(page.getByText("40 / Đen")).toBeVisible();
-  await expect(page.getByText(/Tổng cộng/)).toBeVisible();
-
-  // 4) Thanh toán → /checkout → điền form.
-  await page.getByRole("link", { name: "Thanh toán" }).click();
-  await expect(page).toHaveURL(/\/checkout$/);
-
-  await page.getByLabel("Họ tên").fill("Nguyễn Văn A");
-  await page.getByLabel("Email").fill("khach-e2e@example.com");
-  await page.getByLabel("Số điện thoại").fill("0901234567");
-  await page.getByLabel("Tỉnh/Thành phố").selectOption("Hà Nội");
-  await page.getByLabel("Phường/Xã").fill("Phường Ba Đình");
-  await page.getByLabel("Địa chỉ cụ thể").fill("123 Đường Láng");
-
-  await page.getByRole("button", { name: "Đặt hàng" }).click();
-
-  // 5) /orders/<orderCode> — QR VietQR + mã đơn hàng + tổng tiền raw.
-  await page.waitForURL(/\/orders\/.+/);
-  await expect(
-    page.getByRole("heading", { name: "Đặt hàng thành công" }),
-  ).toBeVisible();
-
-  const orderCode = page.url().split("/orders/")[1];
-  expect(orderCode).toBeTruthy();
-
-  await expect(page.locator('img[src*="img.vietqr.io"]')).toBeVisible();
-  await expect(page.getByTestId("order-code")).toHaveText(orderCode);
-  await expect(page.getByTestId("order-status")).toHaveText("Chờ thanh toán");
-
-  const orderTotal = page.getByTestId("order-total");
-  await expect(orderTotal).toBeVisible();
-  await expect(orderTotal).toContainText("₫");
-  const rawTotal = await orderTotal.getAttribute("data-total");
-  expect(rawTotal).toMatch(/^[1-9]\d*$/);
-  const total = Number(rawTotal);
-  expect(Number.isSafeInteger(total)).toBe(true);
-
-  // 6) Mô phỏng đúng payload SePay + chữ ký trên CHÍNH chuỗi raw gửi đi.
+  // Mô phỏng đúng payload SePay + chữ ký trên CHÍNH chuỗi raw gửi đi.
   const webhookSecret = process.env.SEPAY_WEBHOOK_SECRET;
   const accountNumber = process.env.VIETQR_ACCOUNT_NO;
   if (!webhookSecret || !accountNumber) {
@@ -122,7 +70,7 @@ test("guest: checkout → webhook SePay có chữ ký → đơn đã thanh toán
   expect(webhookResponse.status()).toBe(200);
   expect(await webhookResponse.json()).toEqual({ success: true });
 
-  // 7) Trang force-dynamic đọc lại trạng thái DB sau webhook.
+  // Trang force-dynamic đọc lại trạng thái DB sau webhook.
   await page.reload();
   await expect(page.getByTestId("order-status")).toHaveText("Đã thanh toán");
   await expect(page.locator('img[src*="img.vietqr.io"]')).toHaveCount(0);

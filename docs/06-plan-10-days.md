@@ -74,12 +74,22 @@ Nền tảng(1) → Data+RBAC(2) → Admin CRUD(3) ─┐
 - **Trọng tâm test:** HMAC exact raw JSON; đối soát khớp đúng; sai/missing code và lệch tiền được persist để review; webhook lặp cùng `payload.id` là no-op; test trừ tồn kho chính xác; E2E ký webhook thật → refresh thấy đơn PAID và không còn QR.
 - **Phụ thuộc:** Ngày 5, 6. | **Rủi ro:** khác biệt payload sandbox vs production (giữ verify + test bằng payload mẫu).
 
-## Ngày 8 — Admin quản lý đơn hàng
+## Ngày 8 — Admin quản lý đơn hàng ✅
 
+- **Trạng thái:** hoàn thành.
 - **Mục tiêu:** admin xử lý trọn vòng đời đơn.
-- **Bàn giao:** trang `(admin)/orders` (list + filter theo trạng thái), trang chi tiết đơn, đổi trạng thái hợp lệ (PAID→FULFILLED→COMPLETED, CANCELLED), trang "giao dịch chưa khớp" để xác nhận tay.
-- **Module/file chính:** `src/app/(admin)/orders/*`, `src/server/actions/order-status.ts`, `src/lib/order-status.ts` (máy trạng thái).
-- **Trọng tâm test:** unit máy trạng thái (chỉ cho phép chuyển hợp lệ; chặn chuyển sai); E2E admin xác nhận đơn + fulfill.
+- **Bàn giao:** list đơn có lọc trạng thái/mã đơn/đơn có hoàn tiền; chi tiết
+  đơn và sổ `IN/OUT`; xác nhận payment; máy trạng thái
+  `PENDING_PAYMENT→CANCELLED`, `PAID→FULFILLED→COMPLETED`; ghi nhận hoàn tiền
+  một phần/toàn bộ; màn hình ghép thủ công event `REVIEW_REQUIRED`. `owner` và
+  `staff` có quyền vận hành đơn như nhau.
+- **Module/file chính:** `src/app/admin/orders/*`,
+  `src/app/admin/bank-transactions/review/page.tsx`,
+  `src/server/actions/order-status.ts`, `src/server/actions/refunds.ts`,
+  `src/server/actions/bank-transactions.ts`, `src/lib/order-status.ts`.
+- **Trọng tâm test:** unit/integration máy trạng thái, phân quyền cả hai role,
+  refund đồng thời và guard hoàn toàn bộ; E2E staff xác nhận → fulfill →
+  complete → hoàn một phần, cùng luồng ghép event review vào đơn pending.
 - **Phụ thuộc:** Ngày 7. | **Rủi ro:** phân quyền STAFF vs OWNER cho hành động nhạy cảm (dùng RBAC Ngày 2).
 
 ## Ngày 9 — Polish thiết kế + a11y + trạng thái rỗng/lỗi
