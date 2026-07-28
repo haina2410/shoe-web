@@ -4,16 +4,17 @@ export default function AdminDashboardPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold" style={{ color: "var(--evergreen)" }}>
-        Bảng điều khiển
+        Vận hành cửa hàng
       </h1>
       <p className="mt-2 text-neutral-600">
-        Khu quản trị leafshoes — nội dung sẽ được bổ sung ở các ngày tiếp theo.
+        Truy cập nhanh các công việc hiện có: quản lý sản phẩm, đơn hàng và đối soát
+        giao dịch ngân hàng.
       </p>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Link
           href="/admin/products"
-          className="block rounded-lg border p-4 transition-colors hover:bg-[var(--sage)]/40"
+          className="block rounded-lg border p-4 transition-colors hover:bg-[var(--sage)]/40 focus-visible:bg-[var(--sage)]/40"
           style={{ borderColor: "var(--line)" }}
         >
           <h2 className="font-semibold" style={{ color: "var(--evergreen)" }}>
@@ -25,7 +26,7 @@ export default function AdminDashboardPage() {
         </Link>
         <Link
           href="/admin/orders"
-          className="block rounded-lg border p-4 transition-colors hover:bg-[var(--sage)]/40"
+          className="block rounded-lg border p-4 transition-colors hover:bg-[var(--sage)]/40 focus-visible:bg-[var(--sage)]/40"
           style={{ borderColor: "var(--line)" }}
         >
           <h2 className="font-semibold" style={{ color: "var(--evergreen)" }}>
@@ -37,7 +38,7 @@ export default function AdminDashboardPage() {
         </Link>
         <Link
           href="/admin/bank-transactions/review"
-          className="block rounded-lg border p-4 transition-colors hover:bg-[var(--sage)]/40"
+          className="block rounded-lg border p-4 transition-colors hover:bg-[var(--sage)]/40 focus-visible:bg-[var(--sage)]/40"
           style={{ borderColor: "var(--line)" }}
         >
           <h2 className="font-semibold" style={{ color: "var(--evergreen)" }}>

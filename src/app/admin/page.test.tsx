@@ -3,6 +3,19 @@ import { render, screen } from "@testing-library/react";
 import AdminDashboardPage from "./page";
 
 describe("AdminDashboardPage", () => {
+  it("introduces the existing store operations destinations", () => {
+    render(<AdminDashboardPage />);
+
+    expect(
+      screen.queryByText(/nội dung sẽ được bổ sung/i),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Vận hành cửa hàng" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Quản lý sản phẩm/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Quản lý đơn hàng/i })).toBeInTheDocument();
+  });
+
   it("links to order management and bank transaction review", () => {
     render(<AdminDashboardPage />);
 
