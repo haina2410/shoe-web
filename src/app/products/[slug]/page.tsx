@@ -50,7 +50,7 @@ export default async function ProductDetailPage({
   const [mainImage, ...thumbnails] = product.images;
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 sm:py-12">
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:py-12">
       <nav aria-label="Breadcrumb" className="mb-6 text-sm text-neutral-600">
         <ol className="flex flex-wrap items-center gap-2">
           <li>
@@ -153,6 +153,6 @@ export default async function ProductDetailPage({
           </ul>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

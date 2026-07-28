@@ -38,6 +38,14 @@ beforeEach(() => {
 });
 
 describe("ProductDetailPage", () => {
+  it("để layout gốc sở hữu landmark main duy nhất", async () => {
+    render(
+      await ProductDetailPage({ params: Promise.resolve({ slug: product.slug }) }),
+    );
+
+    expect(screen.queryByRole("main")).not.toBeInTheDocument();
+  });
+
   it("có breadcrumb, ảnh gallery và các cam kết thanh toán/hỗ trợ", async () => {
     render(
       await ProductDetailPage({ params: Promise.resolve({ slug: product.slug }) }),

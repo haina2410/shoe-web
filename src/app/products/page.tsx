@@ -59,7 +59,7 @@ export default async function ProductsPage({
   ]);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 sm:py-12">
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:py-12">
       <p className="text-sm font-semibold tracking-[0.18em] uppercase" style={{ color: "var(--accent)" }}>
         Leafshoes
       </p>
@@ -84,6 +84,6 @@ export default async function ProductsPage({
           </div>
         )}
       </div>
-    </main>
+    </div>
   );
 }

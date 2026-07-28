@@ -26,6 +26,12 @@ beforeEach(() => {
 });
 
 describe("ProductsPage", () => {
+  it("để layout gốc sở hữu landmark main duy nhất", async () => {
+    render(await ProductsPage({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.queryByRole("main")).not.toBeInTheDocument();
+  });
+
   it("hiển thị EmptyState có hành động xem lại catalog khi không có sản phẩm", async () => {
     render(await ProductsPage({ searchParams: Promise.resolve({ q: "không có" }) }));
 
