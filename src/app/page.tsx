@@ -1,4 +1,8 @@
 import Link from "next/link";
+import { CategoryPaths } from "@/components/home/category-paths";
+import { HeroBanner } from "@/components/home/hero-banner";
+import { TrustStrip } from "@/components/home/trust-strip";
+import { EmptyState } from "@/components/empty-state";
 import { prisma } from "@/lib/prisma";
 import { listProducts } from "@/server/queries/catalog";
 import { ProductCard } from "@/components/product-card";
@@ -28,17 +32,13 @@ export default async function HomePage() {
 
   return (
     <>
-      <section className="mx-auto max-w-6xl px-4 py-20">
-        <h1
-          className="text-4xl font-extrabold tracking-tight"
-          style={{ color: "var(--evergreen)" }}
-        >
-          Bước êm cùng leafshoes
-        </h1>
-        <p className="mt-4 text-neutral-600">Giày chính hãng, giao nhanh toàn quốc.</p>
-      </section>
-
-      <section className="mx-auto max-w-6xl px-4 pb-20">
+      <HeroBanner />
+      <CategoryPaths />
+      <section
+        data-testid="home-section"
+        data-section="featured"
+        className="mx-auto max-w-6xl px-4 pb-12 sm:pb-16"
+      >
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold" style={{ color: "var(--evergreen)" }}>
             Sản phẩm nổi bật
@@ -53,15 +53,20 @@ export default async function HomePage() {
         </div>
 
         {featured.length === 0 ? (
-          <p className="mt-6 text-neutral-600">Chưa có sản phẩm nào.</p>
+          <EmptyState
+            title="Chưa có sản phẩm"
+            description="Cửa hàng đang cập nhật sản phẩm mới."
+            action={{ href: "/products", label: "Xem danh mục" }}
+          />
         ) : (
-          <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+          <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
             {featured.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
           </div>
         )}
       </section>
+      <TrustStrip />
     </>
   );
 }

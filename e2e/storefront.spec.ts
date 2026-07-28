@@ -31,7 +31,7 @@ test("trang chủ → sản phẩm nổi bật → search không dấu → chi t
   await expect(page).toHaveURL(/\/products$/);
 
   // 3) Search KHÔNG DẤU "chay bo" → thấy sản phẩm CÓ DẤU trong tên thật.
-  const searchInput = page.getByLabel("Tìm kiếm");
+  const searchInput = page.getByLabel("Tìm kiếm", { exact: true });
   await searchInput.fill("chay bo");
   await searchInput.press("Enter");
 
