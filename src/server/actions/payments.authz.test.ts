@@ -4,7 +4,6 @@ const {
   getBossMock,
   markOrderPaidManuallyCoreMock,
   prismaMock,
-  redirectMock,
   requireAdminMock,
   revalidatePathMock,
   PaymentBusinessErrorMock,
@@ -20,9 +19,6 @@ const {
     getBossMock: vi.fn(),
     markOrderPaidManuallyCoreMock: vi.fn(),
     prismaMock: {},
-    redirectMock: vi.fn((path: string) => {
-      throw new Error(`REDIRECT:${path}`);
-    }),
     requireAdminMock: vi.fn(),
     revalidatePathMock: vi.fn(),
     PaymentBusinessErrorMock: PaymentBusinessError,
@@ -33,7 +29,6 @@ vi.mock("@/lib/auth-guard", () => ({ requireAdmin: requireAdminMock }));
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 vi.mock("@/jobs/queue", () => ({ getBoss: getBossMock }));
 vi.mock("next/cache", () => ({ revalidatePath: revalidatePathMock }));
-vi.mock("next/navigation", () => ({ redirect: redirectMock }));
 vi.mock("@/server/payments/mark-order-paid", () => ({
   markOrderPaidManuallyCore: markOrderPaidManuallyCoreMock,
   PaymentBusinessError: PaymentBusinessErrorMock,
@@ -76,16 +71,18 @@ describe("confirmPaymentManuallyAction", () => {
     expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 
-  it("từ chối staff trước khi làm nóng queue hoặc gọi payment core", async () => {
+  it("staff can confirm payment and the core receives the authenticated actor", async () => {
     requireAdminMock.mockResolvedValue(sessionWithRole("staff"));
 
-    await expect(confirmPaymentManuallyAction("order-1")).rejects.toThrow(
-      "REDIRECT:/",
-    );
+    await expect(confirmPaymentManuallyAction(VALID_ORDER_ID)).resolves.toEqual({
+      ok: true,
+    });
 
-    expect(redirectMock).toHaveBeenCalledWith("/");
-    expect(getBossMock).not.toHaveBeenCalled();
-    expect(markOrderPaidManuallyCoreMock).not.toHaveBeenCalled();
+    expect(markOrderPaidManuallyCoreMock).toHaveBeenCalledWith(
+      prismaMock,
+      VALID_ORDER_ID,
+      "user-1",
+    );
   });
 
   it("trả lỗi validation an toàn cho orderId rỗng", async () => {
@@ -114,7 +111,7 @@ describe("confirmPaymentManuallyAction", () => {
     expect(markOrderPaidManuallyCoreMock).not.toHaveBeenCalled();
   });
 
-  it("owner chỉ truyền orderId đã validate và làm nóng getBoss trước khi core mở transaction", async () => {
+  it("owner passes the authenticated actor and warms getBoss before the core opens its transaction", async () => {
     requireAdminMock.mockResolvedValue(sessionWithRole("owner"));
 
     await expect(
@@ -125,16 +122,21 @@ describe("confirmPaymentManuallyAction", () => {
     expect(markOrderPaidManuallyCoreMock).toHaveBeenCalledWith(
       prismaMock,
       VALID_ORDER_ID,
+      "user-1",
     );
     expect(getBossMock.mock.invocationCallOrder[0]).toBeLessThan(
       markOrderPaidManuallyCoreMock.mock.invocationCallOrder[0],
     );
     expect(revalidatePathMock).toHaveBeenNthCalledWith(
       1,
-      "/admin/orders/pending",
+      "/admin/orders",
     );
     expect(revalidatePathMock).toHaveBeenNthCalledWith(
       2,
+      `/admin/orders/${VALID_ORDER_ID}`,
+    );
+    expect(revalidatePathMock).toHaveBeenNthCalledWith(
+      3,
       "/orders/LEAFABC123",
     );
   });

@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BankTransactionStatus, OrderStatus } from "@/generated/prisma/enums";
+import {
+  BankTransactionStatus,
+  OrderStatus,
+  PaymentDirection,
+} from "@/generated/prisma/enums";
 import {
   markOrderPaidCore,
   markOrderPaidManuallyCore,
@@ -152,7 +156,10 @@ describe("markOrderPaidCore", () => {
         provider: "sepay",
         transactionId: fixture.bankTransaction.providerTransactionId,
         amount: fixture.order.total,
-        bankTransactionId: fixture.bankTransaction.id,
+        bankTransaction: {
+          id: fixture.bankTransaction.id,
+          expectedStatus: BankTransactionStatus.RECEIVED,
+        },
       },
       { enqueuePaymentConfirmed },
     );
@@ -179,6 +186,8 @@ describe("markOrderPaidCore", () => {
       provider: "sepay",
       transactionId: fixture.bankTransaction.providerTransactionId,
       amount: 830_000,
+      direction: PaymentDirection.IN,
+      recordedByUserId: null,
     });
     expect(bankTransaction).toMatchObject({
       status: BankTransactionStatus.MATCHED,
@@ -205,7 +214,10 @@ describe("markOrderPaidCore", () => {
           provider: "sepay",
           transactionId: fixture.bankTransaction.providerTransactionId,
           amount: fixture.order.total,
-          bankTransactionId: fixture.bankTransaction.id,
+          bankTransaction: {
+            id: fixture.bankTransaction.id,
+            expectedStatus: BankTransactionStatus.RECEIVED,
+          },
         },
         { enqueuePaymentConfirmed },
       ),
@@ -253,7 +265,10 @@ describe("markOrderPaidCore", () => {
           provider: "sepay",
           transactionId: fixture.bankTransaction.providerTransactionId,
           amount: fixture.order.total,
-          bankTransactionId: fixture.bankTransaction.id,
+          bankTransaction: {
+            id: fixture.bankTransaction.id,
+            expectedStatus: BankTransactionStatus.RECEIVED,
+          },
         },
         { enqueuePaymentConfirmed },
       ),
@@ -294,14 +309,27 @@ describe("markOrderPaidCore", () => {
 
   it("repeated manual confirmation returns duplicate with one decrement, payment and enqueue", async () => {
     const fixture = await createPendingOrderFixture();
+    const admin = await testPrisma.user.create({
+      data: {
+        id: `user-${crypto.randomUUID()}`,
+        name: "Quản trị viên thanh toán",
+        email: `payment-admin-${crypto.randomUUID()}@example.com`,
+      },
+    });
     const enqueuePaymentConfirmed = vi.fn().mockResolvedValue(undefined);
 
-    const first = await markOrderPaidManuallyCore(testPrisma, fixture.order.id, {
-      enqueuePaymentConfirmed,
-    });
-    const second = await markOrderPaidManuallyCore(testPrisma, fixture.order.id, {
-      enqueuePaymentConfirmed,
-    });
+    const first = await markOrderPaidManuallyCore(
+      testPrisma,
+      fixture.order.id,
+      admin.id,
+      { enqueuePaymentConfirmed },
+    );
+    const second = await markOrderPaidManuallyCore(
+      testPrisma,
+      fixture.order.id,
+      admin.id,
+      { enqueuePaymentConfirmed },
+    );
 
     const [firstVariant, secondVariant, payments] = await Promise.all([
       testPrisma.variant.findUniqueOrThrow({ where: { id: fixture.firstVariant.id } }),
@@ -318,6 +346,8 @@ describe("markOrderPaidCore", () => {
       provider: "manual",
       transactionId: `manual:${fixture.order.id}`,
       amount: fixture.order.total,
+      direction: PaymentDirection.IN,
+      recordedByUserId: admin.id,
     });
     expect(enqueuePaymentConfirmed).toHaveBeenCalledTimes(1);
   });
@@ -504,7 +534,10 @@ describe("markOrderPaidCore", () => {
           provider: "sepay",
           transactionId: fixture.bankTransaction.providerTransactionId,
           amount: fixture.order.total,
-          bankTransactionId: fixture.bankTransaction.id,
+          bankTransaction: {
+            id: fixture.bankTransaction.id,
+            expectedStatus: BankTransactionStatus.RECEIVED,
+          },
         },
         { enqueuePaymentConfirmed },
       ),
@@ -534,5 +567,61 @@ describe("markOrderPaidCore", () => {
       processedAt: null,
     });
     expect(enqueuePaymentConfirmed).not.toHaveBeenCalled();
+  });
+
+  it("claims a reviewed bank event only when the expected reviewed status still matches", async () => {
+    const fixture = await createPendingOrderFixture();
+    await testPrisma.bankTransaction.update({
+      where: { id: fixture.bankTransaction.id },
+      data: {
+        status: BankTransactionStatus.REVIEW_REQUIRED,
+        reviewReason: "ORDER_NOT_FOUND",
+      },
+    });
+    const enqueuePaymentConfirmed = vi.fn().mockResolvedValue(undefined);
+
+    await expect(
+      markOrderPaidCore(
+        testPrisma,
+        {
+          orderId: fixture.order.id,
+          provider: "sepay",
+          transactionId: fixture.bankTransaction.providerTransactionId,
+          amount: fixture.order.total,
+          bankTransaction: {
+            id: fixture.bankTransaction.id,
+            expectedStatus: BankTransactionStatus.RECEIVED,
+          },
+        },
+        { enqueuePaymentConfirmed },
+      ),
+    ).rejects.toMatchObject({ name: "BankEventClaimError" });
+
+    await expect(
+      markOrderPaidCore(
+        testPrisma,
+        {
+          orderId: fixture.order.id,
+          provider: "sepay",
+          transactionId: fixture.bankTransaction.providerTransactionId,
+          amount: fixture.order.total,
+          bankTransaction: {
+            id: fixture.bankTransaction.id,
+            expectedStatus: BankTransactionStatus.REVIEW_REQUIRED,
+          },
+        },
+        { enqueuePaymentConfirmed },
+      ),
+    ).resolves.toEqual({ kind: "paid", orderCode: fixture.order.orderCode });
+
+    await expect(
+      testPrisma.bankTransaction.findUniqueOrThrow({
+        where: { id: fixture.bankTransaction.id },
+        select: { status: true, reviewReason: true },
+      }),
+    ).resolves.toEqual({
+      status: BankTransactionStatus.MATCHED,
+      reviewReason: null,
+    });
   });
 });

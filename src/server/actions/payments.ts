@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getBoss } from "@/jobs/queue";
 import { requireAdmin } from "@/lib/auth-guard";
@@ -36,9 +35,6 @@ export async function confirmPaymentManuallyAction(
   orderId: string,
 ): Promise<ConfirmPaymentManuallyResult> {
   const session = await requireAdmin();
-  if (session.user.role !== "owner") {
-    redirect("/");
-  }
 
   const parsed = orderIdSchema.safeParse(orderId);
   if (!parsed.success) {
@@ -49,9 +45,14 @@ export async function confirmPaymentManuallyAction(
     // Kết nối queue phải sẵn sàng trước khi core mở payment transaction, vì
     // job xác nhận email được ghi atomically trong chính transaction đó.
     await getBoss();
-    const result = await markOrderPaidManuallyCore(prisma, parsed.data);
+    const result = await markOrderPaidManuallyCore(
+      prisma,
+      parsed.data,
+      session.user.id,
+    );
 
-    revalidatePath("/admin/orders/pending");
+    revalidatePath("/admin/orders");
+    revalidatePath(`/admin/orders/${parsed.data}`);
     revalidatePath(`/orders/${result.orderCode}`);
     return { ok: true };
   } catch (error: unknown) {

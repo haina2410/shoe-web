@@ -2,6 +2,7 @@ import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import {
   BankTransactionStatus,
   OrderStatus,
+  PaymentDirection,
 } from "@/generated/prisma/enums";
 import { enqueuePaymentConfirmed } from "@/jobs/queue";
 
@@ -25,12 +26,18 @@ export class BankEventClaimError extends Error {
   }
 }
 
+export type BankTransactionClaim = {
+  id: string;
+  expectedStatus: BankTransactionStatus;
+};
+
 export type MarkOrderPaidInput = {
   orderId: string;
   provider: "sepay" | "manual";
   transactionId: string;
   amount: number;
-  bankTransactionId?: string;
+  bankTransaction?: BankTransactionClaim;
+  recordedByUserId?: string | null;
 };
 
 export type MarkOrderPaidResult =
@@ -108,12 +115,12 @@ export async function markOrderPaidCore(
       }
 
       const now = new Date();
-      if (input.bankTransactionId) {
+      if (input.bankTransaction) {
         const bankEventClaim = await tx.bankTransaction.updateMany({
           where: {
-            id: input.bankTransactionId,
+            id: input.bankTransaction.id,
             providerTransactionId: input.transactionId,
-            status: BankTransactionStatus.RECEIVED,
+            status: input.bankTransaction.expectedStatus,
           },
           data: { updatedAt: now },
         });
@@ -146,16 +153,19 @@ export async function markOrderPaidCore(
           provider: input.provider,
           transactionId: input.transactionId,
           amount: input.amount,
+          direction: PaymentDirection.IN,
+          recordedByUserId: input.recordedByUserId,
         },
       });
 
-      if (input.bankTransactionId) {
+      if (input.bankTransaction) {
         await tx.bankTransaction.update({
-          where: { id: input.bankTransactionId },
+          where: { id: input.bankTransaction.id },
           data: {
             status: BankTransactionStatus.MATCHED,
             orderId: order.id,
             processedAt: now,
+            reviewReason: null,
           },
         });
       }
@@ -178,6 +188,7 @@ export async function markOrderPaidCore(
 export async function markOrderPaidManuallyCore(
   db: PrismaClient,
   orderId: string,
+  recordedByUserId: string,
   deps: MarkOrderPaidDeps = { enqueuePaymentConfirmed },
 ): Promise<MarkOrderPaidResult> {
   const order = await db.order.findUnique({
@@ -193,6 +204,7 @@ export async function markOrderPaidManuallyCore(
       provider: "manual",
       transactionId: `manual:${orderId}`,
       amount: order.total,
+      recordedByUserId,
     },
     deps,
   );

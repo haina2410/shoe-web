@@ -147,7 +147,11 @@ export async function reconcilePersistedSePayEventCore(
         provider: "sepay",
         transactionId: event.providerTransactionId,
         amount: event.amount,
-        bankTransactionId: event.id,
+        bankTransaction: {
+          id: event.id,
+          expectedStatus: BankTransactionStatus.RECEIVED,
+        },
+        recordedByUserId: null,
       },
       deps,
     );

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   BankTransactionStatus,
   OrderStatus,
+  PaymentDirection,
 } from "@/generated/prisma/enums";
 import type { PrismaClient } from "@/generated/prisma/client";
 import type { SePayWebhookPayload } from "@/lib/sepay";
@@ -212,6 +213,8 @@ describe("reconcileSePayCore", () => {
       provider: "sepay",
       transactionId: String(payload.id),
       amount: payload.transferAmount,
+      direction: PaymentDirection.IN,
+      recordedByUserId: null,
     });
     expect(enqueuePaymentConfirmed).toHaveBeenCalledTimes(1);
   });

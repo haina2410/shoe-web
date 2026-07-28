@@ -13,8 +13,7 @@ const createdAtFormatter = new Intl.DateTimeFormat("vi-VN", {
 });
 
 export default async function AdminPendingOrdersPage() {
-  // Staff được xem danh sách để hỗ trợ vận hành; chỉ owner được render action.
-  const session = await requireAdmin();
+  await requireAdmin();
   const pendingOrders = await prisma.order.findMany({
     where: { status: OrderStatus.PENDING_PAYMENT },
     orderBy: { createdAt: "asc" },
@@ -25,8 +24,6 @@ export default async function AdminPendingOrdersPage() {
       total: true,
     },
   });
-  const canConfirmPayment = session.user.role === "owner";
-
   return (
     <div>
       <h1 className="text-2xl font-bold" style={{ color: "var(--evergreen)" }}>
@@ -51,11 +48,9 @@ export default async function AdminPendingOrdersPage() {
                 <th className="px-4 py-3 font-medium">Mã đơn</th>
                 <th className="px-4 py-3 font-medium">Thời gian tạo</th>
                 <th className="px-4 py-3 font-medium">Tổng tiền</th>
-                {canConfirmPayment && (
-                  <th className="px-4 py-3 font-medium">
-                    <span className="sr-only">Hành động</span>
-                  </th>
-                )}
+                <th className="px-4 py-3 font-medium">
+                  <span className="sr-only">Hành động</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -70,11 +65,9 @@ export default async function AdminPendingOrdersPage() {
                     {createdAtFormatter.format(order.createdAt)}
                   </td>
                   <td className="px-4 py-3">{formatVnd(order.total)}</td>
-                  {canConfirmPayment && (
-                    <td className="px-4 py-3">
-                      <ConfirmPaymentButton orderId={order.id} />
-                    </td>
-                  )}
+                  <td className="px-4 py-3">
+                    <ConfirmPaymentButton orderId={order.id} />
+                  </td>
                 </tr>
               ))}
             </tbody>
