@@ -28,6 +28,7 @@ const REFUND_LABEL = {
 } as const;
 
 function maskAccountNumber(accountNumber: string): string {
+  if (accountNumber.length <= 4) return "••••";
   return `•••• ${accountNumber.slice(-4)}`;
 }
 

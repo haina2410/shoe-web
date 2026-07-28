@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import {
   BankTransactionStatus,
   OrderStatus,
@@ -267,5 +267,31 @@ describe("AdminOrderDetailPage", () => {
     expect(
       screen.queryByRole("button", { name: "Chuyển sang đang giao" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("fully masks an account number with four or fewer characters", async () => {
+    getAdminOrderDetailMock.mockResolvedValue({
+      ...baseOrder,
+      bankTransactions: [
+        {
+          ...baseOrder.bankTransactions[0],
+          accountNumber: "1234",
+        },
+      ],
+    });
+
+    render(
+      await AdminOrderDetailPage({
+        params: Promise.resolve({ id: VALID_ORDER_ID }),
+      }),
+    );
+
+    const bankSection = screen
+      .getByRole("heading", { name: "Giao dịch ngân hàng liên kết" })
+      .closest("section");
+    expect(bankSection).not.toBeNull();
+
+    expect(within(bankSection!).getByText("••••")).toBeInTheDocument();
+    expect(within(bankSection!).queryByText(/1234/)).not.toBeInTheDocument();
   });
 });
