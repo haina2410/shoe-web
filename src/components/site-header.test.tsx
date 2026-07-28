@@ -12,4 +12,18 @@ describe("SiteHeader", () => {
     render(<SiteHeader />);
     expect(screen.getByRole("link", { name: /giỏ hàng/i })).toBeInTheDocument();
   });
+
+  it("cung cấp điều hướng và tìm kiếm sản phẩm bằng form GET", () => {
+    render(<SiteHeader />);
+
+    expect(screen.getByRole("banner")).toBeInTheDocument();
+    expect(
+      screen.getByRole("navigation", { name: "Điều hướng chính" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Tìm sản phẩm" })).toHaveAttribute(
+      "name",
+      "q",
+    );
+    expect(screen.getByRole("search")).toHaveAttribute("action", "/products");
+  });
 });
