@@ -24,9 +24,14 @@ export default function RootLayout({
   return (
     <html lang="vi" className={beVietnam.variable}>
       <body className="min-h-screen flex flex-col font-sans antialiased">
+        <a className="skip-link" href="#main-content">
+          Bỏ qua điều hướng
+        </a>
         <CartHydrator />
         <SiteHeader />
-        <main className="flex-1">{children}</main>
+        <main id="main-content" className="flex-1" tabIndex={-1}>
+          {children}
+        </main>
         <SiteFooter />
       </body>
     </html>
