@@ -11,6 +11,9 @@
     "db:seed": "prisma db seed",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:smoke": "playwright test --config playwright.smoke.config.ts",
+    "deploy:production": "bash scripts/deploy-production.sh",
+    "backup:production": "bash scripts/backup-production.sh",
     "worker": "tsx src/worker/index.ts"
   },
   "dependencies": {

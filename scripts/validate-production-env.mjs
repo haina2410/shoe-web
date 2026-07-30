@@ -1,0 +1,37 @@
+import { pathToFileURL } from "node:url";
+
+export const REQUIRED_PRODUCTION_ENV = [
+  "POSTGRES_DB",
+  "POSTGRES_USER",
+  "POSTGRES_PASSWORD",
+  "BETTER_AUTH_SECRET",
+  "BETTER_AUTH_URL",
+  "APP_BASE_URL",
+  "VIETQR_BANK_CODE",
+  "VIETQR_ACCOUNT_NO",
+  "VIETQR_ACCOUNT_NAME",
+  "SEPAY_WEBHOOK_SECRET",
+  "RESEND_API_KEY",
+  "MAIL_FROM",
+  "MAIL_REPLY_TO",
+  "SMOKE_BASE_URL",
+  "SMOKE_PRODUCT_PATH",
+];
+
+export function validateProductionEnv(env = process.env) {
+  return REQUIRED_PRODUCTION_ENV.filter((name) => !env[name]?.trim());
+}
+
+const isDirect =
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isDirect) {
+  const missing = validateProductionEnv();
+  if (missing.length > 0) {
+    console.error(`Thiếu biến môi trường production: ${missing.join(", ")}`);
+    process.exitCode = 1;
+  } else {
+    console.log("Production environment hợp lệ.");
+  }
+}
