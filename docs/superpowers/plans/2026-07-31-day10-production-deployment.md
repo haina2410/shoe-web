@@ -21,6 +21,7 @@
 - Migrate before replacing app/worker; a failed build or migration must leave the current app/worker release running.
 - Remote automatic smoke tests must not create orders, payments, users, uploads, or other production data.
 - Run every behavior change RED → GREEN and commit after each independently reviewable task.
+- For Dockerfile/Compose configuration only, the user approved executable validation (`docker build`, `docker compose config`, and an isolated Compose rehearsal) instead of source-text/regex unit tests.
 - Every implementation and review subagent must use model `gpt-5.6-terra`.
 
 ## File Map
@@ -39,7 +40,6 @@
 | `scripts/deploy-production.sh` | Build → database → migrate → app/worker → health → smoke workflow |
 | `scripts/backup-production.sh` | Timestamped PostgreSQL/upload backup without retention deletion |
 | `src/deployment/production-env.test.ts` | Validator and secret-redaction contract |
-| `src/deployment/deployment-assets.test.ts` | Static deployment-file security and topology contracts |
 | `playwright.smoke.config.ts` | Remote-only Playwright configuration with no local web server |
 | `e2e/production-smoke.spec.ts` | Non-mutating health/storefront/login request checks |
 | `docs/08-production-runbook.md` | Komodo, Tunnel, launch, backup, restore drill, rollback, and diagnosis |
@@ -176,7 +176,6 @@ git commit -m "feat(deploy): add database readiness endpoint"
 **Files:**
 - Create: `Dockerfile`
 - Create: `.dockerignore`
-- Create: `src/deployment/deployment-assets.test.ts`
 - Modify: `next.config.ts`
 
 **Interfaces:**
@@ -195,65 +194,14 @@ sed -n '1,360p' node_modules/next/dist/docs/01-app/02-guides/self-hosting.md
 
 Expected: confirm standalone does not automatically copy `public` or `.next/static`, runtime server env remains available, and self-hosting should use graceful shutdown.
 
-- [ ] **Step 2: Write failing deployment asset contracts**
+- [ ] **Step 2: Record the approved configuration-test exception**
 
-Create `src/deployment/deployment-assets.test.ts`:
+This task changes deployment configuration rather than application behavior.
+Do not add tests that grep Dockerfile or `next.config.ts`. Validation occurs by
+building each target and inspecting the resulting container metadata in Steps
+6–7, as explicitly approved by the user during plan pre-flight.
 
-```ts
-import { readFile } from "node:fs/promises";
-import { describe, expect, it } from "vitest";
-
-async function text(path: string): Promise<string> {
-  return readFile(path, "utf8");
-}
-
-describe("production deployment assets", () => {
-  it("builds a Next.js standalone server", async () => {
-    expect(await text("next.config.ts")).toMatch(/output:\s*["']standalone["']/);
-  });
-
-  it("defines non-root app, worker, and migration targets", async () => {
-    const dockerfile = await text("Dockerfile");
-
-    expect(dockerfile).toMatch(/AS app\b/);
-    expect(dockerfile).toMatch(/AS worker\b/);
-    expect(dockerfile).toMatch(/AS migrate\b/);
-    expect(dockerfile).toContain("/app/.next/standalone");
-    expect(dockerfile).toContain("/app/.next/static");
-    expect(dockerfile).toContain("/app/public");
-    expect(dockerfile.match(/USER nextjs/g)?.length).toBeGreaterThanOrEqual(3);
-    expect(dockerfile).not.toMatch(/ARG\s+(DATABASE_URL|.*SECRET|.*PASSWORD)/);
-  });
-
-  it("excludes secrets and machine-local state from the build context", async () => {
-    const ignored = await text(".dockerignore");
-
-    for (const entry of [
-      ".git",
-      ".env*",
-      "node_modules",
-      ".next",
-      "uploads",
-      "test-results",
-      "playwright-report",
-    ]) {
-      expect(ignored).toContain(entry);
-    }
-  });
-});
-```
-
-- [ ] **Step 3: Confirm RED**
-
-Run:
-
-```bash
-npx vitest run src/deployment/deployment-assets.test.ts
-```
-
-Expected: FAIL because the Docker assets and standalone config do not exist.
-
-- [ ] **Step 4: Enable standalone output**
+- [ ] **Step 3: Enable standalone output**
 
 Replace the current config in `next.config.ts` with:
 
@@ -267,7 +215,7 @@ const nextConfig: NextConfig = {
 export default nextConfig;
 ```
 
-- [ ] **Step 5: Add the Docker build context exclusions**
+- [ ] **Step 4: Add the Docker build context exclusions**
 
 Create `.dockerignore`:
 
@@ -291,7 +239,7 @@ npm-debug.log*
 *.tsbuildinfo
 ```
 
-- [ ] **Step 6: Add the multi-stage Dockerfile**
+- [ ] **Step 5: Add the multi-stage Dockerfile**
 
 Create `Dockerfile` with these exact stages and responsibilities:
 
@@ -349,17 +297,7 @@ Implementation note: if `prisma generate` requires a datasource value in the
 container, add the same non-secret loopback build URL to the `generated` stage;
 never introduce a real build secret.
 
-- [ ] **Step 7: Confirm GREEN at the contract level**
-
-Run:
-
-```bash
-npx vitest run src/deployment/deployment-assets.test.ts
-```
-
-Expected: PASS.
-
-- [ ] **Step 8: Build and inspect all current runtime targets**
+- [ ] **Step 6: Build all current runtime targets**
 
 Run:
 
@@ -367,6 +305,15 @@ Run:
 docker build --target app -t leafshoes/app:day10-test .
 docker build --target worker -t leafshoes/worker:day10-test .
 docker build --target migrate -t leafshoes/migrate:day10-test .
+```
+
+Expected: all three builds succeed.
+
+- [ ] **Step 7: Inspect runtime metadata instead of source text**
+
+Run:
+
+```bash
 docker image inspect leafshoes/app:day10-test --format '{{.Config.User}} {{json .Config.Cmd}}'
 docker image inspect leafshoes/worker:day10-test --format '{{.Config.User}} {{json .Config.Cmd}}'
 docker image inspect leafshoes/migrate:day10-test --format '{{.Config.User}} {{json .Config.Cmd}}'
@@ -374,10 +321,10 @@ docker image inspect leafshoes/migrate:day10-test --format '{{.Config.User}} {{j
 
 Expected: three builds succeed; each inspect begins with `nextjs`.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add Dockerfile .dockerignore next.config.ts src/deployment/deployment-assets.test.ts
+git add Dockerfile .dockerignore next.config.ts
 git commit -m "feat(deploy): add production container targets"
 ```
 
@@ -389,69 +336,18 @@ git commit -m "feat(deploy): add production container targets"
 - Create: `docker-compose.prod.yml`
 - Create: `.env.production.example`
 - Modify: `.gitignore`
-- Modify: `src/deployment/deployment-assets.test.ts`
 
 **Interfaces:**
 - Consumes: Docker targets `app`, `worker`, and `migrate` from Task 2.
 - Produces: Compose services `postgres`, `migrate`, `app`, `worker`, and an `ops` profile; volumes `postgres_data` and `uploads_data`.
 
-- [ ] **Step 1: Extend the asset tests with the production topology**
+- [ ] **Step 1: Record the approved configuration-test exception**
 
-Append these tests to `src/deployment/deployment-assets.test.ts`:
+Do not add source-text tests for the Compose topology or environment example.
+Validate the resolved Compose model with `docker compose config --quiet` and
+the isolated runtime rehearsal in Task 6.
 
-```ts
-it("keeps the origin and database private while declaring durable volumes", async () => {
-  const compose = await text("docker-compose.prod.yml");
-
-  expect(compose).toContain('127.0.0.1:${APP_HOST_PORT:-3000}:3000');
-  expect(compose).not.toMatch(/-\s*["']?\d+:5432/);
-  expect(compose).toContain("postgres_data:");
-  expect(compose).toContain("uploads_data:");
-  expect(compose).toContain("condition: service_healthy");
-  expect(compose).toContain("target: app");
-  expect(compose).toContain("target: worker");
-  expect(compose).toContain("target: migrate");
-});
-
-it("commits only a safe and complete production environment example", async () => {
-  const env = await text(".env.production.example");
-
-  for (const name of [
-    "POSTGRES_DB",
-    "POSTGRES_USER",
-    "POSTGRES_PASSWORD",
-    "BETTER_AUTH_SECRET",
-    "BETTER_AUTH_URL",
-    "APP_BASE_URL",
-    "VIETQR_BANK_CODE",
-    "VIETQR_ACCOUNT_NO",
-    "VIETQR_ACCOUNT_NAME",
-    "SEPAY_WEBHOOK_SECRET",
-    "RESEND_API_KEY",
-    "MAIL_FROM",
-    "MAIL_REPLY_TO",
-    "SMOKE_BASE_URL",
-    "SMOKE_PRODUCT_PATH",
-  ]) {
-    expect(env).toContain(`${name}=`);
-  }
-
-  expect(env).not.toContain("0000000000");
-  expect(env).not.toMatch(/re_[A-Za-z0-9]{10,}/);
-});
-```
-
-- [ ] **Step 2: Confirm RED**
-
-Run:
-
-```bash
-npx vitest run src/deployment/deployment-assets.test.ts
-```
-
-Expected: FAIL because Compose and the production env example do not exist.
-
-- [ ] **Step 3: Allow only the safe production example in Git**
+- [ ] **Step 2: Allow only the safe production example in Git**
 
 Add below the existing `.env` ignore rules in `.gitignore`:
 
@@ -459,7 +355,7 @@ Add below the existing `.env` ignore rules in `.gitignore`:
 !.env.production.example
 ```
 
-- [ ] **Step 4: Create the production environment example**
+- [ ] **Step 3: Create the production environment example**
 
 Create `.env.production.example` with explicit non-secret sentinel values:
 
@@ -500,7 +396,7 @@ SMOKE_PRODUCT_PATH=/products/giay-chay-bo-em-nhe
 # SEED_STAFF_PASSWORD=replace-me
 ```
 
-- [ ] **Step 5: Create the Compose file**
+- [ ] **Step 4: Create the Compose file**
 
 Create `docker-compose.prod.yml` with:
 
@@ -613,21 +509,33 @@ volumes:
   uploads_data:
 ```
 
-- [ ] **Step 6: Confirm GREEN and validate real Compose interpolation**
+- [ ] **Step 5: Validate real Compose interpolation**
 
 Run:
 
 ```bash
-npx vitest run src/deployment/deployment-assets.test.ts
 docker compose --env-file .env.production.example -f docker-compose.prod.yml config --quiet
 ```
 
-Expected: tests PASS and Compose exits `0` without printing resolved secret values.
+Expected: Compose exits `0` without printing resolved secret values.
+
+- [ ] **Step 6: Inspect the resolved topology without exposing values**
+
+Run:
+
+```bash
+docker compose --env-file .env.production.example -f docker-compose.prod.yml config --services
+docker compose --env-file .env.production.example -f docker-compose.prod.yml config --volumes
+```
+
+Expected: services are `postgres`, `app`, and `worker` by default; volumes are
+the project-scoped PostgreSQL and upload volumes. Profile-only jobs are not
+started by an ordinary `up`.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add .gitignore .env.production.example docker-compose.prod.yml src/deployment/deployment-assets.test.ts
+git add .gitignore .env.production.example docker-compose.prod.yml
 git commit -m "feat(deploy): define private production compose stack"
 ```
 
@@ -857,7 +765,7 @@ Expected: both syntax checks exit `0`.
 Run:
 
 ```bash
-npx vitest run src/deployment/production-env.test.ts src/deployment/deployment-assets.test.ts
+npx vitest run src/deployment/production-env.test.ts
 env -i PATH="$PATH" node scripts/validate-production-env.mjs
 ```
 
@@ -881,7 +789,6 @@ git commit -m "feat(deploy): automate safe production rollout"
 - Modify: `Dockerfile`
 - Modify: `docker-compose.prod.yml`
 - Modify: `scripts/deploy-production.sh`
-- Modify: `src/deployment/deployment-assets.test.ts`
 
 **Interfaces:**
 - Consumes: `SMOKE_BASE_URL` and `SMOKE_PRODUCT_PATH`; public app routes from prior days.
@@ -1000,19 +907,7 @@ Append this command after the health loop in `scripts/deploy-production.sh`:
 "${compose[@]}" run --rm smoke
 ```
 
-- [ ] **Step 6: Extend the deployment asset contract**
-
-Add to the Docker/Compose target test:
-
-```ts
-expect(dockerfile).toMatch(/AS smoke\b/);
-expect(dockerfile).not.toContain("playwright install");
-expect(compose).toContain("target: smoke");
-expect(compose).toContain("SMOKE_BASE_URL:");
-expect(compose).toContain("SMOKE_PRODUCT_PATH:");
-```
-
-- [ ] **Step 7: Run smoke against the local production server**
+- [ ] **Step 6: Run smoke against the local production server**
 
 First ensure the development database is migrated/seeded and a production
 server is listening on `3000`, then run:
@@ -1025,22 +920,21 @@ npm run test:smoke
 
 Expected: 3 tests PASS and no browser download occurs.
 
-- [ ] **Step 8: Build the smoke target and validate Compose**
+- [ ] **Step 7: Build the smoke target and validate Compose**
 
 Run:
 
 ```bash
 docker build --target smoke -t leafshoes/smoke:day10-test .
 docker compose --env-file .env.production.example -f docker-compose.prod.yml config --quiet
-npx vitest run src/deployment/deployment-assets.test.ts
 ```
 
 Expected: all commands exit `0`.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add Dockerfile docker-compose.prod.yml scripts/deploy-production.sh playwright.smoke.config.ts e2e/production-smoke.spec.ts src/deployment/deployment-assets.test.ts
+git add Dockerfile docker-compose.prod.yml scripts/deploy-production.sh playwright.smoke.config.ts e2e/production-smoke.spec.ts
 git commit -m "test(deploy): add remote production smoke gate"
 ```
 
