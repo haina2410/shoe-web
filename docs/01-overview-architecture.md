@@ -18,11 +18,15 @@ Lý do monolith 1 codebase: nhanh nhất cho demo 10 ngày, một ngôn ngữ (T
 │                                    │  enqueue (cùng    │            • hết hạn đơn │
 │                                    └─ transaction) ────┘                          │
 │                                                                                  │
-│  [Caddy/Nginx reverse proxy + TLS]                    [Resend] ◄─ gửi email TT   │
+│  [Origin: 127.0.0.1 qua Cloudflare Tunnel]            [Resend] ◄─ gửi email TT   │
 └──────────────────────────────────────────────────────────────────────────────────┘
         ▲                                    ▲
    Khách (guest, chỉ email)            SePay/Casso webhook (khớp CK ngân hàng)
 ```
+
+Production dùng `cloudflared` system service đã có trên VPS để kết thúc HTTPS
+ở Cloudflare và chuyển request tới app bind trên loopback. Stack không cần
+Caddy/Nginx và không mở origin web hoặc PostgreSQL ra Internet.
 
 ## Các thành phần
 

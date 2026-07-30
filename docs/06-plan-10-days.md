@@ -109,10 +109,10 @@ Nền tảng(1) → Data+RBAC(2) → Admin CRUD(3) ─┐
 ## Ngày 10 — Dockerize + deploy dedicated server
 
 - **Mục tiêu:** demo chạy trên server thật.
-- **Bàn giao:** `Dockerfile` (Next.js standalone), Docker Compose (app + worker + postgres), reverse proxy Caddy/Nginx + TLS, biến môi trường production, chạy migrate, **smoke test E2E trên server**; buffer cho lỗi phát sinh.
-- **Module/file chính:** `Dockerfile`, `docker-compose.prod.yml`, `Caddyfile`, `.env.production` (không commit), script deploy.
-- **Trọng tâm test:** smoke E2E checkout trên domain thật; webhook SePay trỏ về endpoint production; gửi email thật (đã cấu hình domain/DKIM).
-- **Phụ thuộc:** tất cả. | **Rủi ro:** DNS/TLS/webhook URL, biến môi trường thiếu → checklist trước deploy.
+- **Bàn giao:** `Dockerfile` nhiều stage (Next.js standalone + worker + migrate), Docker Compose do Komodo quản lý (app + worker + postgres + migration job), app chỉ bind loopback và đi qua `cloudflared` system service đã có, biến môi trường production, healthcheck, backup/rollback runbook và **smoke test E2E trên server**; buffer cho lỗi phát sinh.
+- **Module/file chính:** `Dockerfile`, `docker-compose.prod.yml`, `.env.production.example`, script deploy/backup/smoke, production runbook.
+- **Trọng tâm test:** smoke không phá dữ liệu trên domain thật; manual acceptance checkout + VietQR + webhook SePay + email thật sau khi domain/DKIM sẵn sàng.
+- **Phụ thuộc:** tất cả. | **Rủi ro:** Cloudflare Tunnel origin, webhook URL, migration, persistent volume và biến môi trường thiếu → checklist trước deploy.
 
 ---
 

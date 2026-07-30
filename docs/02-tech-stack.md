@@ -11,7 +11,7 @@
 | Bảng dữ liệu admin | **TanStack Table** | Bảng/sort/filter mạnh cho trang quản trị |
 | Thanh toán | **VietQR + SePay/Casso** webhook | Đối soát chuyển khoản tự động + fallback admin xác nhận tay |
 | State giỏ hàng | **Zustand + localStorage** | Giỏ hàng guest phía client, nhẹ |
-| Deploy | **Docker Compose** (app + worker + postgres) + Caddy/Nginx | Dedicated server, TLS tự động (Caddy) |
+| Deploy | **Komodo + Docker Compose** (app + worker + postgres) qua **Cloudflare Tunnel** | VPS hiện có Komodo và `cloudflared`; TLS ở Cloudflare, origin chỉ bind loopback |
 | Test | **Vitest** (unit) + **Playwright** (E2E checkout) | TDD cho logic trọng điểm |
 
 ## Các quyết định đã cân nhắc (ghi lại lý do)
