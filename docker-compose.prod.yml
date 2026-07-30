@@ -1,0 +1,106 @@
+name: ${COMPOSE_PROJECT_NAME:-leafshoes}
+
+x-runtime-environment: &runtime-environment
+  DATABASE_URL: postgresql://${POSTGRES_USER:?required}:${POSTGRES_PASSWORD:?required}@postgres:5432/${POSTGRES_DB:?required}?schema=public
+  APP_BASE_URL: ${APP_BASE_URL:?required}
+  VIETQR_BANK_CODE: ${VIETQR_BANK_CODE:?required}
+  VIETQR_ACCOUNT_NO: ${VIETQR_ACCOUNT_NO:?required}
+  VIETQR_ACCOUNT_NAME: ${VIETQR_ACCOUNT_NAME:?required}
+  VIETQR_TEMPLATE: ${VIETQR_TEMPLATE:-compact2}
+  RESEND_API_KEY: ${RESEND_API_KEY:?required}
+  MAIL_FROM: ${MAIL_FROM:?required}
+  MAIL_REPLY_TO: ${MAIL_REPLY_TO:?required}
+  MAIL_TO_OVERRIDE: ${MAIL_TO_OVERRIDE:-}
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?required}
+      POSTGRES_USER: ${POSTGRES_USER:?required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  migrate:
+    image: leafshoes/migrate:${RELEASE_TAG:-local}
+    build:
+      context: .
+      target: migrate
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:?required}:${POSTGRES_PASSWORD:?required}@postgres:5432/${POSTGRES_DB:?required}?schema=public
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?required}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:?required}
+      SEED_OWNER_EMAIL: ${SEED_OWNER_EMAIL:-}
+      SEED_OWNER_PASSWORD: ${SEED_OWNER_PASSWORD:-}
+      SEED_STAFF_EMAIL: ${SEED_STAFF_EMAIL:-}
+      SEED_STAFF_PASSWORD: ${SEED_STAFF_PASSWORD:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    profiles: ["ops"]
+
+  app:
+    image: leafshoes/app:${RELEASE_TAG:-local}
+    build:
+      context: .
+      target: app
+    environment:
+      <<: *runtime-environment
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?required}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:?required}
+      SEPAY_WEBHOOK_SECRET: ${SEPAY_WEBHOOK_SECRET:?required}
+      UPLOAD_DIR: ${UPLOAD_DIR:-/data/uploads}
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-5242880}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${APP_HOST_PORT:-3000}:3000"
+    volumes:
+      - uploads_data:${UPLOAD_DIR:-/data/uploads}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 30s
+    security_opt:
+      - no-new-privileges:true
+
+  worker:
+    image: leafshoes/worker:${RELEASE_TAG:-local}
+    build:
+      context: .
+      target: worker
+    environment:
+      <<: *runtime-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 30s
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  postgres_data:
+  uploads_data:
