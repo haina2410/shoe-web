@@ -26,4 +26,18 @@ describe("SiteHeader", () => {
     );
     expect(screen.getByRole("search")).toHaveAttribute("action", "/products");
   });
+
+  it("giữ các điểm chạm chính ở kích thước tối thiểu trên mobile", () => {
+    render(<SiteHeader />);
+
+    for (const target of [
+      screen.getByRole("link", { name: "Trang chủ leafshoes" }),
+      screen.getByRole("link", { name: "Sản phẩm" }),
+      screen.getByRole("link", { name: "Giỏ hàng" }),
+      screen.getByRole("searchbox", { name: "Tìm sản phẩm" }),
+      screen.getByRole("button", { name: "Gửi tìm kiếm" }),
+    ]) {
+      expect(target.className).toMatch(/min-h-11/);
+    }
+  });
 });

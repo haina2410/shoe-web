@@ -27,7 +27,10 @@ export function CategoryPaths(): React.JSX.Element {
             style={{ borderColor: "var(--line)" }}
           >
             {category.label}
-            <ArrowUpRight aria-hidden="true" className="size-5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+            <ArrowUpRight
+              aria-hidden="true"
+              className="size-5 transition-transform motion-safe:group-hover:-translate-y-0.5 motion-safe:group-hover:translate-x-0.5 motion-reduce:transform-none"
+            />
           </Link>
         ))}
       </div>

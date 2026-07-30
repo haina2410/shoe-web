@@ -15,7 +15,7 @@ export function CartSummaryLink() {
     <Link
       href="/cart"
       aria-label={showCount ? `Giỏ hàng, ${count} sản phẩm` : "Giỏ hàng"}
-      className="inline-flex items-center gap-2 whitespace-nowrap rounded-full px-2 py-1 text-sm font-semibold text-[var(--evergreen)] hover:bg-[var(--sage)]"
+      className="inline-flex min-h-11 min-w-11 items-center gap-2 whitespace-nowrap rounded-full px-3 py-1 text-sm font-semibold text-[var(--evergreen)] hover:bg-[var(--sage)]"
     >
       <ShoppingBag aria-hidden="true" size={18} />
       <span>Giỏ hàng</span>
