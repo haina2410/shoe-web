@@ -15,7 +15,10 @@ Compose, build argument, image, log, Playwright report hoặc snapshot.
 - Kiểm tra tài nguyên trước deploy: `df -h`, `free -h`, và dung lượng Docker
   (`docker system df`). Đủ chỗ cho image build, PostgreSQL, upload và backup.
 - Có nơi lưu backup ngoài repository/container. Chọn `BACKUP_DIR` là một thư
-  mục host rõ ràng, có quyền ghi và không bị Docker volume hoặc Git quản lý.
+  mục host rõ ràng, không bị Docker volume hoặc Git quản lý. Tài khoản chạy
+  Komodo Action/Procedure phải sở hữu thư mục này và là tài khoản duy nhất có
+  quyền đọc/ghi; provision thư mục với mode `0700`. Script không tự sửa owner
+  hoặc mode của thư mục có sẵn.
 
 ## 2. Tạo Komodo Stack và environment chung
 
@@ -137,14 +140,25 @@ VPS, với production environment đã được Komodo cấp:
 BACKUP_DIR=/srv/leafshoes-backups npm run backup:production
 ```
 
-Script tạo custom-format PostgreSQL dump và archive uploads, không tự xóa
-backup cũ. Xác nhận cả hai file timestamped tồn tại và không rỗng:
+Script tạo custom-format PostgreSQL dump và stream archive uploads về file do
+host sở hữu, không tự xóa backup cũ. Host áp dụng `umask 077`: thư mục mới do
+script tạo có mode `0700`, hai file backup có mode `0600`. Nếu một trong hai
+tên file của timestamp đã tồn tại, hoặc một tiến trình khác đang dùng cùng
+timestamp, script thoát lỗi trước khi ghi và không overwrite. Giữ nguyên các
+file cũ và chạy lại sau khi timestamp UTC đã thay đổi.
+
+Xác nhận owner/mode đúng, cả hai file timestamped tồn tại và không rỗng:
 
 ```bash
 find /srv/leafshoes-backups -maxdepth 1 -type f -size +0c -print
+stat -c '%U %G %a %n' /srv/leafshoes-backups \
+  /srv/leafshoes-backups/postgres-*.dump \
+  /srv/leafshoes-backups/uploads-*.tar.gz
 ```
 
-Lưu backup ngoài container/repository và ghi lại timestamp cùng Git release.
+Owner phải là tài khoản chạy backup; mode mong đợi lần lượt là `700` cho thư
+mục và `600` cho từng artifact. Lưu backup ngoài container/repository và ghi
+lại timestamp cùng Git release.
 
 ## 7. Restore drill có thể xóa bỏ
 
@@ -289,6 +303,7 @@ incident ticket.
 - [ ] Komodo alone holds real secrets; Git, images, build args, logs and test
   reports do not contain them.
 - [ ] PostgreSQL and uploads volumes persist; latest non-empty backup and a
-  disposable restore drill have been verified.
+  disposable restore drill have been verified; backup directory is owner-only
+  (`0700`) and artifacts are mode `0600`.
 - [ ] Automatic deploy never runs seed, payment, upload, user or order creation;
   smoke remains request-only.
