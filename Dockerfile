@@ -49,3 +49,10 @@ CMD ["./node_modules/.bin/tsx", "src/worker/index.ts"]
 
 FROM worker AS migrate
 CMD ["./node_modules/.bin/prisma", "migrate", "deploy"]
+
+FROM deps AS smoke
+ENV NODE_ENV=test
+COPY playwright.smoke.config.ts ./
+COPY e2e/production-smoke.spec.ts ./e2e/production-smoke.spec.ts
+USER nextjs
+CMD ["npm", "run", "test:smoke"]

@@ -9,7 +9,7 @@ compose=(docker compose -f docker-compose.prod.yml)
 node scripts/validate-production-env.mjs
 export RELEASE_TAG="${RELEASE_TAG:-$(git rev-parse --short=12 HEAD)}"
 "${compose[@]}" config --quiet
-"${compose[@]}" build app worker migrate
+"${compose[@]}" build app worker migrate smoke
 "${compose[@]}" up -d postgres
 "${compose[@]}" run --rm migrate
 "${compose[@]}" up -d --no-deps app worker
@@ -25,3 +25,5 @@ until curl --fail --silent --show-error \
   sleep 5
   ((attempt += 1))
 done
+
+"${compose[@]}" run --rm smoke

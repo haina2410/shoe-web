@@ -101,6 +101,19 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  smoke:
+    image: leafshoes/smoke:${RELEASE_TAG:-local}
+    build:
+      context: .
+      target: smoke
+    environment:
+      SMOKE_BASE_URL: ${SMOKE_BASE_URL:?required}
+      SMOKE_PRODUCT_PATH: ${SMOKE_PRODUCT_PATH:?required}
+    depends_on:
+      app:
+        condition: service_healthy
+    profiles: ["ops"]
+
 volumes:
   postgres_data:
   uploads_data:
