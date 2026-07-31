@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import nextConfig from "../../next.config";
 import playwrightConfig from "../../playwright.config";
+import vitestConfig from "../../vitest.config";
 import { copyStandaloneAssets } from "../../scripts/start-standalone.mjs";
 
 const directories: string[] = [];
@@ -27,6 +28,10 @@ describe("local standalone E2E runtime", () => {
       command: "npm run build && node scripts/start-standalone.mjs",
       url: "http://localhost:3000",
     });
+  });
+
+  it("excludes generated Next output from Vitest discovery", () => {
+    expect(vitestConfig.test?.exclude).toContain(".next/**");
   });
 
   it("copies public and Next static assets beside the standalone server", () => {

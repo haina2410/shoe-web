@@ -9,7 +9,7 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./vitest.setup.ts"],
     globalSetup: ["./vitest.globalSetup.ts"],
-    exclude: [...defaultExclude, "e2e/**"],
+    exclude: [...defaultExclude, "e2e/**", ".next/**"],
     // Các test tích hợp (`*.integration.test.ts`, `prisma/seed.test.ts`) dùng
     // CHUNG một Postgres test DB thật qua `resetDb()` (TRUNCATE ... CASCADE).
     // Chạy nhiều file test song song (mặc định của Vitest) có thể khiến file
