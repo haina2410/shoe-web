@@ -31,7 +31,9 @@ describe("local standalone E2E runtime", () => {
   });
 
   it("excludes generated Next output from Vitest discovery", () => {
-    expect(vitestConfig.test?.exclude).toContain(".next/**");
+    expect(vitestConfig.test?.exclude).toEqual(
+      expect.arrayContaining([".next/**", ".worktrees/**"]),
+    );
   });
 
   it("copies public and Next static assets beside the standalone server", () => {
