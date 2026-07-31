@@ -6,6 +6,18 @@ Stack: **Next.js 16** (App Router, TS strict) · **Prisma 7** + Postgres · **Be
 
 Tài liệu thiết kế: [`docs/`](docs/README.md). Kế hoạch triển khai theo ngày: [`docs/plans/`](docs/plans/README.md).
 
+## Production deployment
+
+Runbook Komodo, Cloudflare Tunnel, backup, rollback và acceptance: [`docs/08-production-runbook.md`](docs/08-production-runbook.md).
+Các lệnh này chỉ chạy với production environment do Komodo cấp; không dùng
+`.env.example` làm credential thật.
+
+```bash
+npm run deploy:production
+npm run backup:production
+npm run test:smoke
+```
+
 ## Bàn giao UI Ngày 9
 
 - Storefront có banner tĩnh, lối vào danh mục, sản phẩm nổi bật, dải cam kết
