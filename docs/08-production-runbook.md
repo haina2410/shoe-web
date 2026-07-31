@@ -142,10 +142,13 @@ BACKUP_DIR=/srv/leafshoes-backups npm run backup:production
 
 Script tạo custom-format PostgreSQL dump và stream archive uploads về file do
 host sở hữu, không tự xóa backup cũ. Host áp dụng `umask 077`: thư mục mới do
-script tạo có mode `0700`, hai file backup có mode `0600`. Nếu một trong hai
-tên file của timestamp đã tồn tại, hoặc một tiến trình khác đang dùng cùng
-timestamp, script thoát lỗi trước khi ghi và không overwrite. Giữ nguyên các
-file cũ và chạy lại sau khi timestamp UTC đã thay đổi.
+script tạo có mode `0700`, hai file backup có mode `0600`. Script ghi vào file
+tạm private, chỉ rename sang tên timestamped sau khi cả dump và archive đều
+hoàn tất, không rỗng. Nếu một bước lỗi, file tạm và lock được dọn, không publish
+artifact dở dang. Nếu một trong hai tên file của timestamp đã tồn tại, hoặc một
+tiến trình khác đang dùng cùng timestamp, script thoát lỗi trước khi ghi và
+không overwrite. Giữ nguyên các file cũ và chạy lại sau khi timestamp UTC đã
+thay đổi.
 
 Xác nhận owner/mode đúng, cả hai file timestamped tồn tại và không rỗng:
 
