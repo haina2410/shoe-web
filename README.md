@@ -18,6 +18,33 @@ npm run backup:production
 npm run test:smoke
 ```
 
+### Image trên GitHub Container Registry
+
+[`.github/workflows/publish-images.yml`](.github/workflows/publish-images.yml)
+build bốn target của [`Dockerfile`](Dockerfile) và push lên `ghcr.io` mỗi khi
+`main` được cập nhật, khi có tag `v*`, hoặc khi chạy tay
+(*Actions → Publish images → Run workflow*):
+
+| Image | Target | Vai trò |
+| --- | --- | --- |
+| `ghcr.io/<owner>/<repo>/app` | `app` | Next.js standalone server |
+| `ghcr.io/<owner>/<repo>/worker` | `worker` | Worker pg-boss |
+| `ghcr.io/<owner>/<repo>/migrate` | `migrate` | `prisma migrate deploy` một lần |
+| `ghcr.io/<owner>/<repo>/smoke` | `smoke` | Playwright smoke sau deploy |
+
+Mỗi image được gắn tag `<sha 12 ký tự>` (đúng dạng `RELEASE_TAG` mà
+`scripts/deploy-production.sh` sinh ra), thêm `latest` và tên nhánh khi push
+`main`, và tag semver khi push `v*`. Pull request chỉ build để chặn `Dockerfile`
+vỡ trước khi merge — không push.
+
+Hai điều cần biết trước khi dùng image này để deploy:
+
+- Package mặc định **private**, nên server phải `docker login ghcr.io` bằng token
+  có `read:packages` (hoặc chuyển package sang public trong *Package settings*).
+- `docker-compose.prod.yml` hiện vẫn `build` tại chỗ với tên image
+  `leafshoes/*`. Muốn deploy bằng image dựng sẵn thì phải đổi `image:` sang
+  đường dẫn `ghcr.io` ở trên; workflow không tự thay đổi luồng deploy.
+
 ## Bàn giao UI Ngày 9
 
 - Storefront có banner tĩnh, lối vào danh mục, sản phẩm nổi bật, dải cam kết
