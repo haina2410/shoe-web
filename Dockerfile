@@ -50,6 +50,17 @@ CMD ["./node_modules/.bin/tsx", "src/worker/index.ts"]
 FROM worker AS migrate
 CMD ["./scripts/migrate-and-seed.sh"]
 
+# Ghim đúng version thay vì `npm install -g` lúc container chạy: khởi động
+# không cần npm registry, và mỗi release luôn ra cùng một bản dashboard.
+FROM base AS dashboard
+ENV NODE_ENV=production
+ENV HOST=0.0.0.0
+ENV PORT=3000
+RUN npm install -g @pg-boss/dashboard@1.6.4
+USER nextjs
+EXPOSE 3000
+CMD ["pg-boss-dashboard"]
+
 FROM deps AS smoke
 ENV NODE_ENV=test
 COPY playwright.smoke.config.ts ./

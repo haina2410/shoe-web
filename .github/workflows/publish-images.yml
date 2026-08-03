@@ -29,7 +29,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [app, worker, migrate, smoke]
+        target: [app, worker, migrate, smoke, dashboard]
     steps:
       - name: Checkout
         uses: actions/checkout@v7
