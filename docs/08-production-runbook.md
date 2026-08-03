@@ -68,8 +68,15 @@ Service thường trực là `postgres`, `app`, `worker`. `migrate` là one-shot
 `depends_on: migrate: service_completed_successfully`, nên mọi `docker compose
 up` đều migrate xong mới cho app lên. Hai hệ quả cần biết:
 
-- Container `migrate` hiện `Exited (0)` trong Komodo là **bình thường**, không
-  phải service chết. Cấu hình cảnh báo đừng coi nó là container unhealthy.
+- Komodo sẽ báo Stack **Unhealthy (đỏ)**: nó suy trạng thái Stack từ state của
+  các container và chỉ trả về màu xanh khi *tất cả* cùng `Running` — `migrate`
+  đứng ở `Exited` là đủ để thành "mixed". Exit code không được xét tới. Cách xử
+  lý là thêm `migrate` vào **`ignore_services`** trong Stack config; Komodo lọc
+  service theo tên khỏi phép tính trước khi so container.
+- Bỏ qua `migrate` như vậy **không** che được migration hỏng: migrate fail thì
+  `app`/`worker` không khởi động (`service_completed_successfully`), Stack thiếu
+  container nên vẫn Unhealthy. Tín hiệu chuẩn xác nhất vẫn là exit code của
+  Action deploy.
 - Từ nay `up` là một thao tác **có sửa schema**. Migration rủi ro thì backup
   trước khi `up`, đúng như trước khi chạy Action deploy.
 
