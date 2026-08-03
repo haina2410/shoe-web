@@ -117,6 +117,29 @@ services:
         condition: service_healthy
     profiles: ["ops"]
 
+  dashboard:
+    image: ghcr.io/haina2410/shoe-web/dashboard:${RELEASE_TAG:-latest}
+    pull_policy: missing
+    environment:
+      # Không thêm `?schema=`: dashboard dùng node-postgres, không phải Prisma.
+      DATABASE_URL: postgresql://${POSTGRES_USER:?required}:${POSTGRES_PASSWORD:?required}@postgres:5432/${POSTGRES_DB:?required}
+      PGBOSS_SCHEMA: ${PGBOSS_SCHEMA:-pgboss}
+      # Bỏ trống cặp này là dashboard chạy KHÔNG xác thực, mà nó retry và xoá
+      # được job — nên đây là `:?required`, không phải giá trị mặc định.
+      PGBOSS_DASHBOARD_AUTH_USERNAME: ${DASHBOARD_AUTH_USERNAME:?required}
+      PGBOSS_DASHBOARD_AUTH_PASSWORD: ${DASHBOARD_AUTH_PASSWORD:?required}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Loopback, và KHÔNG phải 3000: `app` đang giữ host port đó.
+    ports:
+      - "127.0.0.1:${DASHBOARD_HOST_PORT:-3010}:3000"
+    init: true
+    restart: "no"
+    security_opt:
+      - no-new-privileges:true
+    profiles: ["ops"]
+
 volumes:
   postgres_data:
   uploads_data:

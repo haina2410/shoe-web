@@ -367,14 +367,14 @@ Job nền thất bại thì `docker compose logs worker | grep "job thất bại
 `@pg-boss/dashboard` lên tạm:
 
 ```bash
-export DASHBOARD_AUTH_USERNAME=... DASHBOARD_AUTH_PASSWORD=...
-docker compose -f docker-compose.prod.yml -f docker-compose.dashboard.yml \
-  --profile ops up -d dashboard
+docker compose -f docker-compose.prod.yml --profile ops up -d dashboard
 ```
 
-Thiếu một trong hai biến là compose từ chối chạy — cố ý, vì bỏ trống cặp đó thì
-dashboard chạy **không xác thực** trong khi nó retry và xoá job được. Coi nó
-ngang quyền ghi vào production.
+`DASHBOARD_AUTH_USERNAME` và `DASHBOARD_AUTH_PASSWORD` phải nằm trong
+environment Komodo như mọi biến bắt buộc khác — thiếu là **mọi** lệnh compose
+báo lỗi, không riêng lệnh này. Cố ý như vậy: bỏ trống cặp đó thì dashboard chạy
+**không xác thực** trong khi nó retry và xoá job được. Coi nó ngang quyền ghi
+vào production.
 
 Nó chỉ bind `127.0.0.1:${DASHBOARD_HOST_PORT:-3010}` (không phải 3000 — `app`
 đang giữ port đó) và **không** đi qua Cloudflare Tunnel. Mở từ máy mình bằng SSH
@@ -387,9 +387,12 @@ ssh -N -L 3010:127.0.0.1:3010 <user>@<vps>
 Xong việc thì bỏ hẳn container, đừng để nó chạy thường trực:
 
 ```bash
-docker compose -f docker-compose.prod.yml -f docker-compose.dashboard.yml \
-  --profile ops rm -sf dashboard
+docker compose -f docker-compose.prod.yml --profile ops rm -sf dashboard
 ```
+
+`dashboard` và `smoke` đều thuộc profile `ops`, nên `up` thường không dựng chúng
+và Komodo cũng không thấy chúng khi parse config — trạng thái Stack không bị ảnh
+hưởng.
 
 Check Komodo alerts for unhealthy containers, restart loops, disk/RAM pressure
 and failed Action runs. App, worker and migration logs go to stdout/stderr;

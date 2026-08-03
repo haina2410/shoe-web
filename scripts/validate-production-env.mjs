@@ -16,6 +16,11 @@ export const REQUIRED_PRODUCTION_ENV = [
   "MAIL_REPLY_TO",
   "SMOKE_BASE_URL",
   "SMOKE_PRODUCT_PATH",
+  // Service `dashboard` nằm cùng compose file nên Compose nội suy hai biến này
+  // ở MỌI lệnh, kể cả khi profile `ops` chưa bật. Kiểm ở đây để lỗi đọc được,
+  // thay vì một dòng "error while interpolating" của Compose.
+  "DASHBOARD_AUTH_USERNAME",
+  "DASHBOARD_AUTH_PASSWORD",
 ];
 
 export function validateProductionEnv(env = process.env) {
