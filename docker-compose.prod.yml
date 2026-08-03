@@ -51,7 +51,6 @@ services:
       postgres:
         condition: service_healthy
     restart: "no"
-    profiles: ["ops"]
 
   app:
     image: ghcr.io/haina2410/shoe-web/app:${RELEASE_TAG:-latest}
@@ -66,6 +65,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     ports:
       - "127.0.0.1:${APP_HOST_PORT:-3000}:3000"
     volumes:
@@ -96,6 +97,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     init: true
     restart: unless-stopped
     stop_grace_period: 30s

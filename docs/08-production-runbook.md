@@ -63,8 +63,20 @@ deploy: Stack cần nó để nội suy service/volume/port, còn Action/Procedu
 migrate, health check và chạy smoke. Nếu hai nơi dùng environment khác nhau,
 deploy có thể kiểm tra một target nhưng Stack lại chạy target khác.
 
-Service bình thường là `postgres`, `app`, `worker`; `migrate` và `smoke` là
-one-shot job profile `ops`. PostgreSQL không có public port. App chỉ bind
+Service thường trực là `postgres`, `app`, `worker`. `migrate` là one-shot: chạy
+`prisma migrate deploy` rồi thoát `0`, và `app`/`worker` khai
+`depends_on: migrate: service_completed_successfully`, nên mọi `docker compose
+up` đều migrate xong mới cho app lên. Hai hệ quả cần biết:
+
+- Container `migrate` hiện `Exited (0)` trong Komodo là **bình thường**, không
+  phải service chết. Cấu hình cảnh báo đừng coi nó là container unhealthy.
+- Từ nay `up` là một thao tác **có sửa schema**. Migration rủi ro thì backup
+  trước khi `up`, đúng như trước khi chạy Action deploy.
+
+`smoke` vẫn nằm trong profile `ops`, nên nó không xuất hiện khi Komodo parse
+config — đó là chủ đích, gọi tên tường minh (`compose run --rm smoke`) mới chạy.
+
+PostgreSQL không có public port. App chỉ bind
 `127.0.0.1:${APP_HOST_PORT}:3000`; database và upload là named volume bền vững
 theo project.
 
@@ -147,6 +159,9 @@ Kết quả mong đợi: image `app`, `worker`, `migrate`, `smoke` pull thành c
 tag sha của commit; PostgreSQL healthy; migration one-shot exit `0`; app health
 trên loopback trả `200`; worker vẫn running; smoke hoàn thành 3 test
 request-only. Không dùng `.env.example` như production credential.
+
+Script chạy `migrate` tường minh rồi mới `up --no-deps app worker`, nên
+migration chỉ chạy một lần dù `app`/`worker` cũng khai `depends_on` tới nó.
 
 Khi registry không tới được (GitHub sự cố, mạng VPS hỏng) mà vẫn buộc phải
 deploy, dùng đường thoát build tại chỗ — nó build đúng bốn target rồi gắn cùng
