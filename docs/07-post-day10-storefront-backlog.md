@@ -8,7 +8,9 @@ vào MVP 10 ngày. Chỉ bắt đầu sau khi deploy/smoke test Ngày 10 ổn đ
 - Thay logo SVG tạm bằng logo trong suốt/vector chính thức.
 - Thay banner và ảnh seed AI/tạm bằng ảnh sản phẩm thật của cửa hàng.
 - Chuẩn hoá bộ ảnh theo màu sản phẩm; các size cùng màu dùng chung gallery.
-- Viết và công khai trang giao hàng, đổi trả, bảo mật và hướng dẫn thanh toán.
+- ~~Viết và công khai trang giao hàng, đổi trả, bảo mật và hướng dẫn thanh
+  toán.~~ ✅ đã làm cùng khối trang doanh nghiệp — nội dung ở
+  `src/lib/policy-content.ts`, xem mục "Trang nội dung tĩnh" trong README.
 - Xác nhận URL Zalo chính thức và social profiles trước khi bật floating
   contact.
 - Bổ sung Open Graph image, metadata và structured data Product/Organization.
@@ -40,6 +42,22 @@ vào MVP 10 ngày. Chỉ bắt đầu sau khi deploy/smoke test Ngày 10 ổn đ
 - Trang tự phục vụ yêu cầu đổi trả; giai đoạn đầu tiếp tục xử lý trực tiếp qua
   Zalo.
 - Search nâng cao (`pg_trgm`, typo tolerance) khi catalog đủ lớn để cần.
+
+## Chủ shop cần xác nhận (đang dùng giá trị tạm)
+
+Bốn giá trị dưới đây do người viết trang chọn theo thông lệ bán lẻ, KHÔNG suy ra
+được từ code. Sửa ở `src/lib/company-content.ts` và `src/lib/policy-content.ts`:
+
+| Nội dung | Đang ghi | Nơi sửa |
+|---|---|---|
+| Giờ làm việc | 8:00 – 17:30, Thứ Hai – Thứ Bảy | `WORKING_HOURS` |
+| Thời hạn đổi trả | 7 ngày kể từ khi nhận hàng | `POLICY_PAGES["doi-tra"]` |
+| Thời gian giao dự kiến | 2 – 5 ngày làm việc | `POLICY_PAGES["giao-hang"]` |
+| Số địa điểm | một trụ sở kèm xưởng | `CHI_NHANH_PAGE` |
+
+Các con số còn lại trong trang chính sách (phí 30.000 ₫, hết hạn 24 giờ, 34 tỉnh
+thành, chỉ nhận VietQR) là hành vi thật của hệ thống — đổi code thì phải đổi cả
+trang tương ứng.
 
 ## Điều kiện đưa một mục vào kế hoạch
 

@@ -88,7 +88,7 @@ test("mua hàng public sử dụng được hoàn toàn bằng bàn phím", asyn
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/cart$/);
 
-  await tabTo(page, page.getByRole("link", { name: "Thanh toán" }));
+  await tabTo(page, page.getByRole("link", { name: "Thanh toán", exact: true }));
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/checkout$/);
 });

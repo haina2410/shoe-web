@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { OrderStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
@@ -260,6 +261,14 @@ function PendingPaymentSection({
         <span data-testid="order-transfer-content" className="select-all break-all rounded bg-red-50 px-1">
           {orderCode}
         </span>
+      </p>
+
+      <p className="mt-3 text-sm text-neutral-600">
+        Chuyển sai nội dung hoặc sai số tiền?{" "}
+        <Link className="underline hover:text-[var(--evergreen)]" href="/chinh-sach/thanh-toan">
+          Xem hướng dẫn thanh toán
+        </Link>
+        .
       </p>
     </section>
   );

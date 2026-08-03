@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { STORE_INFO } from "@/lib/storefront-content";
 
 vi.mock("next/font/google", () => ({
   Be_Vietnam_Pro: () => ({ variable: "--font-sans" }),
@@ -21,5 +22,18 @@ describe("RootLayout", () => {
       "#main-content",
     );
     expect(screen.getByRole("main")).toHaveAttribute("id", "main-content");
+  });
+
+  it("đặt thanh liên hệ trên cùng, trước cả header, ở mọi trang", () => {
+    const rootLayout = RootLayout({ children: <h1>Nội dung</h1> });
+    const body = rootLayout.props.children;
+    render(body.props.children);
+
+    const phone = screen.getByRole("link", { name: STORE_INFO.phoneDisplay });
+    expect(phone).toHaveAttribute("href", `tel:${STORE_INFO.phoneDigits}`);
+    expect(
+      phone.compareDocumentPosition(screen.getByRole("main")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 });

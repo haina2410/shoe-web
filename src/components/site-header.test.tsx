@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { SiteHeader } from "./site-header";
 
 describe("SiteHeader", () => {
@@ -25,6 +26,21 @@ describe("SiteHeader", () => {
       "q",
     );
     expect(screen.getByRole("search")).toHaveAttribute("action", "/products");
+  });
+
+  it("mở được menu Tổng quan doanh nghiệp với ba trang doanh nghiệp", async () => {
+    const user = userEvent.setup();
+    render(<SiteHeader />);
+
+    await user.click(screen.getByRole("button", { name: "Tổng quan doanh nghiệp" }));
+
+    for (const [name, href] of [
+      ["Giới thiệu công ty", "/gioi-thieu"],
+      ["Nhà máy & hoạt động kinh doanh", "/nha-may"],
+      ["Chi nhánh", "/chi-nhanh"],
+    ] as const) {
+      expect(screen.getByRole("link", { name }), name).toHaveAttribute("href", href);
+    }
   });
 
   it("giữ các điểm chạm chính ở kích thước tối thiểu trên mobile", () => {

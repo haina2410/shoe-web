@@ -32,7 +32,9 @@ export async function createPendingOrderViaCheckout(
   await expect(page.getByText("40 / Đen")).toBeVisible();
   await expect(page.getByText(/Tổng cộng/)).toBeVisible();
 
-  await page.getByRole("link", { name: "Thanh toán" }).click();
+  // `exact` là bắt buộc: chân trang có link "Hướng dẫn thanh toán", nếu khớp
+  // lỏng thì selector này trúng hai phần tử.
+  await page.getByRole("link", { name: "Thanh toán", exact: true }).click();
   await expect(page).toHaveURL(/\/checkout$/);
 
   await page.getByLabel("Họ tên").fill(`Khách E2E ${customerSuffix}`);

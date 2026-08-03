@@ -3,6 +3,7 @@ import { Be_Vietnam_Pro } from "next/font/google";
 import "./globals.css";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { SiteTopBar } from "@/components/site-top-bar";
 import { CartHydrator } from "@/components/cart-hydrator";
 
 const beVietnam = Be_Vietnam_Pro({
@@ -28,6 +29,7 @@ export default function RootLayout({
           Bỏ qua điều hướng
         </a>
         <CartHydrator />
+        <SiteTopBar />
         <SiteHeader />
         <main id="main-content" className="flex-1" tabIndex={-1}>
           {children}

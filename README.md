@@ -113,6 +113,26 @@ npm run worker
 - Giao dịch SePay `REVIEW_REQUIRED` được giữ trong hàng đợi đối soát. Admin nhập mã đơn thật để ghép thủ công; hệ thống vẫn kiểm tra số tiền, trạng thái pending và tồn kho trước khi dùng cùng luồng xác nhận thanh toán.
 - Ghi nhận hoàn tiền chỉ tạo bút toán `OUT`: ứng dụng **không tự chuyển tiền qua ngân hàng**, không đổi trạng thái đơn và không hoàn tồn kho.
 
+## Trang nội dung tĩnh
+
+Ngoài luồng mua hàng, site có bảy trang chữ: `/gioi-thieu`, `/nha-may`,
+`/chi-nhanh` (menu "Doanh nghiệp" trên navbar) và bốn trang chính sách
+`/chinh-sach/{thanh-toan,giao-hang,doi-tra,bao-mat}` (chân trang).
+
+- Nội dung nằm trong `src/lib/company-content.ts` và `src/lib/policy-content.ts`
+  dưới dạng constant `ContentPage` — **không** có trong database, nên sửa chữ là
+  sửa code (và biên tập viên không cần vào admin). Bốn trang chính sách dùng
+  chung route động `/chinh-sach/[slug]` và được prerender lúc build.
+- `src/lib/content-pages.test.ts` chốt các bất biến: không trang nào rỗng hay còn
+  chỗ chờ điền, `href` khớp slug thật (không có link chết trong navbar/footer),
+  và điều hướng được suy ra từ chính nội dung.
+- **Trang chính sách mô tả hành vi thật của hệ thống** — phí giao hàng phẳng
+  30.000 ₫, đơn chưa thanh toán hết hạn sau 24 giờ, chỉ nhận chuyển khoản VietQR
+  với nội dung đúng mã đơn. Đổi các hành vi này trong code thì phải sửa cả trang
+  tương ứng, nếu không là hứa sai với khách. Các giá trị chưa có căn cứ trong
+  code (giờ làm việc, thời hạn đổi trả, thời gian giao dự kiến) được liệt kê
+  trong [`docs/07`](docs/07-post-day10-storefront-backlog.md) để chủ shop xác nhận.
+
 ## Email
 
 Email xác nhận đơn hàng render bằng React Email, gửi qua Resend từ worker.

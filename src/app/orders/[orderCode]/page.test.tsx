@@ -98,6 +98,14 @@ describe("OrderConfirmationPage payment state", () => {
     );
   });
 
+  it("PENDING_PAYMENT dẫn tới hướng dẫn thanh toán cho khách chuyển sai nội dung", async () => {
+    await renderOrder(OrderStatus.PENDING_PAYMENT);
+
+    expect(
+      screen.getByRole("link", { name: "Xem hướng dẫn thanh toán" }),
+    ).toHaveAttribute("href", "/chinh-sach/thanh-toan");
+  });
+
   it.each([OrderStatus.PAID, OrderStatus.FULFILLED, OrderStatus.COMPLETED])(
     "%s dùng giao diện đã thanh toán và không còn QR hay hướng dẫn chuyển khoản",
     async (status) => {
