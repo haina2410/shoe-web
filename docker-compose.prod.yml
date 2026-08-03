@@ -1,5 +1,19 @@
 name: ${COMPOSE_PROJECT_NAME:-leafshoes}
 
+# App, worker, migrate và smoke được pull từ ghcr.io — chính bản image mà
+# .github/workflows/publish-images.yml đã build cho commit đó, không build lại
+# trên VPS. `RELEASE_TAG` mà scripts/deploy-production.sh sinh ra là sha 12 ký
+# tự, đúng tag workflow đẩy lên, nên checkout ở commit nào là chạy image commit
+# đó.
+#
+# Không service nào ở đây có `build:`, và đó là điều cố ý: Compose spec quy định
+# khi có cả `build:` lẫn `image:` mà không khai `pull_policy` thì nó pull trước,
+# pull không ra thì **âm thầm build từ source**. Khi ấy một release pull lỗi sẽ
+# lặng lẽ thành một bản build khác thay vì báo lỗi. Cần build tại chỗ (registry
+# không tới được mà vẫn phải deploy) thì dùng override tường minh:
+#
+#   BUILD_LOCALLY=1 npm run deploy:production   # xem docker-compose.build.yml
+
 x-runtime-environment: &runtime-environment
   DATABASE_URL: postgresql://${POSTGRES_USER:?required}:${POSTGRES_PASSWORD:?required}@postgres:5432/${POSTGRES_DB:?required}?schema=public
   APP_BASE_URL: ${APP_BASE_URL:?required}
@@ -30,10 +44,15 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   migrate:
-    image: leafshoes/migrate:${RELEASE_TAG:-local}
-    build:
-      context: .
-      target: migrate
+    image: ghcr.io/haina2410/shoe-web/migrate:${RELEASE_TAG:-latest}
+    # `missing`, không phải `always`: tag sha là bất biến nên bản local đã pull
+    # về luôn đúng, và backup/diagnosis (`compose run`, `exec`) không phải chạm
+    # tới registry mới làm việc được.
+    #
+    # Deploy không dựa vào policy này: nó gọi `compose pull --policy always` để
+    # ép lấy bản của CI, vì `compose pull` mặc định tôn trọng `missing` và sẽ bỏ
+    # qua image đã nằm sẵn ở local — kể cả bản do BUILD_LOCALLY build ra.
+    pull_policy: missing
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:?required}:${POSTGRES_PASSWORD:?required}@postgres:5432/${POSTGRES_DB:?required}?schema=public
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?required}
@@ -49,10 +68,8 @@ services:
     profiles: ["ops"]
 
   app:
-    image: leafshoes/app:${RELEASE_TAG:-local}
-    build:
-      context: .
-      target: app
+    image: ghcr.io/haina2410/shoe-web/app:${RELEASE_TAG:-latest}
+    pull_policy: missing
     environment:
       <<: *runtime-environment
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?required}
@@ -86,10 +103,8 @@ services:
       - no-new-privileges:true
 
   worker:
-    image: leafshoes/worker:${RELEASE_TAG:-local}
-    build:
-      context: .
-      target: worker
+    image: ghcr.io/haina2410/shoe-web/worker:${RELEASE_TAG:-latest}
+    pull_policy: missing
     environment:
       <<: *runtime-environment
     depends_on:
@@ -102,10 +117,8 @@ services:
       - no-new-privileges:true
 
   smoke:
-    image: leafshoes/smoke:${RELEASE_TAG:-local}
-    build:
-      context: .
-      target: smoke
+    image: ghcr.io/haina2410/shoe-web/smoke:${RELEASE_TAG:-latest}
+    pull_policy: missing
     environment:
       SMOKE_BASE_URL: ${SMOKE_BASE_URL:?required}
       SMOKE_PRODUCT_PATH: ${SMOKE_PRODUCT_PATH:?required}

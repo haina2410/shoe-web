@@ -12,8 +12,23 @@ Compose, build argument, image, log, Playwright report hoặc snapshot.
 - `cloudflared` đã chạy dưới dạng **system service** trên VPS; không đưa nó vào
   Stack này và không thêm Caddy, Nginx hay reverse proxy khác.
 - Cloudflare đã có public hostname và DNS/Tunnel thuộc đúng tài khoản.
+- VPS pull được image release từ `ghcr.io`. Repository `haina2410/shoe-web` đang
+  là public nên package cũng public: **không cần credential nào để pull** — đã
+  xác nhận bằng `docker manifest inspect` từ một host chưa `docker login`.
+  Không có secret nào bị bake vào image: build chỉ dùng giá trị giả (xem
+  `Dockerfile`), mọi secret thật đến từ environment lúc container chạy.
+
+  Nếu về sau repository chuyển sang private thì package thành private theo, và
+  VPS phải đăng nhập bằng token **chỉ có `read:packages`**, đặt trong
+  environment Komodo chứ không viết thẳng vào lệnh:
+
+  ```bash
+  echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+  ```
 - Kiểm tra tài nguyên trước deploy: `df -h`, `free -h`, và dung lượng Docker
-  (`docker system df`). Đủ chỗ cho image build, PostgreSQL, upload và backup.
+  (`docker system df`). Đủ chỗ cho image, PostgreSQL, upload và backup. Deploy
+  bình thường chỉ pull nên không cần chỗ cho build cache; đường thoát
+  `BUILD_LOCALLY=1` thì cần.
 - Có nơi lưu backup ngoài repository/container. Chọn `BACKUP_DIR` là một thư
   mục host rõ ràng, không bị Docker volume hoặc Git quản lý. Tài khoản chạy
   Komodo Action/Procedure phải sở hữu thư mục này và là tài khoản duy nhất có
@@ -27,8 +42,16 @@ Tạo Stack từ Git repository, branch `main`, file
 
 ```dotenv
 COMPOSE_PROJECT_NAME=leafshoes
+RELEASE_TAG=latest
 APP_HOST_PORT=3000
 ```
+
+`RELEASE_TAG` quyết định tag image được pull. `scripts/deploy-production.sh`
+luôn tự đặt lại thành sha 12 ký tự của commit đang checkout, nên giá trị trong
+environment chỉ có tác dụng khi ai đó `up` Stack thẳng từ Komodo mà không qua
+Action. Nếu thao tác tay như vậy, đặt đúng sha của release đang chạy trước khi
+`up`; để `latest` thì Stack sẽ nhảy sang bản `main` mới nhất chứ không giữ
+nguyên bản đang chạy.
 
 Sao chép **tên biến** từ [`.env.production.example`](../.env.production.example)
 vào environment của Komodo rồi điền giá trị thật tại đó. Không copy file ví dụ
@@ -95,10 +118,11 @@ auth và webhook phải đi tới origin theo request.
    npm run deploy:production
    ```
 
-   Luồng này validate environment (không in secret), build image, đảm bảo
-   PostgreSQL healthy, chạy `prisma migrate deploy`, sau đó mới thay app/worker,
-   chờ `/api/health` loopback và chạy smoke chỉ đọc. Build hoặc migration lỗi
-   phải giữ release app/worker cũ đang chạy.
+   Luồng này validate environment (không in secret), pull image của commit đang
+   checkout từ `ghcr.io`, đảm bảo PostgreSQL healthy, chạy `prisma migrate
+   deploy`, sau đó mới thay app/worker, chờ `/api/health` loopback và chạy smoke
+   chỉ đọc. Pull hoặc migration lỗi phải giữ release app/worker cũ đang chạy —
+   pull chạy trước khi động vào container nào nên đây là điểm dừng an toàn.
 4. Kiểm tra `https://leafshoesvietnam.com/api/health` trả
    `{"status":"ok"}` và Stack/Komodo báo app healthy, worker running.
 5. Chỉ khi đã đặt seed credentials **và** xác nhận production chưa có catalog
@@ -119,10 +143,18 @@ Komodo Action/Procedure với production environment chung:
 npm run deploy:production
 ```
 
-Kết quả mong đợi: image `app`, `worker`, `migrate`, `smoke` build thành công;
-PostgreSQL healthy; migration one-shot exit `0`; app health trên loopback trả
-`200`; worker vẫn running; smoke hoàn thành 3 test request-only. Không dùng
-`.env.example` như production credential.
+Kết quả mong đợi: image `app`, `worker`, `migrate`, `smoke` pull thành công ở
+tag sha của commit; PostgreSQL healthy; migration one-shot exit `0`; app health
+trên loopback trả `200`; worker vẫn running; smoke hoàn thành 3 test
+request-only. Không dùng `.env.example` như production credential.
+
+Khi registry không tới được (GitHub sự cố, mạng VPS hỏng) mà vẫn buộc phải
+deploy, dùng đường thoát build tại chỗ — nó build đúng bốn target rồi gắn cùng
+tên image, và lần deploy bình thường kế tiếp sẽ pull đè lại bản của CI:
+
+```bash
+BUILD_LOCALLY=1 npm run deploy:production
+```
 
 Xem trạng thái và log (chỉ xem trong environment có đúng project):
 
@@ -214,7 +246,10 @@ with `leafshoes` or `leafshoes-staging`.
 
 1. Record current Git SHA/tag, deploy timestamp and backup paths.
 2. Identify the prior known-good commit/tag and redeploy it through the same
-   Action/Procedure.
+   Action/Procedure. The deploy pulls that commit's published image instead of
+   rebuilding, so a rollback costs one pull. If its image is missing, the
+   `Publish images` workflow for that commit never completed — rerun the
+   workflow rather than building an untested image on the host.
 3. Never run a migration down automatically. New migrations should be
    expand/contract compatible with the previous app release.
 4. If schema compatibility is broken, stop normal traffic only in an approved
@@ -305,6 +340,11 @@ incident ticket.
 - [ ] Cloudflare does not cache `/api/*` or `/admin/*` with `Cache Everything`.
 - [ ] Komodo alone holds real secrets; Git, images, build args, logs and test
   reports do not contain them.
+- [ ] Release images carry no secrets: build arguments are placeholders only and
+  every real value arrives from the runtime environment. Published packages are
+  public because the repository is; if the repository is ever made private, the
+  host's `ghcr.io` credential must be read-only (`read:packages`) and live in the
+  Komodo environment, not in shell history or a checked-in file.
 - [ ] PostgreSQL and uploads volumes persist; latest non-empty backup and a
   disposable restore drill have been verified; backup directory is owner-only
   (`0700`) and artifacts are mode `0600`.

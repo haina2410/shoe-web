@@ -1,0 +1,40 @@
+# Đường thoát: build image ngay trên host thay vì pull từ ghcr.io.
+#
+# Chỉ dùng khi registry không tới được hoặc workflow chưa publish xong mà vẫn
+# buộc phải deploy. Luồng thường là pull image CI đã build — xem đầu
+# docker-compose.prod.yml.
+#
+#   BUILD_LOCALLY=1 npm run deploy:production
+#
+# hoặc gọi trực tiếp:
+#
+#   docker compose -f docker-compose.prod.yml -f docker-compose.build.yml build
+#
+# `pull_policy: build` ghi đè `missing` của file prod, nên Compose build chứ
+# không thử chạm registry. Tên image vẫn giữ nguyên đường dẫn ghcr.io: bản build
+# tại chỗ chiếm đúng chỗ của bản đáng lẽ được pull, và lần deploy sau (không có
+# BUILD_LOCALLY) sẽ pull đè lại đúng bản của CI.
+services:
+  migrate:
+    build:
+      context: .
+      target: migrate
+    pull_policy: build
+
+  app:
+    build:
+      context: .
+      target: app
+    pull_policy: build
+
+  worker:
+    build:
+      context: .
+      target: worker
+    pull_policy: build
+
+  smoke:
+    build:
+      context: .
+      target: smoke
+    pull_policy: build

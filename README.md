@@ -37,13 +37,26 @@ Mỗi image được gắn tag `<sha 12 ký tự>` (đúng dạng `RELEASE_TAG` 
 `main`, và tag semver khi push `v*`. Pull request chỉ build để chặn `Dockerfile`
 vỡ trước khi merge — không push.
 
-Hai điều cần biết trước khi dùng image này để deploy:
+`docker-compose.prod.yml` pull chính những image này thay vì build trên VPS;
+`npm run deploy:production` chạy `docker compose pull` cho cả bốn service trước
+khi động vào container nào, nên thiếu image là deploy dừng lúc bản cũ còn chạy
+nguyên. Rollback vì thế chỉ là pull lại tag sha cũ.
 
-- Package mặc định **private**, nên server phải `docker login ghcr.io` bằng token
-  có `read:packages` (hoặc chuyển package sang public trong *Package settings*).
-- `docker-compose.prod.yml` hiện vẫn `build` tại chỗ với tên image
-  `leafshoes/*`. Muốn deploy bằng image dựng sẵn thì phải đổi `image:` sang
-  đường dẫn `ghcr.io` ở trên; workflow không tự thay đổi luồng deploy.
+Hai điều cần biết:
+
+- Repo đang public nên package cũng public: VPS pull không cần credential.
+  Chuyển repo sang private thì package thành private theo và host phải
+  `docker login ghcr.io` bằng token có `read:packages` — mục 1 của runbook.
+- Không service nào trong file prod còn `build:`, vì Compose có cả `build:` lẫn
+  `image:` sẽ *âm thầm build từ source* khi pull hụt. Cần build tại chỗ thì phải
+  nói rõ:
+
+  ```bash
+  BUILD_LOCALLY=1 npm run deploy:production
+  ```
+
+  Lệnh này thêm [`docker-compose.build.yml`](docker-compose.build.yml) vào,
+  đặt `pull_policy: build`, và chỉ dành cho lúc registry không tới được.
 
 ## Bàn giao UI Ngày 9
 
