@@ -14,8 +14,8 @@ node scripts/validate-production-env.mjs
 export RELEASE_TAG="${RELEASE_TAG:-$(git rev-parse --short=12 HEAD)}"
 "${compose[@]}" config --quiet
 
-# Pull (hoặc build) trước khi động vào bất cứ container nào đang chạy: thiếu
-# image thì deploy phải dừng lúc app/worker cũ còn nguyên.
+# `--policy always` vì `compose pull` tôn trọng `pull_policy: missing` và bỏ qua
+# image đã có ở local, kể cả bản BUILD_LOCALLY cũ trùng tag.
 if [[ "$build_locally" == "1" ]]; then
   "${compose[@]}" build app worker migrate smoke
 elif ! "${compose[@]}" pull --policy always app worker migrate smoke; then

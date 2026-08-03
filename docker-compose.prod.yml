@@ -1,18 +1,9 @@
 name: ${COMPOSE_PROJECT_NAME:-leafshoes}
 
-# App, worker, migrate và smoke được pull từ ghcr.io — chính bản image mà
-# .github/workflows/publish-images.yml đã build cho commit đó, không build lại
-# trên VPS. `RELEASE_TAG` mà scripts/deploy-production.sh sinh ra là sha 12 ký
-# tự, đúng tag workflow đẩy lên, nên checkout ở commit nào là chạy image commit
-# đó.
-#
-# Không service nào ở đây có `build:`, và đó là điều cố ý: Compose spec quy định
-# khi có cả `build:` lẫn `image:` mà không khai `pull_policy` thì nó pull trước,
-# pull không ra thì **âm thầm build từ source**. Khi ấy một release pull lỗi sẽ
-# lặng lẽ thành một bản build khác thay vì báo lỗi. Cần build tại chỗ (registry
-# không tới được mà vẫn phải deploy) thì dùng override tường minh:
-#
-#   BUILD_LOCALLY=1 npm run deploy:production   # xem docker-compose.build.yml
+# Không service nào ở đây có `build:`, và đó là cố ý: Compose có cả `build:` lẫn
+# `image:` mà không khai `pull_policy` thì pull hụt sẽ âm thầm build từ source,
+# biến một release pull lỗi thành bản build khác. Build tại chỗ đi qua
+# docker-compose.build.yml, tường minh.
 
 x-runtime-environment: &runtime-environment
   DATABASE_URL: postgresql://${POSTGRES_USER:?required}:${POSTGRES_PASSWORD:?required}@postgres:5432/${POSTGRES_DB:?required}?schema=public
@@ -45,13 +36,8 @@ services:
 
   migrate:
     image: ghcr.io/haina2410/shoe-web/migrate:${RELEASE_TAG:-latest}
-    # `missing`, không phải `always`: tag sha là bất biến nên bản local đã pull
-    # về luôn đúng, và backup/diagnosis (`compose run`, `exec`) không phải chạm
-    # tới registry mới làm việc được.
-    #
-    # Deploy không dựa vào policy này: nó gọi `compose pull --policy always` để
-    # ép lấy bản của CI, vì `compose pull` mặc định tôn trọng `missing` và sẽ bỏ
-    # qua image đã nằm sẵn ở local — kể cả bản do BUILD_LOCALLY build ra.
+    # `missing` để backup và lệnh chẩn đoán không cần chạm registry; deploy tự
+    # ép pull bằng `--policy always`.
     pull_policy: missing
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:?required}:${POSTGRES_PASSWORD:?required}@postgres:5432/${POSTGRES_DB:?required}?schema=public

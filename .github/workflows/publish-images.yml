@@ -1,13 +1,5 @@
-# Build bốn image của Dockerfile và push lên GitHub Container Registry.
-#
-# Mỗi target trong Dockerfile thành một package riêng dưới đường dẫn của repo:
-#   ghcr.io/<owner>/<repo>/app      (Next.js standalone server)
-#   ghcr.io/<owner>/<repo>/worker   (pg-boss worker)
-#   ghcr.io/<owner>/<repo>/migrate  (prisma migrate deploy, one-shot)
-#   ghcr.io/<owner>/<repo>/smoke    (Playwright smoke, chạy sau deploy)
-#
-# Tên package bắt đầu bằng tên repo là có chủ đích: GHCR tự liên kết package
-# với repo đó, nên `secrets.GITHUB_TOKEN` push được mà không cần tạo PAT.
+# Tên package phải bắt đầu bằng tên repo: GHCR chỉ tự liên kết package với repo
+# theo đường dẫn đó, nhờ vậy `secrets.GITHUB_TOKEN` push được, không cần PAT.
 name: Publish images
 
 on:
@@ -17,15 +9,14 @@ on:
   pull_request:
   workflow_dispatch:
 
-# Push liên tiếp lên cùng một ref thì chỉ release cái mới nhất là có ý nghĩa.
 concurrency:
   group: publish-images-${{ github.ref }}
   cancel-in-progress: true
 
 env:
   REGISTRY: ghcr.io
-  # Chỉ amd64 vì production server là amd64; thêm arm64 vào đây sẽ gấp đôi thời
-  # gian build (`npm run build` chạy lại dưới QEMU) nên chỉ thêm khi thật cần.
+  # Thêm arm64 vào đây là gấp đôi thời gian build: `npm run build` chạy lại dưới
+  # QEMU.
   PLATFORMS: linux/amd64
 
 jobs:
@@ -36,8 +27,6 @@ jobs:
       contents: read
       packages: write
     strategy:
-      # Không fail-fast: khi một target vỡ, vẫn muốn biết ba target còn lại có
-      # vỡ theo hay không thay vì phải chạy lại workflow để biết.
       fail-fast: false
       matrix:
         target: [app, worker, migrate, smoke]
@@ -48,18 +37,15 @@ jobs:
       - name: Xác định tên image và release tag
         id: names
         run: |
-          # GITHUB_REPOSITORY có thể chứa chữ hoa, nhưng tên image Docker thì
-          # không được, nên hạ chữ trước khi ghép.
+          # Hạ chữ vì GITHUB_REPOSITORY cho phép chữ hoa, tên image thì không.
           echo "image=${REGISTRY}/${GITHUB_REPOSITORY,,}/${{ matrix.target }}" >> "$GITHUB_OUTPUT"
-          # Cùng dạng tag với RELEASE_TAG mà scripts/deploy-production.sh dùng
-          # (`git rev-parse --short=12 HEAD`), để một release chỉ có một tên.
+          # Phải khớp RELEASE_TAG của scripts/deploy-production.sh, nếu không
+          # deploy sẽ pull một tag không tồn tại.
           echo "release_tag=$(git rev-parse --short=12 HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v4
 
-      # Pull request chỉ build để chặn Dockerfile vỡ trước khi merge, không
-      # push, nên cũng không cần đăng nhập registry.
       - name: Đăng nhập ghcr.io
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v4
@@ -91,8 +77,8 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # Đọc thêm cache của `app` vì app là target build đủ nhất: nó chứa
-          # sẵn layer `deps` và `generated` mà worker/migrate/smoke cần.
+          # Đọc thêm scope của `app`: cache của nó đã chứa layer `deps` và
+          # `generated` mà ba target kia cần, khỏi `npm ci` lại từ đầu.
           cache-from: |
             type=gha,scope=${{ matrix.target }}
             type=gha,scope=app
