@@ -144,14 +144,27 @@ auth và webhook phải đi tới origin theo request.
    pull chạy trước khi động vào container nào nên đây là điểm dừng an toàn.
 4. Kiểm tra `https://leafshoesvietnam.com/api/health` trả
    `{"status":"ok"}` và Stack/Komodo báo app healthy, worker running.
-5. Chỉ khi đã đặt seed credentials **và** xác nhận production chưa có catalog
-   cần giữ, thực hiện bootstrap một lần có chủ đích:
+5. Bootstrap dữ liệu. Chỉ làm khi đã đặt seed credentials **và** xác nhận
+   database chưa có catalog cần giữ. Có hai đường, dùng đúng đường cho đúng việc:
+
+   **Staging dựng lại từ đầu — đặt `SEED=1`.** Service `migrate` sẽ seed ngay
+   sau khi migrate xong, nhưng chỉ khi catalog còn rỗng: đã có sản phẩm là nó in
+   `[seed] Bỏ qua` rồi thoát `0`. Nhờ vậy `SEED=1` sót lại không phá shop ở lần
+   `up` sau.
+
+   **Re-seed có chủ đích — gọi tay, không qua cờ.** Đường này *không* có chốt,
+   nó thật sự ghi đè:
 
    ```bash
    docker compose -f docker-compose.prod.yml run --rm migrate npm run db:seed
    ```
 
-   Không chạy `prisma db seed` tự động trong deploy thường.
+   Nhánh `update` của seed đặt lại `stock`, `basePrice`, `status: ACTIVE` và
+   xoá-tạo-lại toàn bộ ảnh sản phẩm. Trên shop đang bán, đó là mất tồn kho, mất
+   giá đã sửa và mất ảnh đã upload. Backup trước khi chạy.
+
+   **Không đặt `SEED` trong environment production.** Chốt catalog-rỗng là lưới
+   an toàn cho sự cố, không phải giấy phép để bật thường trực.
 
 ## 5. Deploy thông thường
 
@@ -370,5 +383,7 @@ incident ticket.
 - [ ] PostgreSQL and uploads volumes persist; latest non-empty backup and a
   disposable restore drill have been verified; backup directory is owner-only
   (`0700`) and artifacts are mode `0600`.
-- [ ] Automatic deploy never runs seed, payment, upload, user or order creation;
-  smoke remains request-only.
+- [ ] The production environment does not define `SEED`. Automatic deploy never
+  runs payment, upload, user or order creation; seed runs only when `SEED=1` is
+  set deliberately, and even then only into an empty catalog. Smoke remains
+  request-only.

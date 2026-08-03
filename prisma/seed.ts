@@ -203,6 +203,17 @@ export async function seed(prisma: Db) {
   }
 }
 
+/**
+ * Nhánh `update` của seed ghi đè `stock`, `basePrice`, `status` và thay lại toàn
+ * bộ ảnh sản phẩm, nên chạy lại trên shop thật là mất tồn kho, giá và ảnh.
+ *
+ * Đo bằng số sản phẩm, không đếm `user`: tài khoản có vòng đời riêng (seed admin
+ * tự bỏ qua email đã tồn tại) và catalog rỗng thì seed không có gì để ghi đè.
+ */
+export async function catalogAlreadySeeded(prisma: Db) {
+  return (await prisma.product.count()) > 0;
+}
+
 type AdminSeedUser = {
   email: string;
   password: string;
@@ -261,12 +272,23 @@ async function seedAdminUsers(prisma: Db) {
   }
 }
 
+async function runCli(prisma: Db) {
+  if (
+    process.argv.includes("--only-if-empty") &&
+    (await catalogAlreadySeeded(prisma))
+  ) {
+    console.log("[seed] Bỏ qua: catalog đã có dữ liệu.");
+    return;
+  }
+  await seed(prisma);
+  await seedAdminUsers(prisma);
+}
+
 if (process.argv[1] && process.argv[1].includes("seed")) {
   const prisma = new PrismaClient({
     adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }),
   });
-  seed(prisma)
-    .then(() => seedAdminUsers(prisma))
+  runCli(prisma)
     .then(() => prisma.$disconnect())
     .catch((e) => {
       console.error(e);

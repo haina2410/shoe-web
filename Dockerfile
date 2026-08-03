@@ -48,7 +48,7 @@ USER nextjs
 CMD ["./node_modules/.bin/tsx", "src/worker/index.ts"]
 
 FROM worker AS migrate
-CMD ["./node_modules/.bin/prisma", "migrate", "deploy"]
+CMD ["./scripts/migrate-and-seed.sh"]
 
 FROM deps AS smoke
 ENV NODE_ENV=test

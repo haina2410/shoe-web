@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { testPrisma, resetDb } from "@/test/db";
-import { seed } from "./seed";
+import { seed, catalogAlreadySeeded } from "./seed";
 import { PROVINCE_ZONES } from "./data/provinces";
 import { SEEDED_PRODUCT_IMAGE_BY_SLUG } from "@/lib/storefront-assets";
 
@@ -37,6 +37,12 @@ describe("seed()", () => {
     await seed(testPrisma);
     const c2 = await testPrisma.provinceZone.count();
     expect(c2).toBe(c1);
+  });
+
+  it("phân biệt được catalog rỗng và catalog đã seed, để SEED=1 không ghi đè shop", async () => {
+    expect(await catalogAlreadySeeded(testPrisma)).toBe(false);
+    await seed(testPrisma);
+    expect(await catalogAlreadySeeded(testPrisma)).toBe(true);
   });
 
   it("gắn đúng ảnh storefront cho từng sản phẩm mẫu", async () => {

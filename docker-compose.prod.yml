@@ -43,6 +43,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:?required}:${POSTGRES_PASSWORD:?required}@postgres:5432/${POSTGRES_DB:?required}?schema=public
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?required}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:?required}
+      SEED: ${SEED:-}
       SEED_OWNER_EMAIL: ${SEED_OWNER_EMAIL:-}
       SEED_OWNER_PASSWORD: ${SEED_OWNER_PASSWORD:-}
       SEED_STAFF_EMAIL: ${SEED_STAFF_EMAIL:-}
