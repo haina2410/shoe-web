@@ -16,13 +16,14 @@ the `push` event on `refs/heads/main`, and requires no repository checkout.
 
 The job reads the original GitHub webhook payload from `GITHUB_EVENT_PATH`,
 computes its HMAC-SHA256 with `KOMODO_WEBHOOK_SECRET`, and sends the same bytes
-to `KOMODO_WEBHOOK_URL`. The request uses `application/json`, identifies itself
+to `KOMODO_STAGING_WEBHOOK_URL`. The request uses `application/json`, identifies itself
 as a GitHub push event, includes a delivery identifier derived from the workflow
 run, and supplies the signature as `X-Hub-Signature-256: sha256=<digest>`.
 
 ## Configuration
 
-- `vars.KOMODO_WEBHOOK_URL` contains the Komodo GitHub-style Stack deploy URL.
+- `vars.KOMODO_STAGING_WEBHOOK_URL` contains the staging Komodo GitHub-style
+  deploy URL.
 - `secrets.KOMODO_WEBHOOK_SECRET` matches Komodo Core's
   `KOMODO_WEBHOOK_SECRET` exactly.
 - The URL must be reachable from the selected GitHub-hosted runner.

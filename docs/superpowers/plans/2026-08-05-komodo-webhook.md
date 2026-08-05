@@ -24,7 +24,7 @@
 - Modify: `.github/workflows/publish-images.yml`
 
 **Interfaces:**
-- Consumes: `vars.KOMODO_WEBHOOK_URL`, `secrets.KOMODO_WEBHOOK_SECRET`, `GITHUB_EVENT_PATH`, `GITHUB_EVENT_NAME`, `GITHUB_RUN_ID`, and `GITHUB_RUN_ATTEMPT`.
+- Consumes: `vars.KOMODO_STAGING_WEBHOOK_URL`, `secrets.KOMODO_WEBHOOK_SECRET`, `GITHUB_EVENT_PATH`, `GITHUB_EVENT_NAME`, `GITHUB_RUN_ID`, and `GITHUB_RUN_ATTEMPT`.
 - Produces: one GitHub-style authenticated HTTP POST to the configured Komodo listener after the complete `publish` matrix succeeds.
 
 - [ ] **Step 1: Run a structural assertion and confirm RED**
@@ -41,7 +41,7 @@ Expected: FAIL because the `deploy` job does not exist.
 
 Add a `deploy` job that depends on `publish`, filters to `push` on
 `refs/heads/main`, signs `GITHUB_EVENT_PATH` with HMAC-SHA256, and posts those
-bytes to `KOMODO_WEBHOOK_URL` with GitHub-style headers.
+bytes to `KOMODO_STAGING_WEBHOOK_URL` with GitHub-style headers.
 
 - [ ] **Step 3: Validate structure and HMAC construction**
 

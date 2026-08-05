@@ -21,8 +21,8 @@ npm run test:smoke
 ### Image trên GitHub Container Registry
 
 [`.github/workflows/publish-images.yml`](.github/workflows/publish-images.yml)
-build bốn target của [`Dockerfile`](Dockerfile) và push lên `ghcr.io` mỗi khi
-`main` được cập nhật, khi có tag `v*`, hoặc khi chạy tay
+build năm target của [`Dockerfile`](Dockerfile) và push lên `ghcr.io` mỗi khi
+`main` được cập nhật hoặc khi chạy tay
 (*Actions → Publish images → Run workflow*):
 
 | Image | Target | Vai trò |
@@ -31,11 +31,10 @@ build bốn target của [`Dockerfile`](Dockerfile) và push lên `ghcr.io` mỗ
 | `ghcr.io/<owner>/<repo>/worker` | `worker` | Worker pg-boss |
 | `ghcr.io/<owner>/<repo>/migrate` | `migrate` | `prisma migrate deploy` một lần |
 | `ghcr.io/<owner>/<repo>/smoke` | `smoke` | Playwright smoke sau deploy |
+| `ghcr.io/<owner>/<repo>/dashboard` | `dashboard` | Dashboard vận hành pg-boss |
 
-Mỗi image được gắn tag `<sha 12 ký tự>` (đúng dạng `RELEASE_TAG` mà
-`scripts/deploy-production.sh` sinh ra), thêm `latest` và tên nhánh khi push
-`main`, và tag semver khi push `v*`. Pull request chỉ build để chặn `Dockerfile`
-vỡ trước khi merge — không push.
+Mỗi image được gắn tag bằng full commit SHA và thêm `latest` khi push `main`.
+Pull request chỉ build để chặn `Dockerfile` vỡ trước khi merge — không push.
 
 `docker-compose.prod.yml` pull chính những image này thay vì build trên VPS;
 `npm run deploy:production` chạy `docker compose pull` cho cả bốn service trước

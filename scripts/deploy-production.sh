@@ -11,7 +11,7 @@ if [[ "$build_locally" == "1" ]]; then
 fi
 
 node scripts/validate-production-env.mjs
-export RELEASE_TAG="${RELEASE_TAG:-$(git rev-parse --short=12 HEAD)}"
+export RELEASE_TAG="${RELEASE_TAG:-$(git rev-parse HEAD)}"
 "${compose[@]}" config --quiet
 
 # `--policy always` vì `compose pull` tôn trọng `pull_policy: missing` và bỏ qua
