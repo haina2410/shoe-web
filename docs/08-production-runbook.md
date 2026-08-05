@@ -186,11 +186,13 @@ production environment chung và chạy:
 npm run deploy:production
 ```
 
-Không dùng URL `/stack/.../deploy` nếu production cần đọc tag từ payload. GitHub
-gửi JSON đã ký có trường `release_tag` đúng bằng tag của GitHub Release. Komodo
-không tự chuyển trường webhook thành Compose environment; flow production phải
-gán giá trị đó vào `RELEASE_TAG` trước khi gọi script. Nếu flow không gán,
-Compose dùng `latest`. Workflow production không build, copy hoặc đổi tag image.
+Hai workflow gửi body `text/plain` chỉ gồm full commit SHA, không có JSON hoặc
+newline cuối. Staging gửi `GITHUB_SHA`; production gửi tag của GitHub Release và
+dừng nếu tag không phải 40 ký tự hex viết thường. Komodo phải ký/đọc đúng chuỗi
+này và flow production phải gán nó vào `RELEASE_TAG` trước khi gọi script. Nếu
+flow không gán, Compose dùng `latest`. Listener cần parse GitHub push JSON để lọc
+branch sẽ không phù hợp với payload này. Workflow production không build, copy
+hoặc đổi tag image.
 
 Để release một commit cụ thể, tạo GitHub Release với tag là full commit SHA đã
 được workflow `Publish images` build. Review commit và backup trước migration có
