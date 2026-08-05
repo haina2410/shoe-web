@@ -96,3 +96,36 @@ jobs:
             echo ""
             echo "Tag: \`${{ steps.names.outputs.release_tag }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: Redeploy with Komodo
+    needs: publish
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      KOMODO_WEBHOOK_URL: ${{ vars.KOMODO_WEBHOOK_URL }}
+      KOMODO_WEBHOOK_SECRET: ${{ secrets.KOMODO_WEBHOOK_SECRET }}
+    steps:
+      - name: Trigger Komodo redeploy
+        run: |
+          signature="$(
+            openssl dgst \
+              -sha256 \
+              -hmac "$KOMODO_WEBHOOK_SECRET" \
+              "$GITHUB_EVENT_PATH" |
+              awk '{ print $NF }'
+          )"
+
+          curl \
+            --fail-with-body \
+            --silent \
+            --show-error \
+            --request POST \
+            --header "Content-Type: application/json" \
+            --header "X-GitHub-Event: ${GITHUB_EVENT_NAME}" \
+            --header "X-GitHub-Delivery: ${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --header "X-Hub-Signature-256: sha256=${signature}" \
+            --data-binary "@${GITHUB_EVENT_PATH}" \
+            "$KOMODO_WEBHOOK_URL"
