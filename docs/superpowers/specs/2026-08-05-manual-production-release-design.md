@@ -13,17 +13,17 @@ set of GHCR images to production without rebuilding them.
 The workflow has one required `workflow_dispatch` input named `tag` whose
 default is `latest`.
 
-- `latest` selects the images produced by the most recent successful `main`
-  publishing workflow.
+- `latest` resolves to the 12-character commit tag recorded in the OCI revision
+  label of `app:latest`, freezing the source before cross-image verification.
 - A specific value must be the exact 12-character lowercase hexadecimal commit
   tag produced by `.github/workflows/publish-images.yml`.
 - GitHub Releases and semantic version tags are not involved.
 
 ## Promotion
 
-The workflow authenticates to GHCR and verifies that the selected source tag
-exists for `app`, `worker`, `migrate`, `smoke`, and `dashboard`. Verification of
-all five images completes before any destination tag changes.
+The workflow authenticates to GHCR and verifies that the resolved immutable
+source tag exists for `app`, `worker`, `migrate`, `smoke`, and `dashboard`.
+Verification of all five images completes before any destination tag changes.
 
 After verification, each existing source manifest is copied to the mutable
 `production` tag with `docker buildx imagetools create`. No Dockerfile is built

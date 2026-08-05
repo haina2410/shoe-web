@@ -42,16 +42,15 @@ Tạo Stack từ Git repository, branch `main`, file
 
 ```dotenv
 COMPOSE_PROJECT_NAME=leafshoes
-RELEASE_TAG=latest
+RELEASE_TAG=production
 APP_HOST_PORT=3000
 ```
 
-`RELEASE_TAG` quyết định tag image được pull. `scripts/deploy-production.sh`
-luôn tự đặt lại thành sha 12 ký tự của commit đang checkout, nên giá trị trong
-environment chỉ có tác dụng khi ai đó `up` Stack thẳng từ Komodo mà không qua
-Action. Nếu thao tác tay như vậy, đặt đúng sha của release đang chạy trước khi
-`up`; để `latest` thì Stack sẽ nhảy sang bản `main` mới nhất chứ không giữ
-nguyên bản đang chạy.
+`RELEASE_TAG` quyết định tag image được pull. Production cố định tag mutable
+`production`; workflow `Release production` chỉ chuyển tag này sang bộ image đã
+được build ở `latest` hoặc sha 12 ký tự được chọn. `scripts/deploy-production.sh`
+tôn trọng giá trị này và ép pull trước khi migrate/deploy. Không `up` Stack
+production trực tiếp: `pull_policy: missing` có thể giữ image cũ ở local.
 
 Sao chép **tên biến** từ [`.env.production.example`](../.env.production.example)
 vào environment của Komodo rồi điền giá trị thật tại đó. Không copy file ví dụ
@@ -93,6 +92,7 @@ Tạo Stack staging bằng **cùng** Compose file, nhưng environment riêng:
 
 ```dotenv
 COMPOSE_PROJECT_NAME=leafshoes-staging
+RELEASE_TAG=latest
 APP_HOST_PORT=3300
 ```
 
@@ -168,15 +168,33 @@ auth và webhook phải đi tới origin theo request.
 
 ## 5. Deploy thông thường
 
-Review commit/tag và backup trước migration có rủi ro, sau đó chạy trong
-Komodo Action/Procedure với production environment chung:
+Trong GitHub, tạo Environment tên `production` và cấu hình:
+
+- variable `KOMODO_WEBHOOK_URL`: URL webhook của Komodo Action/Procedure;
+- secret `KOMODO_WEBHOOK_SECRET`: cùng giá trị với Komodo Core.
+
+Action/Procedure phải nghe branch `main`, dùng production environment chung và
+chạy:
 
 ```bash
 npm run deploy:production
 ```
 
+Không dùng URL `/stack/.../deploy` ở đây. Action trên gọi script để ép pull tag
+`production`, chạy migration, kiểm tra health và smoke test.
+
+Chạy workflow `Release production` bằng `workflow_dispatch`. Input `tag` nhận
+`latest` hoặc sha 12 ký tự đã được workflow `Publish images` đẩy lên GHCR. Luồng
+release đổi `latest` thành sha lấy từ OCI revision của image `app`, rồi kiểm tra
+đủ sha đó trên `app`, `worker`, `migrate`, `smoke`, `dashboard` trước khi chuyển
+từng manifest sang tag `production`; chỉ sau khi cả năm thành công mới gọi
+Komodo. Workflow không build lại image.
+
+Review commit và backup trước migration có rủi ro, sau đó duyệt GitHub
+Environment nếu protection rule yêu cầu.
+
 Kết quả mong đợi: image `app`, `worker`, `migrate`, `smoke` pull thành công ở
-tag sha của commit; PostgreSQL healthy; migration one-shot exit `0`; app health
+tag `production`; PostgreSQL healthy; migration one-shot exit `0`; app health
 trên loopback trả `200`; worker vẫn running; smoke hoàn thành 3 test
 request-only. Không dùng `.env.example` như production credential.
 

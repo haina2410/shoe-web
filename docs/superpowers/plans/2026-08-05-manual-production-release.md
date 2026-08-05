@@ -13,7 +13,7 @@
 - The manual input is named `tag`, is required, and defaults to `latest`.
 - A non-`latest` input is exactly 12 lowercase hexadecimal characters.
 - Promote existing registry manifests; never rebuild images in this workflow.
-- Verify `app`, `worker`, `migrate`, `smoke`, and `dashboard` before changing any `production` tag.
+- Resolve `latest` through the `app:latest` OCI revision label, then verify `app`, `worker`, `migrate`, `smoke`, and `dashboard` at that immutable commit tag before changing any `production` tag.
 - Use the GitHub `production` Environment and its `KOMODO_WEBHOOK_URL` variable and `KOMODO_WEBHOOK_SECRET` secret.
 - Trigger a Komodo Action or Procedure that runs `npm run deploy:production` with `RELEASE_TAG=production`.
 - Add no code comments.
@@ -46,8 +46,9 @@ Expected: FAIL because `.github/workflows/release-production.yml` does not exist
 
 Create a manual workflow with a required `tag` input defaulting to `latest`, a
 non-canceling production concurrency group, `contents: read` and
-`packages: write`, the `production` Environment, separate verification and
-promotion loops, and a final HMAC-authenticated Komodo request.
+`packages: write`, the `production` Environment, immutable resolution of
+`latest`, separate verification and promotion loops, and a final
+HMAC-authenticated Komodo request.
 
 - [ ] **Step 3: Align production configuration documentation**
 
