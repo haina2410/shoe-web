@@ -5,7 +5,9 @@ export type ZaloNotificationRecipient = {
   chatId: string;
 };
 
-export const ZALO_NOTIFICATION_RECIPIENTS: readonly ZaloNotificationRecipient[] = [];
+export const ZALO_NOTIFICATION_RECIPIENTS: readonly ZaloNotificationRecipient[] = [
+  { key: "nam", chatId: "6586dcd80b91e2cfbb80" }
+];
 
 export type ZaloUpdate = {
   eventName: string;
