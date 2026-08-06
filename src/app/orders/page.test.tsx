@@ -64,7 +64,7 @@ describe("OrdersPage", () => {
     expect(findUniqueMock).not.toHaveBeenCalled();
     expect(screen.getByLabelText("Mã đơn hàng")).toHaveValue("leaf-abc123");
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "Không tìm thấy đơn hàng",
+      /^Không tìm thấy đơn hàng$/,
     );
   });
 
@@ -75,7 +75,7 @@ describe("OrdersPage", () => {
 
     expect(screen.getByLabelText("Mã đơn hàng")).toHaveValue("LEAFABC123");
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "Không tìm thấy đơn hàng",
+      /^Không tìm thấy đơn hàng$/,
     );
   });
 });

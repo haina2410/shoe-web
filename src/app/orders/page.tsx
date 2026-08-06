@@ -75,7 +75,7 @@ export default async function OrdersPage({
             className="rounded-md bg-red-50 px-3 py-2 text-sm"
             style={{ color: "var(--destructive)" }}
           >
-            Không tìm thấy đơn hàng. Vui lòng kiểm tra lại mã đơn hàng.
+            Không tìm thấy đơn hàng
           </p>
         ) : null}
 
