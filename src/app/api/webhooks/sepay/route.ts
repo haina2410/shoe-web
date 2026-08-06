@@ -12,7 +12,29 @@ import {
 
 export const runtime = "nodejs";
 
-function failure(status: 400 | 401 | 500): Response {
+type FailureCategory =
+  | "authentication"
+  | "configuration"
+  | "infrastructure"
+  | "validation";
+
+type FailureReason =
+  | "account-mismatch"
+  | "body-read-failed"
+  | "invalid-payload"
+  | "invalid-signature"
+  | "malformed-json"
+  | "missing-account-config"
+  | "processing-failed";
+
+function failure(
+  status: 400 | 401 | 500,
+  category: FailureCategory,
+  reason: FailureReason,
+): Response {
+  console.error(
+    `[sepay-webhook] operation=receive category=${category} reason=${reason} status=${status}`,
+  );
   return Response.json({ success: false }, { status });
 }
 
@@ -21,7 +43,7 @@ export async function POST(request: Request): Promise<Response> {
   try {
     rawBody = await request.text();
   } catch {
-    return failure(400);
+    return failure(400, "validation", "body-read-failed");
   }
 
   const signatureHeader = request.headers.get("x-sepay-signature");
@@ -34,23 +56,31 @@ export async function POST(request: Request): Promise<Response> {
     timestamp: request.headers.get("x-sepay-timestamp"),
     secret: process.env.SEPAY_WEBHOOK_SECRET ?? "",
   });
-  if (!signatureIsValid) return failure(401);
+  if (!signatureIsValid) {
+    return failure(401, "authentication", "invalid-signature");
+  }
 
   let json: unknown;
   try {
     json = JSON.parse(rawBody);
   } catch {
-    return failure(400);
+    return failure(400, "validation", "malformed-json");
   }
 
   const parsed = sePayWebhookPayloadSchema.safeParse(json);
-  if (!parsed.success) return failure(400);
+  if (!parsed.success) {
+    return failure(400, "validation", "invalid-payload");
+  }
 
   const expectedAccount = process.env.VIETQR_ACCOUNT_NO?.trim();
+  if (!expectedAccount) {
+    return failure(400, "configuration", "missing-account-config");
+  }
+
   const accountMatches = parsed.data.accountNumber.trim() === expectedAccount;
   const subAccountMatches = parsed.data.subAccount?.trim() === expectedAccount;
-  if (!expectedAccount || (!accountMatches && !subAccountMatches)) {
-    return failure(400);
+  if (!accountMatches && !subAccountMatches) {
+    return failure(400, "validation", "account-mismatch");
   }
 
   try {
@@ -67,6 +97,6 @@ export async function POST(request: Request): Promise<Response> {
     await reconcilePersistedSePayEventCore(prisma, event.id);
     return Response.json({ success: true }, { status: 200 });
   } catch {
-    return failure(500);
+    return failure(500, "infrastructure", "processing-failed");
   }
 }

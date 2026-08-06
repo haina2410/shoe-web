@@ -83,10 +83,24 @@ function webhookRequest(
 }
 
 describe("POST /api/webhooks/sepay", () => {
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+
+  function expectFailureLog(
+    category: string,
+    reason: string,
+    status: number,
+  ): void {
+    expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      `[sepay-webhook] operation=receive category=${category} reason=${reason} status=${status}`,
+    );
+  }
+
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
     vi.clearAllMocks();
+    consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     process.env.SEPAY_WEBHOOK_SECRET = SECRET;
     process.env.VIETQR_ACCOUNT_NO = "0000000000";
     getBossMock.mockResolvedValue(undefined);
@@ -99,9 +113,21 @@ describe("POST /api/webhooks/sepay", () => {
   });
 
   afterEach(() => {
+    consoleErrorSpy.mockRestore();
     vi.useRealTimers();
     delete process.env.SEPAY_WEBHOOK_SECRET;
     delete process.env.VIETQR_ACCOUNT_NO;
+  });
+
+  it("logs when the request body cannot be read", async () => {
+    const request = webhookRequest(JSON.stringify(validPayload));
+    vi.spyOn(request, "text").mockRejectedValue(new Error("body unavailable"));
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(400);
+    expectFailureLog("validation", "body-read-failed", 400);
+    expect(persistSePayEventCoreMock).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -115,6 +141,7 @@ describe("POST /api/webhooks/sepay", () => {
       );
 
       expect(response.status).toBe(401);
+      expectFailureLog("authentication", "invalid-signature", 401);
       expect(getBossMock).not.toHaveBeenCalled();
       expect(persistSePayEventCoreMock).not.toHaveBeenCalled();
       expect(reconcilePersistedSePayEventCoreMock).not.toHaveBeenCalled();
@@ -132,6 +159,7 @@ describe("POST /api/webhooks/sepay", () => {
     const response = await POST(request);
 
     expect(response.status).toBe(401);
+    expectFailureLog("authentication", "invalid-signature", 401);
     expect(textSpy).toHaveBeenCalledTimes(1);
     expect(persistSePayEventCoreMock).not.toHaveBeenCalled();
     expect(reconcilePersistedSePayEventCoreMock).not.toHaveBeenCalled();
@@ -179,19 +207,34 @@ describe("POST /api/webhooks/sepay", () => {
   });
 
   it.each([
-    ["malformed JSON", "{"],
+    ["malformed JSON", "{", "malformed-json"],
     [
       "invalid schema",
       JSON.stringify({ ...validPayload, transferAmount: 0 }),
+      "invalid-payload",
     ],
-  ])("returns 400 for %s without queue or database work", async (_label, body) => {
-    const response = await POST(webhookRequest(body));
+  ])(
+    "returns 400 for %s without queue or database work",
+    async (_label, body, reason) => {
+      const response = await POST(webhookRequest(body));
+
+      expect(response.status).toBe(400);
+      expectFailureLog("validation", reason, 400);
+      expect(getBossMock).not.toHaveBeenCalled();
+      expect(persistSePayEventCoreMock).not.toHaveBeenCalled();
+      expect(reconcilePersistedSePayEventCoreMock).not.toHaveBeenCalled();
+      expect(reconcileSePayCoreMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it("logs when the receiving account configuration is missing", async () => {
+    delete process.env.VIETQR_ACCOUNT_NO;
+
+    const response = await POST(webhookRequest(JSON.stringify(validPayload)));
 
     expect(response.status).toBe(400);
-    expect(getBossMock).not.toHaveBeenCalled();
+    expectFailureLog("configuration", "missing-account-config", 400);
     expect(persistSePayEventCoreMock).not.toHaveBeenCalled();
-    expect(reconcilePersistedSePayEventCoreMock).not.toHaveBeenCalled();
-    expect(reconcileSePayCoreMock).not.toHaveBeenCalled();
   });
 
   it("returns 400 when the trimmed receiving account does not match configuration", async () => {
@@ -202,6 +245,10 @@ describe("POST /api/webhooks/sepay", () => {
     );
 
     expect(response.status).toBe(400);
+    expectFailureLog("validation", "account-mismatch", 400);
+    const loggedText = consoleErrorSpy.mock.calls.flat().join(" ");
+    expect(loggedText).not.toContain("0000000000");
+    expect(loggedText).not.toContain("9999999999");
     expect(getBossMock).not.toHaveBeenCalled();
     expect(persistSePayEventCoreMock).not.toHaveBeenCalled();
     expect(reconcilePersistedSePayEventCoreMock).not.toHaveBeenCalled();
@@ -259,6 +306,7 @@ describe("POST /api/webhooks/sepay", () => {
 
     expect(response.status).toBe(500);
     expect(await response.text()).toBe('{"success":false}');
+    expectFailureLog("infrastructure", "processing-failed", 500);
     expect(persistSePayEventCoreMock).toHaveBeenCalledTimes(1);
     expect(
       persistSePayEventCoreMock.mock.invocationCallOrder[0],
@@ -276,6 +324,7 @@ describe("POST /api/webhooks/sepay", () => {
 
     expect(response.status).toBe(500);
     expect(await response.text()).toBe('{"success":false}');
+    expectFailureLog("infrastructure", "processing-failed", 500);
   });
 
   it.each(["MATCHED", "REVIEW_REQUIRED"])(
@@ -289,6 +338,7 @@ describe("POST /api/webhooks/sepay", () => {
       const response = await POST(webhookRequest(JSON.stringify(validPayload)));
 
       expect(response.status).toBe(200);
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
       expect(persistSePayEventCoreMock).toHaveBeenCalledTimes(1);
       expect(getBossMock).not.toHaveBeenCalled();
       expect(reconcilePersistedSePayEventCoreMock).not.toHaveBeenCalled();

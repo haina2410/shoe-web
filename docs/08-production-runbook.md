@@ -232,6 +232,18 @@ docker compose -f docker-compose.prod.yml ps
 docker compose -f docker-compose.prod.yml logs --tail=200 app worker postgres
 ```
 
+### Log webhook SePay
+
+Mỗi webhook SePay thất bại ghi đúng một dòng bắt đầu bằng
+`[sepay-webhook] operation=receive`, kèm `category`, `reason` và HTTP `status`.
+Các reason có thể tìm kiếm là `body-read-failed`, `invalid-signature`,
+`malformed-json`, `invalid-payload`, `missing-account-config`,
+`account-mismatch` và `processing-failed`.
+
+Log webhook không chứa raw body, payload đã parse, chữ ký, số tài khoản cấu
+hình hoặc nhận được, provider transaction ID hay chi tiết exception. Webhook
+thành công và event lặp đã ở trạng thái cuối không phát log lỗi.
+
 ### Dọn image GHCR cũ
 
 Workflow `Cleanup images` chạy lúc 03:00 sáng thứ Hai theo giờ Việt Nam và có
