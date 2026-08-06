@@ -36,6 +36,7 @@ describe("OrdersPage", () => {
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Mã đơn hàng")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(findUniqueMock).not.toHaveBeenCalled();
   });
 
   it("dùng biểu mẫu GET gửi mã đơn hàng đến tuyến tra cứu", async () => {
@@ -67,6 +68,21 @@ describe("OrdersPage", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(
       /^Không tìm thấy đơn hàng$/,
     );
+    expect(
+      screen.getByText(
+        "Bạn có thể tìm mã đơn hàng trong email xác nhận đơn hàng.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("coi mã truy vấn lặp lại là một lần gửi không hợp lệ", async () => {
+    await renderPage(["LEAFABC123", "LEAFDEF456"]);
+
+    expect(findUniqueMock).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Mã đơn hàng")).toHaveValue("LEAFABC123");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      /^Không tìm thấy đơn hàng$/,
+    );
   });
 
   it("cho phép khách thay thế mã không đúng định dạng", async () => {
@@ -89,5 +105,15 @@ describe("OrdersPage", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(
       /^Không tìm thấy đơn hàng$/,
     );
+  });
+
+  it("để lỗi Prisma tiếp tục đến error boundary", async () => {
+    findUniqueMock.mockRejectedValue(new Error("database unavailable"));
+
+    await expect(
+      OrdersPage({
+        searchParams: Promise.resolve({ orderCode: "LEAFABC123" }),
+      }),
+    ).rejects.toThrow("database unavailable");
   });
 });

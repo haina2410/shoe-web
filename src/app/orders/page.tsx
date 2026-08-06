@@ -19,12 +19,15 @@ export default async function OrdersPage({
   searchParams: Promise<OrderSearchParams>;
 }) {
   const query = await searchParams;
+  const hasRepeatedOrderCode = Array.isArray(query.orderCode);
   const rawOrderCode =
-    typeof query.orderCode === "string" ? query.orderCode : "";
+    typeof query.orderCode === "string"
+      ? query.orderCode
+      : query.orderCode?.[0] ?? "";
   const orderCode = rawOrderCode.trim().toUpperCase();
   let lookupFailed = false;
 
-  if (rawOrderCode && ORDER_CODE_PATTERN.test(orderCode)) {
+  if (!hasRepeatedOrderCode && rawOrderCode && ORDER_CODE_PATTERN.test(orderCode)) {
     const order = await prisma.order.findUnique({
       where: { orderCode },
       select: { orderCode: true },
@@ -32,7 +35,7 @@ export default async function OrdersPage({
 
     if (order) redirect(`/orders/${order.orderCode}`);
     lookupFailed = true;
-  } else if (rawOrderCode) {
+  } else if (rawOrderCode || hasRepeatedOrderCode) {
     lookupFailed = true;
   }
 
@@ -70,13 +73,18 @@ export default async function OrdersPage({
         </div>
 
         {lookupFailed ? (
-          <p
-            role="alert"
-            className="rounded-md bg-red-50 px-3 py-2 text-sm"
-            style={{ color: "var(--destructive)" }}
-          >
-            Không tìm thấy đơn hàng
-          </p>
+          <>
+            <p
+              role="alert"
+              className="rounded-md bg-red-50 px-3 py-2 text-sm"
+              style={{ color: "var(--destructive)" }}
+            >
+              Không tìm thấy đơn hàng
+            </p>
+            <p className="text-sm text-neutral-600">
+              Bạn có thể tìm mã đơn hàng trong email xác nhận đơn hàng.
+            </p>
+          </>
         ) : null}
 
         <button
