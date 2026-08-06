@@ -6,7 +6,8 @@ export type ZaloNotificationRecipient = {
 };
 
 export const ZALO_NOTIFICATION_RECIPIENTS: readonly ZaloNotificationRecipient[] = [
-  { key: "nam", chatId: "6586dcd80b91e2cfbb80" }
+  { key: "nam", chatId: "6586dcd80b91e2cfbb80" },
+  { key: "sung", chatId: "5fe4a715e25c0b02524d" }
 ];
 
 export type ZaloUpdate = {
