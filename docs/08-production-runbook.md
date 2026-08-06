@@ -170,7 +170,8 @@ auth và webhook phải đi tới origin theo request.
 
 Trong GitHub Actions, cấu hình:
 
-- repository secret `KOMODO_URL`: URL gốc của Komodo;
+- repository variable `KOMODO_STAGING_URL`: URL gốc của Komodo staging;
+- repository variable `KOMODO_PRODUCTION_URL`: URL gốc của Komodo production;
 - repository secret `KOMODO_API_KEY`: API key có quyền pull/deploy Stack;
 - repository secret `KOMODO_API_SECRET`: secret đi cùng API key;
 - repository variable `KOMODO_STAGING_STACK_NAME`: tên Stack staging;

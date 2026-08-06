@@ -103,7 +103,7 @@ jobs:
       - name: Deploy staging stack
         uses: pandeptwidyaop/komodoactions@v1
         with:
-          komodo-url: ${{ secrets.KOMODO_URL }}
+          komodo-url: ${{ vars.KOMODO_STAGING_URL }}
           api-key: ${{ secrets.KOMODO_API_KEY }}
           api-secret: ${{ secrets.KOMODO_API_SECRET }}
           stack-name: ${{ vars.KOMODO_STAGING_STACK_NAME }}
