@@ -95,6 +95,7 @@ services:
     pull_policy: missing
     environment:
       <<: *runtime-environment
+      BOT_TOKEN: ${BOT_TOKEN:?required}
     depends_on:
       postgres:
         condition: service_healthy
@@ -105,6 +106,16 @@ services:
     stop_grace_period: 30s
     security_opt:
       - no-new-privileges:true
+
+  zalo-bot:
+    image: ghcr.io/haina2410/shoe-web/worker:${RELEASE_TAG:-latest}
+    pull_policy: missing
+    command: npm run zalo-bot
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN:?required}
+    init: true
+    restart: unless-stopped
+    profiles: ["zalo-bot"]
 
   smoke:
     image: ghcr.io/haina2410/shoe-web/smoke:${RELEASE_TAG:-latest}

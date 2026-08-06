@@ -6,6 +6,7 @@
 | ORM / DB | **Prisma + PostgreSQL** | Type-safe, migration tốt, AI viết mượt; Postgres dùng chung cho cả job queue |
 | Background jobs | **pg-boss** (worker riêng) | Chạy trên Postgres sẵn có, **không cần Redis**; enqueue trong cùng transaction ghi đơn |
 | Email | **Resend + React Email** | Template email viết bằng React (đồng bộ với frontend); free tier đủ; cần domain riêng để SPF/DKIM |
+| Thông báo nội bộ | **Zalo Bot API trực tiếp** | Gửi thông báo đơn mới cho danh sách nhân viên có khoá ổn định; không cần dịch vụ trung gian hay lưu chat ID trong pg-boss |
 | Auth | **Better Auth** (v1.6.x) | Email/mật khẩu first-class + RBAC qua plugin; hợp shadcn (better-auth-ui) |
 | UI component | **shadcn/ui + Tailwind** | Sở hữu code, không khóa vendor, dựng được bản sắc riêng (không "templated") |
 | Bảng dữ liệu admin | **TanStack Table** | Bảng/sort/filter mạnh cho trang quản trị |

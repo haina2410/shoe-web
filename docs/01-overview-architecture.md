@@ -20,6 +20,7 @@ trì và không có glue code giữa nhiều ứng dụng khi quy mô hiện t�
 │                                    └─ transaction) ────┘                          │
 │                                                                                  │
 │  [Origin: 127.0.0.1 qua Cloudflare Tunnel]            [Resend] ◄─ gửi email TT   │
+│                                                        [Zalo Bot API] ◄─ báo đơn  │
 └──────────────────────────────────────────────────────────────────────────────────┘
         ▲                                    ▲
    Khách (guest, chỉ email)            SePay/Casso webhook (khớp CK ngân hàng)
@@ -48,7 +49,13 @@ Caddy/Nginx và không mở origin web hoặc PostgreSQL ra Internet.
 ### 4. Worker (pg-boss)
 - Tiến trình Node riêng (`worker.ts`), cùng repo, kết nối cùng Postgres.
 - Xử lý job: gửi email (đặt hàng, đã thanh toán), đối soát, cron **hết hạn đơn chưa thanh toán**.
+- Job `send-zalo-order-created` chỉ mang `orderCode` và khoá người nhận; worker tra đơn khi gửi thông báo Zalo cho nhân viên.
 - **Enqueue job nằm trong cùng transaction** với thao tác ghi đơn hàng → không mất job, không double-processing (xem [04](04-payment-checkout-flow.md)).
+
+### 5. Zalo Bot API
+
+- Zalo là dịch vụ ngoài dùng Bot API trực tiếp cho thông báo đơn mới nội bộ.
+- Danh sách người nhận là cấu hình mã nguồn có khoá ổn định và chat ID; hàng đợi chỉ lưu khoá, không lưu chat ID hay PII khách hàng.
 
 ## Ranh giới module (để dễ hiểu & test độc lập)
 
@@ -61,9 +68,9 @@ Caddy/Nginx và không mở origin web hoặc PostgreSQL ra Internet.
 | `payments` | Webhook, đối soát, idempotency | orders, jobs |
 | `shipping` | Tính phí ship theo vùng | DB (ShippingZone) |
 | `auth` | Đăng nhập admin + RBAC (Better Auth) | DB |
-| `jobs` | Định nghĩa & xử lý job pg-boss | DB, email |
+| `jobs` | Định nghĩa & xử lý job pg-boss | DB, email, Zalo Bot API |
 | `email` | Template React Email + gửi qua Resend | Resend |
 
 ## Môi trường & cấu hình
 
-Biến môi trường chính: `DATABASE_URL`, `BETTER_AUTH_SECRET`, `RESEND_API_KEY`, `SEPAY_WEBHOOK_API_KEY`, thông tin tài khoản ngân hàng nhận tiền (số TK, ngân hàng, tên) để sinh VietQR, `APP_URL`.
+Biến môi trường chính: `DATABASE_URL`, `BETTER_AUTH_SECRET`, `RESEND_API_KEY`, `BOT_TOKEN`, `SEPAY_WEBHOOK_API_KEY`, thông tin tài khoản ngân hàng nhận tiền (số TK, ngân hàng, tên) để sinh VietQR, `APP_URL`.

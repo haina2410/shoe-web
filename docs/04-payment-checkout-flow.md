@@ -13,6 +13,7 @@ Khách chuyển khoản qua **VietQR**. Hệ thống đối soát **tự động
    - Sinh `orderCode` duy nhất (VD `LEAF8F3K2P`).
    - Tạo `Order` (status=`PENDING_PAYMENT`) + `OrderItem` (snapshot tên/giá).
    - **Enqueue job `send-order-confirmation`** (cùng transaction → không mất job).
+   - **Enqueue một job `send-zalo-order-created` cho mỗi người nhận cấu hình** (cùng transaction). Payload chỉ có `orderCode` và `recipientKey`; chat ID không đi vào pg-boss.
 3. Trả về trang thanh toán hiển thị **mã VietQR**.
 
 ## Sinh mã VietQR
@@ -89,10 +90,11 @@ Khách CK ─► Ngân hàng ─► SePay phát hiện GD vào ─► POST /api/
 | Job | Kích hoạt | Việc |
 |---|---|---|
 | `send-order-confirmation` | khi tạo đơn | Email xác nhận đặt hàng + QR + hướng dẫn CK |
+| `send-zalo-order-created` | khi tạo đơn | Thông báo nội bộ Zalo gồm mã đơn, khách, số điện thoại, tổng, trạng thái và link admin |
 | `send-payment-confirmed` | khi đơn PAID | Email báo đã nhận thanh toán |
 | `expire-unpaid` (cron) | định kỳ (VD mỗi 15') | Huỷ đơn `PENDING_PAYMENT` quá hạn (VD 24h) → `EXPIRED` |
 
-- Worker xử lý cả hai queue email, đồng thời đăng ký lịch `expire-unpaid` mỗi 15 phút theo UTC. pg-boss lo **retry/backoff** email khi lỗi tạm thời; expiry dùng update có điều kiện nên chạy lặp an toàn.
+- Worker xử lý hai queue email, queue Zalo và lịch `expire-unpaid` mỗi 15 phút theo UTC. pg-boss lo **retry/backoff** delivery khi lỗi tạm thời; expiry dùng update có điều kiện nên chạy lặp an toàn.
 
 ## Email (React Email + Resend)
 

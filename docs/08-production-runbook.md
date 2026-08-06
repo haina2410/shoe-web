@@ -62,7 +62,7 @@ deploy: Stack cần nó để nội suy service/volume/port, còn Action/Procedu
 migrate, health check và chạy smoke. Nếu hai nơi dùng environment khác nhau,
 deploy có thể kiểm tra một target nhưng Stack lại chạy target khác.
 
-Service thường trực là `postgres`, `app`, `worker`. `migrate` là one-shot: chạy
+Service thường trực là `postgres`, `app`, `worker`. `zalo-bot` là collector tuỳ chọn trong profile riêng, chỉ bật khi lấy chat ID. `migrate` là one-shot: chạy
 `prisma migrate deploy` rồi thoát `0`, và `app`/`worker` khai
 `depends_on: migrate: service_completed_successfully`, nên mọi `docker compose
 up` đều migrate xong mới cho app lên. Hai hệ quả cần biết:
@@ -129,7 +129,7 @@ auth và webhook phải đi tới origin theo request.
 ## 4. First launch
 
 1. Điền toàn bộ production environment trong Komodo, gồm URL HTTPS thật,
-   random secrets, VietQR, Resend và `SMOKE_BASE_URL`/`SMOKE_PRODUCT_PATH`.
+   random secrets, VietQR, Resend, `BOT_TOKEN` và `SMOKE_BASE_URL`/`SMOKE_PRODUCT_PATH`.
 2. Xác nhận Tunnel hostname và `APP_HOST_PORT` khớp trước khi chạy Action.
 3. Chạy Action/Procedure ở repository checkout của Stack:
 
@@ -419,6 +419,29 @@ docker compose -f docker-compose.prod.yml --profile ops rm -sf dashboard
 `dashboard` và `smoke` đều thuộc profile `ops`, nên `up` thường không dựng chúng
 và Komodo cũng không thấy chúng khi parse config — trạng thái Stack không bị ảnh
 hưởng.
+
+### Thu thập Zalo chat ID
+
+`BOT_TOKEN` là secret của Zalo Bot API. Worker thường trực dùng nó để gửi thông
+báo đơn mới; collector `zalo-bot` chỉ dùng cùng token, không nhận database,
+mail, VietQR hay app secret.
+
+Khi thêm nhân viên, bật collector tạm thời:
+
+```bash
+docker compose -f docker-compose.prod.yml --profile zalo-bot up -d zalo-bot
+```
+
+Nhân viên nhắn `hi` hoặc `hello` cho bot. Bot trả lại chat ID. Thêm chat ID đó
+với một khoá ổn định vào `ZALO_NOTIFICATION_RECIPIENTS` trong
+`src/lib/zalo-bot.ts`, rồi rebuild và redeploy worker để danh sách mới được
+dùng. Không lưu chat ID trong database hay payload pg-boss.
+
+Sau khi đã ghi nhận ID, dừng và xoá collector:
+
+```bash
+docker compose -f docker-compose.prod.yml --profile zalo-bot rm -sf zalo-bot
+```
 
 Check Komodo alerts for unhealthy containers, restart loops, disk/RAM pressure
 and failed Action runs. App, worker and migration logs go to stdout/stderr;
