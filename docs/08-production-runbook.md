@@ -170,41 +170,30 @@ auth và webhook phải đi tới origin theo request.
 
 Trong GitHub Actions, cấu hình:
 
-- repository variable `KOMODO_STAGING_WEBHOOK_URL`: URL webhook của Komodo flow
-  staging;
-- repository variable `KOMODO_PRODUCTION_WEBHOOK_URL`: URL webhook của Komodo
-  flow production;
-- repository secret `KOMODO_WEBHOOK_SECRET`: cùng giá trị với Komodo Core, dùng
-  để ký cả hai webhook.
+- repository secret `KOMODO_URL`: URL gốc của Komodo;
+- repository secret `KOMODO_API_KEY`: API key có quyền pull/deploy Stack;
+- repository secret `KOMODO_API_SECRET`: secret đi cùng API key;
+- repository variable `KOMODO_STAGING_STACK_NAME`: tên Stack staging;
+- repository variable `KOMODO_PRODUCTION_STACK_NAME`: tên Stack production.
 
-Flow staging chạy sau khi toàn bộ image của một push `main` được publish. Flow
-production chạy khi một GitHub Release không phải prerelease được publish.
-Action/Procedure production phải nghe branch `main` hoặc `__ANY__`, dùng
-production environment chung và chạy:
+Workflow dùng `pandeptwidyaop/komodoactions@v1` để gọi Komodo API. Staging chạy
+sau khi toàn bộ image của một push `main` được publish; production chạy khi một
+GitHub Release không phải prerelease được publish. Cả hai bật
+`pull-before-deploy`, chờ PullStack thành công rồi mới gọi DeployStack.
 
-```bash
-npm run deploy:production
-```
-
-Hai workflow gửi body `text/plain` chỉ gồm full commit SHA, không có JSON hoặc
-newline cuối. Staging gửi `GITHUB_SHA`; production gửi tag của GitHub Release và
-dừng nếu tag không phải 40 ký tự hex viết thường. Komodo phải ký/đọc đúng chuỗi
-này và flow production phải gán nó vào `RELEASE_TAG` trước khi gọi script. Nếu
-flow không gán, Compose dùng `latest`. Listener cần parse GitHub push JSON để lọc
-branch sẽ không phù hợp với payload này. Workflow production không build, copy
-hoặc đổi tag image.
-
-Để release một commit cụ thể, tạo GitHub Release với tag là full commit SHA đã
-được workflow `Publish images` build. Review commit và backup trước migration có
-rủi ro rồi publish Release; draft và prerelease không deploy production.
+API action không sửa environment của Stack và không truyền GitHub Release tag
+vào Compose. Tag deploy là `RELEASE_TAG` đang cấu hình trong Komodo; bỏ trống thì
+Compose dùng `latest`. Vì vậy GitHub Release chỉ là cổng kích hoạt production.
+Muốn deploy một full commit SHA cụ thể, đặt `RELEASE_TAG` của Stack production
+thành SHA đã được workflow `Publish images` build trước khi publish Release.
+Draft và prerelease không deploy production.
 
 Kết quả mong đợi: image `app`, `worker`, `migrate`, `smoke` pull thành công ở
-tag trong `RELEASE_TAG`; PostgreSQL healthy; migration one-shot exit `0`; app health
-trên loopback trả `200`; worker vẫn running; smoke hoàn thành 3 test
-request-only. Không dùng `.env.example` như production credential.
-
-Script chạy `migrate` tường minh rồi mới `up --no-deps app worker`, nên
-migration chỉ chạy một lần dù `app`/`worker` cũng khai `depends_on` tới nó.
+tag trong `RELEASE_TAG`; PostgreSQL healthy; migration one-shot exit `0`; app và
+worker running. DeployStack chạy Compose trực tiếp nên không chạy health loop và
+smoke test của `scripts/deploy-production.sh`; chạy `npm run test:smoke` riêng
+khi release cần acceptance đầy đủ. Không dùng `.env.example` như production
+credential.
 
 Khi registry không tới được (GitHub sự cố, mạng VPS hỏng) mà vẫn buộc phải
 deploy, dùng đường thoát build tại chỗ — nó build đúng bốn target rồi gắn cùng

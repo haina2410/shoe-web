@@ -15,36 +15,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    env:
-      RELEASE_TAG: ${{ github.event.release.tag_name }}
-      KOMODO_PRODUCTION_WEBHOOK_URL: ${{ vars.KOMODO_PRODUCTION_WEBHOOK_URL }}
-      KOMODO_WEBHOOK_SECRET: ${{ secrets.KOMODO_WEBHOOK_SECRET }}
     steps:
-      - name: Trigger production deployment
-        run: |
-          payload="$RELEASE_TAG"
-          if [[ ! "$payload" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "GitHub Release tag must be a full lowercase commit hash" >&2
-            exit 1
-          fi
-          signature="$(
-            printf '%s' "$payload" |
-              openssl dgst -sha256 -hmac "$KOMODO_WEBHOOK_SECRET" |
-              awk '{ print $NF }'
-          )"
-
-          curl \
-            --fail-with-body \
-            --silent \
-            --show-error \
-            --request POST \
-            --header "Content-Type: text/plain" \
-            --header "X-GitHub-Event: push" \
-            --header "X-GitHub-Delivery: ${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
-            --header "X-Hub-Signature-256: sha256=${signature}" \
-            --data-binary "$payload" \
-            "$KOMODO_PRODUCTION_WEBHOOK_URL"
-
-      - name: Write deployment summary
-        run: |
-          echo "Production release tag: \`$RELEASE_TAG\`" >> "$GITHUB_STEP_SUMMARY"
+      - name: Deploy production stack
+        uses: pandeptwidyaop/komodoactions@v1
+        with:
+          komodo-url: ${{ secrets.KOMODO_URL }}
+          api-key: ${{ secrets.KOMODO_API_KEY }}
+          api-secret: ${{ secrets.KOMODO_API_SECRET }}
+          stack-name: ${{ vars.KOMODO_PRODUCTION_STACK_NAME }}
+          pull-before-deploy: true
