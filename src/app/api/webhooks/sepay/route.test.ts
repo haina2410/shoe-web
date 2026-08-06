@@ -208,6 +208,28 @@ describe("POST /api/webhooks/sepay", () => {
     expect(reconcileSePayCoreMock).not.toHaveBeenCalled();
   });
 
+  it("accepts a matching virtual sub-account", async () => {
+    process.env.VIETQR_ACCOUNT_NO = "SBSEPAYZTVDNOGDS71M";
+    const payload = {
+      ...validPayload,
+      accountNumber: "0906768592",
+      subAccount: "SBSEPAYZTVDNOGDS71M",
+    };
+
+    const response = await POST(webhookRequest(JSON.stringify(payload)));
+
+    expect(response.status).toBe(200);
+    expect(persistSePayEventCoreMock).toHaveBeenCalledWith(
+      prismaMock,
+      payload,
+      payload,
+    );
+    expect(reconcilePersistedSePayEventCoreMock).toHaveBeenCalledWith(
+      prismaMock,
+      "bank-event-1",
+    );
+  });
+
   it.each([
     { kind: "matched" },
     { kind: "duplicate" },

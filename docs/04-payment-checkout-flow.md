@@ -48,6 +48,9 @@ Khách CK ─► Ngân hàng ─► SePay phát hiện GD vào ─► POST /api/
 
 ### Quy tắc quan trọng
 - **HMAC trên bytes gốc:** cấu hình `SEPAY_WEBHOOK_SECRET`; yêu cầu header `X-SePay-Timestamp` (Unix seconds) và `X-SePay-Signature: sha256=<hex>`. Chữ ký HMAC-SHA256 được tính trên đúng `<timestamp>.<raw request body>`, với cửa sổ thời gian 5 phút. Không stringify lại JSON trước khi verify.
+- **Đúng tài khoản nhận:** `VIETQR_ACCOUNT_NO` phải khớp `accountNumber` hoặc
+  `subAccount` của SePay sau khi trim; nhờ đó cùng một kiểm tra hỗ trợ cả tài
+  khoản chính và tài khoản ảo.
 - **Idempotency:** chuỗi của `payload.id` là `BankTransaction.providerTransactionId` và `Payment.transactionId` unique. Webhook lặp cùng `payload.id` là no-op an toàn.
 - **Persist trước queue và match:** mọi event đã xác thực/hợp lệ được lưu cùng
   canonical `paymentCode`, amount và original JSON trước khi khởi tạo queue.

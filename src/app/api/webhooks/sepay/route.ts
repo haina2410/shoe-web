@@ -47,10 +47,9 @@ export async function POST(request: Request): Promise<Response> {
   if (!parsed.success) return failure(400);
 
   const expectedAccount = process.env.VIETQR_ACCOUNT_NO?.trim();
-  if (
-    !expectedAccount ||
-    parsed.data.accountNumber.trim() !== expectedAccount
-  ) {
+  const accountMatches = parsed.data.accountNumber.trim() === expectedAccount;
+  const subAccountMatches = parsed.data.subAccount?.trim() === expectedAccount;
+  if (!expectedAccount || (!accountMatches && !subAccountMatches)) {
     return failure(400);
   }
 
