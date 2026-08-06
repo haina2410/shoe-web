@@ -221,6 +221,17 @@ docker compose -f docker-compose.prod.yml ps
 docker compose -f docker-compose.prod.yml logs --tail=200 app worker postgres
 ```
 
+### Dọn image GHCR cũ
+
+Workflow `Cleanup images` chạy lúc 03:00 sáng thứ Hai theo giờ Việt Nam và có
+thể chạy tay. Nó dùng `actions/delete-package-versions@v5` cho `app`, `worker`,
+`migrate`, `smoke`, `dashboard` và giữ 20 version mới nhất của từng package.
+
+Repository phải có quyền **Admin** trong **Package settings → Manage Actions
+access** của cả năm package để `GITHUB_TOKEN` xoá version. Policy chỉ xét độ mới;
+commit/release cũ hơn 20 version có thể bị xoá và không còn dùng được để
+rollback.
+
 ## 6. Backup
 
 Backup trước launch, trước migration rủi ro và theo lịch vận hành. Trên host

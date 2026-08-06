@@ -1,0 +1,30 @@
+name: Cleanup images
+
+on:
+  schedule:
+    - cron: "0 20 * * 0"
+  workflow_dispatch:
+
+concurrency:
+  group: cleanup-images
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    name: ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [app, worker, migrate, smoke, dashboard]
+    steps:
+      - name: Keep latest 20 versions
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: ${{ github.event.repository.name }}/${{ matrix.target }}
+          package-type: container
+          min-versions-to-keep: 20
+          token: ${{ secrets.GITHUB_TOKEN }}

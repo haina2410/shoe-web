@@ -29,7 +29,7 @@
 - Consumes: `github.event.repository.name`, `matrix.target`, and `secrets.GITHUB_TOKEN`.
 - Produces: one cleanup attempt for each GHCR package, retaining 20 versions.
 
-- [ ] **Step 1: Run a failing structural assertion**
+- [x] **Step 1: Run a failing structural assertion**
 
 ```bash
 ruby -e 'require "yaml"; YAML.load_file(".github/workflows/cleanup-images.yml", aliases: true)'
@@ -37,19 +37,19 @@ ruby -e 'require "yaml"; YAML.load_file(".github/workflows/cleanup-images.yml", 
 
 Expected: fail with `No such file or directory`.
 
-- [ ] **Step 2: Add the workflow**
+- [x] **Step 2: Add the workflow**
 
 Create `cleanup-images.yml` with cron `0 20 * * 0`, `workflow_dispatch`, a
 non-canceling concurrency group, `contents: read`, `packages: write`, a
 five-target matrix, and `actions/delete-package-versions@v5` configured with
 `package-type: container`, `min-versions-to-keep: 20`, and `GITHUB_TOKEN`.
 
-- [ ] **Step 3: Document retention**
+- [x] **Step 3: Document retention**
 
 Add the schedule, package access requirement, retained count, and old rollback
 image consequence to the production runbook.
 
-- [ ] **Step 4: Run GREEN structural checks**
+- [x] **Step 4: Run GREEN structural checks**
 
 ```bash
 ruby - <<'RUBY'
@@ -71,12 +71,12 @@ git diff --check
 
 Expected: all assertions pass and no whitespace errors are reported.
 
-- [ ] **Step 5: Run repository verification**
+- [x] **Step 5: Run repository verification**
 
 Run `npm test -- --run`. Record any unrelated failure without modifying
 application code.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Stage only the workflow, runbook, and completed plan, then commit with
 `ci: clean old GHCR images`.
