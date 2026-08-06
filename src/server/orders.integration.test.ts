@@ -5,7 +5,13 @@ import { createOrderCore } from "@/server/orders";
 import { OrderStatus } from "@/generated/prisma/enums";
 import type { CreateOrderInput } from "@/lib/validation/checkout";
 import { createTestBoss, resetQueues } from "@/test/boss";
-import { QUEUE_SEND_ORDER_CONFIRMATION, ensureQueues, enqueueOrderConfirmation } from "@/jobs/queue";
+import {
+  QUEUE_SEND_ORDER_CONFIRMATION,
+  QUEUE_SEND_ZALO_ORDER_CREATED,
+  ensureQueues,
+  enqueueOrderConfirmation,
+  enqueueZaloOrderCreatedNotifications,
+} from "@/jobs/queue";
 
 /**
  * `src/server/orders.integration.test.ts` — integration test cho
@@ -92,7 +98,10 @@ function baseInput(overrides: Partial<CreateOrderInput> = {}): CreateOrderInput 
  * báo cáo). Một fake mới mỗi lần gọi để không rò rỉ call-count giữa các test.
  */
 function noEnqueueDeps() {
-  return { enqueueOrderConfirmation: vi.fn().mockResolvedValue(undefined) };
+  return {
+    enqueueOrderConfirmation: vi.fn().mockResolvedValue(undefined),
+    enqueueZaloOrderCreatedNotifications: vi.fn().mockResolvedValue(undefined),
+  };
 }
 
 describe("createOrderCore", () => {
@@ -227,20 +236,27 @@ describe("createOrderCore", () => {
     expect(persisted?.stock).toBe(10);
   });
 
-  it("đặt hàng thành công → deps.enqueueOrderConfirmation được gọi đúng 1 lần với orderCode của đơn vừa tạo", async () => {
+  it("đặt hàng thành công → enqueue email và Zalo cùng nhận orderCode của đơn vừa tạo", async () => {
     await makeShippingZone();
     const category = await makeCategory();
     const { variant } = await makeProductWithVariant({ categoryId: category.id, stock: 10 });
-    const enqueueFake = vi.fn().mockResolvedValue(undefined);
+    const enqueueEmail = vi.fn().mockResolvedValue(undefined);
+    const enqueueZalo = vi.fn().mockResolvedValue(undefined);
 
     const order = await createOrderCore(
       testPrisma,
       baseInput({ items: [{ variantId: variant.id, quantity: 1 }] }),
-      { enqueueOrderConfirmation: enqueueFake },
+      {
+        enqueueOrderConfirmation: enqueueEmail,
+        enqueueZaloOrderCreatedNotifications: enqueueZalo,
+      },
     );
 
-    expect(enqueueFake).toHaveBeenCalledTimes(1);
-    expect(enqueueFake).toHaveBeenCalledWith(
+    expect(enqueueEmail).toHaveBeenCalledWith(
+      expect.anything(),
+      { orderCode: order.orderCode },
+    );
+    expect(enqueueZalo).toHaveBeenCalledWith(
       expect.anything(),
       { orderCode: order.orderCode },
     );
@@ -250,17 +266,22 @@ describe("createOrderCore", () => {
     await makeShippingZone();
     const category = await makeCategory();
     const { variant } = await makeProductWithVariant({ categoryId: category.id, stock: 1 });
-    const enqueueFake = vi.fn().mockResolvedValue(undefined);
+    const enqueueEmail = vi.fn().mockResolvedValue(undefined);
+    const enqueueZalo = vi.fn().mockResolvedValue(undefined);
 
     await expect(
       createOrderCore(
         testPrisma,
         baseInput({ items: [{ variantId: variant.id, quantity: 5 }] }),
-        { enqueueOrderConfirmation: enqueueFake },
+        {
+          enqueueOrderConfirmation: enqueueEmail,
+          enqueueZaloOrderCreatedNotifications: enqueueZalo,
+        },
       ),
     ).rejects.toThrow();
 
-    expect(enqueueFake).not.toHaveBeenCalled();
+    expect(enqueueEmail).not.toHaveBeenCalled();
+    expect(enqueueZalo).not.toHaveBeenCalled();
     expect(await testPrisma.order.count()).toBe(0);
   });
 
@@ -268,15 +289,40 @@ describe("createOrderCore", () => {
     await makeShippingZone();
     const category = await makeCategory();
     const { variant } = await makeProductWithVariant({ categoryId: category.id, stock: 10 });
-    const enqueueFake = vi.fn().mockRejectedValue(new Error("Lỗi hạ tầng hàng đợi giả lập"));
+    const enqueueEmail = vi.fn().mockRejectedValue(new Error("Lỗi hạ tầng hàng đợi giả lập"));
 
     await expect(
       createOrderCore(
         testPrisma,
         baseInput({ items: [{ variantId: variant.id, quantity: 1 }] }),
-        { enqueueOrderConfirmation: enqueueFake },
+        {
+          enqueueOrderConfirmation: enqueueEmail,
+          enqueueZaloOrderCreatedNotifications: vi.fn().mockResolvedValue(undefined),
+        },
       ),
     ).rejects.toThrow("Lỗi hạ tầng hàng đợi giả lập");
+
+    expect(await testPrisma.order.count()).toBe(0);
+    expect(await testPrisma.orderItem.count()).toBe(0);
+  });
+
+  it("Zalo enqueue thất bại → createOrderCore rollback đơn hàng", async () => {
+    await makeShippingZone();
+    const category = await makeCategory();
+    const { variant } = await makeProductWithVariant({ categoryId: category.id, stock: 10 });
+
+    await expect(
+      createOrderCore(
+        testPrisma,
+        baseInput({ items: [{ variantId: variant.id, quantity: 1 }] }),
+        {
+          enqueueOrderConfirmation: vi.fn().mockResolvedValue(undefined),
+          enqueueZaloOrderCreatedNotifications: vi
+            .fn()
+            .mockRejectedValue(new Error("Zalo queue unavailable")),
+        },
+      ),
+    ).rejects.toThrow("Zalo queue unavailable");
 
     expect(await testPrisma.order.count()).toBe(0);
     expect(await testPrisma.orderItem.count()).toBe(0);
@@ -309,6 +355,11 @@ describe("createOrderCore", () => {
         baseInput({ items: [{ variantId: variant.id, quantity: 1 }] }),
         {
           enqueueOrderConfirmation: (tx, payload) => enqueueOrderConfirmation(tx, payload, boss),
+          enqueueZaloOrderCreatedNotifications: (tx, payload) =>
+            enqueueZaloOrderCreatedNotifications(tx, payload, boss, [
+              { key: "staff-hanoi", chatId: "1000001" },
+              { key: "staff-saigon", chatId: "1000002" },
+            ]),
         },
       );
 
@@ -316,7 +367,17 @@ describe("createOrderCore", () => {
         data: { orderCode: order.orderCode },
       });
       expect(jobs).toHaveLength(1);
-      expect(jobs[0].data).toEqual({ orderCode: order.orderCode });
+    expect(jobs[0].data).toEqual({ orderCode: order.orderCode });
+
+      const zaloJobs = await boss.findJobs<{
+        orderCode: string;
+        recipientKey: string;
+      }>(QUEUE_SEND_ZALO_ORDER_CREATED, { data: { orderCode: order.orderCode } });
+      expect(zaloJobs).toHaveLength(2);
+      expect(zaloJobs.map((job) => job.data)).toEqual(expect.arrayContaining([
+        { orderCode: order.orderCode, recipientKey: "staff-hanoi" },
+        { orderCode: order.orderCode, recipientKey: "staff-saigon" },
+      ]));
     });
   });
 });

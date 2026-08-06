@@ -110,7 +110,10 @@ async function makeOrder(opts: { skipZone?: boolean } = {}) {
   return createOrderCore(
     testPrisma,
     baseInput({ items: [{ variantId: variant.id, quantity: 1 }] }),
-    { enqueueOrderConfirmation: vi.fn().mockResolvedValue(undefined) },
+    {
+      enqueueOrderConfirmation: vi.fn().mockResolvedValue(undefined),
+      enqueueZaloOrderCreatedNotifications: vi.fn().mockResolvedValue(undefined),
+    },
   );
 }
 

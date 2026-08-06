@@ -9,11 +9,14 @@ import {
   QUEUE_EXPIRE_UNPAID,
   QUEUE_SEND_ORDER_CONFIRMATION,
   QUEUE_SEND_PAYMENT_CONFIRMED,
+  QUEUE_SEND_ZALO_ORDER_CREATED,
 } from "@/jobs/queue";
 import {
   registerExpireUnpaidWorker,
   registerOrderConfirmationWorker,
   registerPaymentConfirmedWorker,
+  registerZaloOrderCreatedWorker,
+  workerClientsFromEnv,
   requireAppBaseUrlForWorker,
   type WorkCapableBoss,
 } from "@/worker/index";
@@ -107,7 +110,10 @@ async function makeOrder(opts: { skipZone?: boolean } = {}) {
   return createOrderCore(
     testPrisma,
     baseInput({ items: [{ variantId: variant.id, quantity: 1 }] }),
-    { enqueueOrderConfirmation: vi.fn().mockResolvedValue(undefined) },
+    {
+      enqueueOrderConfirmation: vi.fn().mockResolvedValue(undefined),
+      enqueueZaloOrderCreatedNotifications: vi.fn().mockResolvedValue(undefined),
+    },
   );
 }
 
@@ -116,6 +122,16 @@ function fakeMailer(): Mailer & { messages: MailMessage[] } {
   return {
     messages,
     send: vi.fn(async (message: MailMessage) => {
+      messages.push(message);
+    }),
+  };
+}
+
+function fakeZaloBot() {
+  const messages: { chatId: string; text: string; parseMode?: "markdown" | "html" }[] = [];
+  return {
+    messages,
+    sendMessage: vi.fn(async (message) => {
       messages.push(message);
     }),
   };
@@ -278,6 +294,71 @@ describe("registerPaymentConfirmedWorker (hợp đồng đăng ký)", () => {
   });
 });
 
+describe("registerZaloOrderCreatedWorker", () => {
+  beforeEach(async () => {
+    await resetDb();
+  });
+
+  it("registers the Zalo queue and handles every job in a batch", async () => {
+    await makeShippingZone();
+    const orderA = await makeOrder({ skipZone: true });
+    const orderB = await makeOrder({ skipZone: true });
+    const boss = createCapturingBoss();
+    const bot = fakeZaloBot();
+
+    await registerZaloOrderCreatedWorker(boss, {
+      db: testPrisma,
+      bot,
+      recipients: [{ key: "staff-hanoi", chatId: "1000001" }],
+    });
+
+    expect(boss.captured?.name).toBe(QUEUE_SEND_ZALO_ORDER_CREATED);
+    await boss.captured?.handler([
+      { ...fakeJob(orderA.orderCode), name: QUEUE_SEND_ZALO_ORDER_CREATED, data: { orderCode: orderA.orderCode, recipientKey: "staff-hanoi" } },
+      { ...fakeJob(orderB.orderCode), name: QUEUE_SEND_ZALO_ORDER_CREATED, data: { orderCode: orderB.orderCode, recipientKey: "staff-hanoi" } },
+    ]);
+
+    expect(bot.sendMessage).toHaveBeenCalledTimes(2);
+    expect(bot.messages.map((message) => message.chatId)).toEqual(["1000001", "1000001"]);
+  });
+
+  it("logs only Zalo queue, job, and order identifiers then rethrows failures", async () => {
+    const order = await makeOrder();
+    const boss = createCapturingBoss();
+    const bot = fakeZaloBot();
+    bot.sendMessage.mockRejectedValue(
+      new Error("customer@example.com 0901234567 123 Private Street"),
+    );
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      await registerZaloOrderCreatedWorker(boss, {
+        db: testPrisma,
+        bot,
+        recipients: [{ key: "staff-hanoi", chatId: "1000001" }],
+      });
+      const job = {
+        ...fakeJob(order.orderCode),
+        id: "zalo-job-1",
+        name: QUEUE_SEND_ZALO_ORDER_CREATED,
+        data: { orderCode: order.orderCode, recipientKey: "staff-hanoi" },
+      };
+
+      await expect(boss.captured?.handler([job])).rejects.toThrow("customer@example.com");
+
+      const logged = consoleErrorSpy.mock.calls.flat().join(" ");
+      expect(logged).toContain(QUEUE_SEND_ZALO_ORDER_CREATED);
+      expect(logged).toContain("zalo-job-1");
+      expect(logged).toContain(order.orderCode);
+      expect(logged).not.toContain("customer@example.com");
+      expect(logged).not.toContain("0901234567");
+      expect(logged).not.toContain("123 Private Street");
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+});
+
 describe("registerExpireUnpaidWorker (hợp đồng đăng ký)", () => {
   beforeEach(async () => {
     await resetDb();
@@ -369,5 +450,19 @@ describe("requireAppBaseUrlForWorker() (F7)", () => {
     vi.stubEnv("APP_BASE_URL", "https://leafshoes.vn");
 
     expect(() => requireAppBaseUrlForWorker()).not.toThrow();
+  });
+});
+
+describe("workerClientsFromEnv", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("rejects a missing BOT_TOKEN during worker initialization", () => {
+    vi.stubEnv("RESEND_API_KEY", "resend-test-key");
+    vi.stubEnv("MAIL_FROM", "orders@example.com");
+    vi.stubEnv("BOT_TOKEN", "");
+
+    expect(() => workerClientsFromEnv()).toThrow(/BOT_TOKEN/);
   });
 });

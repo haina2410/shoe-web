@@ -94,7 +94,10 @@ async function makeOrder() {
   return createOrderCore(
     testPrisma,
     baseInput({ items: [{ variantId: variant.id, quantity: 2 }] }),
-    { enqueueOrderConfirmation: vi.fn().mockResolvedValue(undefined) },
+    {
+      enqueueOrderConfirmation: vi.fn().mockResolvedValue(undefined),
+      enqueueZaloOrderCreatedNotifications: vi.fn().mockResolvedValue(undefined),
+    },
   );
 }
 

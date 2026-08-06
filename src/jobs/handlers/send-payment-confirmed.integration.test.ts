@@ -43,6 +43,7 @@ async function makeOrder() {
 
   return createOrderCore(testPrisma, input, {
     enqueueOrderConfirmation: vi.fn().mockResolvedValue(undefined),
+    enqueueZaloOrderCreatedNotifications: vi.fn().mockResolvedValue(undefined),
   });
 }
 

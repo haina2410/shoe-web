@@ -4,7 +4,10 @@ import { cartSubtotal, orderTotal } from "@/lib/cart-math";
 import { generateOrderCode } from "@/lib/order-code";
 import { getShippingFee } from "@/lib/shipping";
 import type { CreateOrderInput } from "@/lib/validation/checkout";
-import { enqueueOrderConfirmation } from "@/jobs/queue";
+import {
+  enqueueOrderConfirmation,
+  enqueueZaloOrderCreatedNotifications,
+} from "@/jobs/queue";
 
 /**
  * `src/server/orders.ts` — hàm core THUẦN cho nghiệp vụ đặt hàng (checkout).
@@ -40,6 +43,10 @@ export class OrderBusinessError extends Error {
  */
 export type CreateOrderDeps = {
   enqueueOrderConfirmation: (
+    tx: Prisma.TransactionClient,
+    payload: { orderCode: string },
+  ) => Promise<void>;
+  enqueueZaloOrderCreatedNotifications: (
     tx: Prisma.TransactionClient,
     payload: { orderCode: string },
   ) => Promise<void>;
@@ -90,7 +97,10 @@ async function generateUniqueOrderCode(
 export async function createOrderCore(
   db: PrismaClient,
   input: CreateOrderInput,
-  deps: CreateOrderDeps = { enqueueOrderConfirmation },
+  deps: CreateOrderDeps = {
+    enqueueOrderConfirmation,
+    enqueueZaloOrderCreatedNotifications,
+  },
 ): Promise<OrderWithItems> {
   return db.$transaction(async (tx) => {
     const lines: {
@@ -167,6 +177,7 @@ export async function createOrderCore(
     // Ghi job gửi email xác nhận TRONG cùng `tx` — enqueue throw ⇒ transaction
     // rollback ⇒ không có đơn, không có job (xem docstring hàm ở trên).
     await deps.enqueueOrderConfirmation(tx, { orderCode: order.orderCode });
+    await deps.enqueueZaloOrderCreatedNotifications(tx, { orderCode: order.orderCode });
 
     return order;
   });

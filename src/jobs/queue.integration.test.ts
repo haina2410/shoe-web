@@ -6,10 +6,12 @@ import {
   QUEUE_EXPIRE_UNPAID,
   QUEUE_SEND_ORDER_CONFIRMATION,
   QUEUE_SEND_PAYMENT_CONFIRMED,
+  QUEUE_SEND_ZALO_ORDER_CREATED,
   ensureQueues,
   ensureSchedules,
   enqueueOrderConfirmation,
   enqueuePaymentConfirmed,
+  enqueueZaloOrderCreatedNotifications,
 } from "@/jobs/queue";
 
 /**
@@ -122,6 +124,53 @@ describe("enqueuePaymentConfirmed", () => {
       QUEUE_SEND_PAYMENT_CONFIRMED,
       { data: { orderCode: "LEAFPROLL1" } },
     );
+    expect(jobs).toHaveLength(0);
+  });
+});
+
+describe("enqueueZaloOrderCreatedNotifications", () => {
+  it("transaction commit creates one recipient-scoped job per configured recipient", async () => {
+    await testPrisma.$transaction(async (tx) => {
+      await enqueueZaloOrderCreatedNotifications(
+        tx,
+        { orderCode: "LEAFZAL001" },
+        boss,
+        [
+          { key: "staff-hanoi", chatId: "1000001" },
+          { key: "staff-saigon", chatId: "1000002" },
+        ],
+      );
+    });
+
+    const jobs = await boss.findJobs<{ orderCode: string; recipientKey: string }>(
+      QUEUE_SEND_ZALO_ORDER_CREATED,
+      { data: { orderCode: "LEAFZAL001" } },
+    );
+    expect(jobs).toHaveLength(2);
+    expect(jobs.map((job) => job.data)).toEqual(
+      expect.arrayContaining([
+        { orderCode: "LEAFZAL001", recipientKey: "staff-hanoi" },
+        { orderCode: "LEAFZAL001", recipientKey: "staff-saigon" },
+      ]),
+    );
+  });
+
+  it("transaction rollback leaves no recipient-scoped Zalo jobs", async () => {
+    await expect(
+      testPrisma.$transaction(async (tx) => {
+        await enqueueZaloOrderCreatedNotifications(
+          tx,
+          { orderCode: "LEAFZAL002" },
+          boss,
+          [{ key: "staff-hanoi", chatId: "1000001" }],
+        );
+        throw new Error("rollback Zalo jobs");
+      }),
+    ).rejects.toThrow("rollback Zalo jobs");
+
+    const jobs = await boss.findJobs(QUEUE_SEND_ZALO_ORDER_CREATED, {
+      data: { orderCode: "LEAFZAL002" },
+    });
     expect(jobs).toHaveLength(0);
   });
 });

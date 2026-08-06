@@ -5,16 +5,23 @@ import type { PrismaClient } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { mailerFromEnv, type Mailer } from "@/lib/mailer";
 import {
+  zaloBotClientFromEnv,
+  type ZaloBotClient,
+  type ZaloNotificationRecipient,
+} from "@/lib/zalo-bot";
+import {
   createBoss,
   ensureQueues,
   ensureSchedules,
   QUEUE_EXPIRE_UNPAID,
   QUEUE_SEND_ORDER_CONFIRMATION,
   QUEUE_SEND_PAYMENT_CONFIRMED,
+  QUEUE_SEND_ZALO_ORDER_CREATED,
 } from "@/jobs/queue";
 import { expireUnpaidOrders } from "@/jobs/handlers/expire-unpaid";
 import { handleSendOrderConfirmation } from "@/jobs/handlers/send-order-confirmation";
 import { handleSendPaymentConfirmed } from "@/jobs/handlers/send-payment-confirmed";
+import { handleSendZaloOrderCreated } from "@/jobs/handlers/send-zalo-order-created";
 import { vietQrConfigFromEnv } from "@/lib/vietqr";
 
 /**
@@ -154,6 +161,29 @@ export async function registerPaymentConfirmedWorker(
   });
 }
 
+export async function registerZaloOrderCreatedWorker(
+  boss: WorkCapableBoss,
+  deps: {
+    db: PrismaClient;
+    bot: Pick<ZaloBotClient, "sendMessage">;
+    recipients?: readonly ZaloNotificationRecipient[];
+  },
+): Promise<void> {
+  await boss.work(QUEUE_SEND_ZALO_ORDER_CREATED, {}, async (jobs) => {
+    for (const job of jobs) {
+      try {
+        await handleSendZaloOrderCreated(deps, job.data);
+      } catch (error: unknown) {
+        console.error(
+          `[worker] job thất bại: queue=${QUEUE_SEND_ZALO_ORDER_CREATED} ` +
+            `jobId=${job.id} orderCode=${orderCodeForLog(job.data)}`,
+        );
+        throw error;
+      }
+    }
+  });
+}
+
 /** Đăng ký worker expiry; xử lý mọi job trong batch và không log payload/lỗi. */
 export async function registerExpireUnpaidWorker(
   boss: WorkCapableBoss,
@@ -192,8 +222,15 @@ export function requireAppBaseUrlForWorker(): void {
   }
 }
 
+export function workerClientsFromEnv(): { mailer: Mailer; zaloBot: ZaloBotClient } {
+  return {
+    mailer: mailerFromEnv(),
+    zaloBot: zaloBotClientFromEnv(),
+  };
+}
+
 async function main(): Promise<void> {
-  const mailer = mailerFromEnv();
+  const { mailer, zaloBot } = workerClientsFromEnv();
   vietQrConfigFromEnv();
   requireAppBaseUrlForWorker();
 
@@ -210,11 +247,13 @@ async function main(): Promise<void> {
 
   await registerOrderConfirmationWorker(boss, { db: prisma, mailer });
   await registerPaymentConfirmedWorker(boss, { db: prisma, mailer });
+  await registerZaloOrderCreatedWorker(boss, { db: prisma, bot: zaloBot });
   await registerExpireUnpaidWorker(boss, { db: prisma });
 
   console.log(
-    `[worker] sẵn sàng, đang lắng nghe queues "${QUEUE_SEND_ORDER_CONFIRMATION}", ` +
-      `"${QUEUE_SEND_PAYMENT_CONFIRMED}", "${QUEUE_EXPIRE_UNPAID}"...`,
+      `[worker] sẵn sàng, đang lắng nghe queues "${QUEUE_SEND_ORDER_CONFIRMATION}", ` +
+      `"${QUEUE_SEND_PAYMENT_CONFIRMED}", "${QUEUE_SEND_ZALO_ORDER_CREATED}", ` +
+      `"${QUEUE_EXPIRE_UNPAID}"...`,
   );
 
   const shutdown = async (signal: NodeJS.Signals): Promise<void> => {

@@ -1,6 +1,10 @@
 import { PgBoss, fromPrisma } from "pg-boss";
 import type { PrismaTransactionLike } from "pg-boss";
 import { z } from "zod";
+import {
+  ZALO_NOTIFICATION_RECIPIENTS,
+  type ZaloNotificationRecipient,
+} from "@/lib/zalo-bot";
 
 /**
  * `src/jobs/queue.ts` — hàng đợi pg-boss phía app (chỉ ghi job). Worker xử lý
@@ -10,6 +14,7 @@ import { z } from "zod";
 /** Tên queue gửi email xác nhận đơn hàng. */
 export const QUEUE_SEND_ORDER_CONFIRMATION = "send-order-confirmation";
 export const QUEUE_SEND_PAYMENT_CONFIRMED = "send-payment-confirmed";
+export const QUEUE_SEND_ZALO_ORDER_CREATED = "send-zalo-order-created";
 export const QUEUE_EXPIRE_UNPAID = "expire-unpaid";
 
 const ORDER_CODE_PATTERN = /^LEAF[A-Z0-9]{6}$/;
@@ -32,6 +37,13 @@ export const paymentConfirmedJobSchema = z.object({
 });
 
 export type PaymentConfirmedJob = z.infer<typeof paymentConfirmedJobSchema>;
+
+export const zaloOrderCreatedJobSchema = z.object({
+  orderCode: z.string().regex(ORDER_CODE_PATTERN),
+  recipientKey: z.string().min(1),
+});
+
+export type ZaloOrderCreatedJob = z.infer<typeof zaloOrderCreatedJobSchema>;
 
 /**
  * Tạo instance `PgBoss` mới (không cache). Dùng `createBoss()` khi cần một
@@ -118,6 +130,8 @@ export async function ensureQueues(boss: PgBoss): Promise<void> {
   await boss.updateQueue(QUEUE_SEND_ORDER_CONFIRMATION, QUEUE_RETRY_OPTIONS);
   await boss.createQueue(QUEUE_SEND_PAYMENT_CONFIRMED, QUEUE_RETRY_OPTIONS);
   await boss.updateQueue(QUEUE_SEND_PAYMENT_CONFIRMED, QUEUE_RETRY_OPTIONS);
+  await boss.createQueue(QUEUE_SEND_ZALO_ORDER_CREATED, QUEUE_RETRY_OPTIONS);
+  await boss.updateQueue(QUEUE_SEND_ZALO_ORDER_CREATED, QUEUE_RETRY_OPTIONS);
   await boss.createQueue(QUEUE_EXPIRE_UNPAID, QUEUE_RETRY_OPTIONS);
   await boss.updateQueue(QUEUE_EXPIRE_UNPAID, QUEUE_RETRY_OPTIONS);
 }
@@ -236,4 +250,28 @@ export async function enqueuePaymentConfirmed(
     db: fromPrisma(tx),
   });
   if (!jobId) throw new Error("Ghi job xác nhận thanh toán thất bại.");
+}
+
+export async function enqueueZaloOrderCreatedNotifications(
+  tx: PrismaTransactionLike,
+  payload: { orderCode: string },
+  boss?: PgBoss,
+  recipients: readonly ZaloNotificationRecipient[] = ZALO_NOTIFICATION_RECIPIENTS,
+): Promise<void> {
+  const bossInstance = boss ?? (await getBoss());
+
+  for (const recipient of recipients) {
+    const data = zaloOrderCreatedJobSchema.parse({
+      orderCode: payload.orderCode,
+      recipientKey: recipient.key,
+    });
+    const jobId = await bossInstance.send(QUEUE_SEND_ZALO_ORDER_CREATED, data, {
+      db: fromPrisma(tx),
+    });
+    if (!jobId) {
+      throw new Error(
+        `Ghi job gửi thông báo Zalo thất bại (pg-boss trả về id rỗng cho orderCode: ${data.orderCode}).`,
+      );
+    }
+  }
 }

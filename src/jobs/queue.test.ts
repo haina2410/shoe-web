@@ -5,13 +5,17 @@ import {
   QUEUE_EXPIRE_UNPAID,
   QUEUE_SEND_ORDER_CONFIRMATION,
   QUEUE_SEND_PAYMENT_CONFIRMED,
+  QUEUE_SEND_ZALO_ORDER_CREATED,
   orderConfirmationJobSchema,
   paymentConfirmedJobSchema,
+  zaloOrderCreatedJobSchema,
   getBoss,
   createBoss,
+  ensureQueues,
   ensureSchedules,
   enqueueOrderConfirmation,
   enqueuePaymentConfirmed,
+  enqueueZaloOrderCreatedNotifications,
 } from "@/jobs/queue";
 
 /**
@@ -104,6 +108,94 @@ describe("paymentConfirmedJobSchema", () => {
 
   it("dùng đúng tên queue thanh toán", () => {
     expect(QUEUE_SEND_PAYMENT_CONFIRMED).toBe("send-payment-confirmed");
+  });
+});
+
+describe("Zalo order-created queue", () => {
+  it("creates and updates the send-zalo-order-created queue", async () => {
+    const createQueue = vi.fn().mockResolvedValue(undefined);
+    const updateQueue = vi.fn().mockResolvedValue(undefined);
+    const boss = { createQueue, updateQueue } as unknown as PgBoss;
+
+    await ensureQueues(boss);
+
+    expect(QUEUE_SEND_ZALO_ORDER_CREATED).toBe("send-zalo-order-created");
+    expect(createQueue).toHaveBeenCalledWith(
+      QUEUE_SEND_ZALO_ORDER_CREATED,
+      expect.objectContaining({ retryLimit: 5, retryDelay: 60, retryBackoff: true }),
+    );
+    expect(updateQueue).toHaveBeenCalledWith(
+      QUEUE_SEND_ZALO_ORDER_CREATED,
+      expect.objectContaining({ retryLimit: 5, retryDelay: 60, retryBackoff: true }),
+    );
+  });
+
+  it("accepts only canonical orderCode and a non-empty recipient key", () => {
+    expect(
+      zaloOrderCreatedJobSchema.parse({
+        orderCode: "LEAFABC123",
+        recipientKey: "staff-hanoi",
+        chatId: "must-not-persist",
+      }),
+    ).toEqual({ orderCode: "LEAFABC123", recipientKey: "staff-hanoi" });
+
+    expect(() =>
+      zaloOrderCreatedJobSchema.parse({ orderCode: "LEAFABC123", recipientKey: "" }),
+    ).toThrow();
+  });
+
+  it("enqueues one PII-free job per configured recipient", async () => {
+    const send = vi.fn().mockResolvedValue("job-id");
+    const boss = { send } as unknown as PgBoss;
+    const tx = { $queryRawUnsafe: vi.fn() };
+
+    await enqueueZaloOrderCreatedNotifications(
+      tx,
+      { orderCode: "LEAFABC123" },
+      boss,
+      [
+        { key: "staff-hanoi", chatId: "1000001" },
+        { key: "staff-saigon", chatId: "1000002" },
+      ],
+    );
+
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send).toHaveBeenNthCalledWith(
+      1,
+      QUEUE_SEND_ZALO_ORDER_CREATED,
+      { orderCode: "LEAFABC123", recipientKey: "staff-hanoi" },
+      expect.objectContaining({ db: expect.anything() }),
+    );
+    expect(send).toHaveBeenNthCalledWith(
+      2,
+      QUEUE_SEND_ZALO_ORDER_CREATED,
+      { orderCode: "LEAFABC123", recipientKey: "staff-saigon" },
+      expect.objectContaining({ db: expect.anything() }),
+    );
+  });
+
+  it("does not enqueue jobs when no recipients are configured", async () => {
+    const send = vi.fn();
+    const boss = { send } as unknown as PgBoss;
+    const tx = { $queryRawUnsafe: vi.fn() };
+
+    await enqueueZaloOrderCreatedNotifications(tx, { orderCode: "LEAFABC123" }, boss, []);
+
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("rejects a null pg-boss job id so the transaction rolls back", async () => {
+    const boss = { send: vi.fn().mockResolvedValue(null) } as unknown as PgBoss;
+    const tx = { $queryRawUnsafe: vi.fn() };
+
+    await expect(
+      enqueueZaloOrderCreatedNotifications(
+        tx,
+        { orderCode: "LEAFABC123" },
+        boss,
+        [{ key: "staff-hanoi", chatId: "1000001" }],
+      ),
+    ).rejects.toThrow(/LEAFABC123/);
   });
 });
 
