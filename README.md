@@ -4,7 +4,7 @@ Demo thương mại điện tử bán giày (tiếng Việt): duyệt sản ph�
 
 Stack: **Next.js 16** (App Router, TS strict) · **Prisma 7** + Postgres · **Better Auth** (RBAC owner/staff) · **Zustand** (giỏ hàng) · **pg-boss** (job nền) · **React Email** + **Resend** · **Vitest** (unit + integration trên DB thật) · **Playwright** (E2E).
 
-Tài liệu thiết kế: [`docs/`](docs/README.md). Kế hoạch triển khai theo ngày: [`docs/plans/`](docs/plans/README.md).
+Kiến trúc, nghiệp vụ và runbook vận hành: [`docs/`](docs/README.md).
 
 ## Production deployment
 
@@ -57,16 +57,16 @@ Hai điều cần biết:
   Lệnh này thêm [`docker-compose.build.yml`](docker-compose.build.yml) vào,
   đặt `pull_policy: build`, và chỉ dành cho lúc registry không tới được.
 
-## Bàn giao UI Ngày 9
+## Storefront UI
 
 - Storefront có banner tĩnh, lối vào danh mục, sản phẩm nổi bật, dải cam kết
   và footer; storefront/admin đã được kiểm tra ở mobile `390×844` và desktop
   `1440×1000`.
 - Logo lá, banner và sáu ảnh sản phẩm hiện là asset tạm thời, có thể thay thế
-  khi cửa hàng cung cấp bộ nhận diện và ảnh thật. Ngày 9 không triển khai
-  carousel hoặc giao diện giảm giá.
+  khi cửa hàng cung cấp bộ nhận diện và ảnh thật. Storefront không triển khai
+  carousel hoặc giao diện giảm giá khi chưa có dữ liệu/campaign thật.
 - Có skip link, focus bàn phím, reduced motion cùng các trạng thái rỗng/lỗi.
-  Các hạng mục storefront để làm sau Ngày 10 được giữ tại
+  Các hạng mục storefront chưa triển khai được giữ tại
   [`docs/07-post-day10-storefront-backlog.md`](docs/07-post-day10-storefront-backlog.md).
 
 Thông tin doanh nghiệp hiển thị ở footer public:
@@ -141,12 +141,12 @@ npm run worker
 - `POST /api/webhooks/sepay` yêu cầu `X-SePay-Timestamp` (Unix seconds) và `X-SePay-Signature: sha256=<hex>`.
 - Chữ ký là HMAC-SHA256 với `SEPAY_WEBHOOK_SECRET` trên đúng chuỗi `<timestamp>.<raw request body>`; không parse rồi stringify lại body trước khi verify. Timestamp chỉ hợp lệ trong cửa sổ 5 phút.
 - Cấu hình payment code phía SePay: prefix `LEAF`, suffix đúng 6 ký tự alphanumeric. Mã đơn/payment canonical là `LEAFXXXXXX` (`^LEAF[A-Z0-9]{6}$`).
-- Event dùng `payload.id` chính thức của SePay làm ID giao dịch duy nhất. Event hợp lệ cùng original JSON được lưu trước khi khởi tạo queue; retry chỉ dùng canonical code/amount đã persist. Queue warm-up lỗi vẫn giữ event `RECEIVED`; giao dịch thiếu/sai mã đơn, lệch tiền, đơn không còn pending hoặc thiếu tồn kho được giữ ở `BankTransaction.REVIEW_REQUIRED` cho màn hình xử lý Ngày 8.
+- Event dùng `payload.id` chính thức của SePay làm ID giao dịch duy nhất. Event hợp lệ cùng original JSON được lưu trước khi khởi tạo queue; retry chỉ dùng canonical code/amount đã persist. Queue warm-up lỗi vẫn giữ event `RECEIVED`; giao dịch thiếu/sai mã đơn, lệch tiền, đơn không còn pending hoặc thiếu tồn kho được giữ ở `BankTransaction.REVIEW_REQUIRED` cho màn hình xử lý của admin.
 - Kết quả đã khớp, webhook lặp và giao dịch cần review đều được acknowledge HTTP 200 với body chính xác `{"success":true}`. Lỗi chữ ký/validation/hạ tầng không giả thành success.
 
 ## Vận hành đơn hàng
 
-- `owner` và `staff` có quyền như nhau đối với các thao tác đơn hàng Ngày 8: xem/lọc đơn, xác nhận thanh toán, chuyển trạng thái, ghi nhận hoàn tiền và ghép giao dịch cần đối soát. Quyền CRUD sản phẩm vẫn theo RBAC riêng.
+- `owner` và `staff` có quyền như nhau đối với các thao tác đơn hàng: xem/lọc đơn, xác nhận thanh toán, chuyển trạng thái, ghi nhận hoàn tiền và ghép giao dịch cần đối soát. Quyền CRUD sản phẩm vẫn theo RBAC riêng. Các invariant nằm trong [`docs/06-admin-order-domain.md`](docs/06-admin-order-domain.md).
 - Chuyển trạng thái do admin chỉ gồm `PENDING_PAYMENT → CANCELLED`, `PAID → FULFILLED` và `FULFILLED → COMPLETED`. Đơn `COMPLETED`, `CANCELLED`, `EXPIRED` là trạng thái cuối; đơn đã hoàn toàn bộ không thể chuyển `PAID → FULFILLED`.
 - Sổ thanh toán dùng `Payment.direction`: `IN` là tiền nhận, `OUT` là khoản hoàn do admin ghi nhận. Trạng thái hoàn tiền được suy ra từ tổng `IN/OUT`; `Order.lastRefundAt` lưu thời điểm ghi nhận hoàn tiền gần nhất.
 - Giao dịch SePay `REVIEW_REQUIRED` được giữ trong hàng đợi đối soát. Admin nhập mã đơn thật để ghép thủ công; hệ thống vẫn kiểm tra số tiền, trạng thái pending và tồn kho trước khi dùng cùng luồng xác nhận thanh toán.

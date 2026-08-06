@@ -4,7 +4,8 @@
 
 Một **Next.js app (App Router) duy nhất** phục vụ storefront + admin + API routes, cộng **một tiến trình worker** riêng chạy pg-boss dùng chung codebase & database. Tất cả đóng gói bằng Docker Compose trên một dedicated server.
 
-Lý do monolith 1 codebase: nhanh nhất cho demo 10 ngày, một ngôn ngữ (TypeScript), frontend React (dễ bảo trì về sau), tránh glue code giữa nhiều app.
+Lý do monolith một codebase: một ngôn ngữ (TypeScript), frontend React dễ bảo
+trì và không có glue code giữa nhiều ứng dụng khi quy mô hiện tại chưa cần tách.
 
 ## Sơ đồ
 

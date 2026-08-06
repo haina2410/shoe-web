@@ -1,7 +1,7 @@
-# 07 — Storefront backlog sau Ngày 10
+# 07 — Storefront backlog
 
-Document này giữ các action item storefront có giá trị nhưng không được đưa
-vào MVP 10 ngày. Chỉ bắt đầu sau khi deploy/smoke test Ngày 10 ổn định.
+Document này giữ các action item storefront có giá trị nhưng chưa thuộc phạm vi
+hiện tại. Chỉ bắt đầu khi production và smoke test đã ổn định.
 
 ## Ưu tiên 1 — Nội dung và độ tin cậy thật
 
@@ -68,4 +68,3 @@ Mỗi mục cần có:
 3. design/spec riêng;
 4. test và rollout plan tương ứng;
 5. không làm suy yếu happy path checkout/payment hiện tại.
-

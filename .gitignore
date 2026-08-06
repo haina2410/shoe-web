@@ -45,6 +45,8 @@ next-env.d.ts
 # orchestration scratch (not part of the shipped app)
 /.superpowers/
 /.worktrees/
+/docs/plans/
+/docs/superpowers/
 
 # generated prisma client
 /src/generated/

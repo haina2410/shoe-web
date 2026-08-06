@@ -38,7 +38,7 @@ Khách CK ─► Ngân hàng ─► SePay phát hiện GD vào ─► POST /api/
                     ┌──── khớp ────┐        ┌──── không khớp ────┐
                     ▼                        ▼
    TRANSACTION:                     BankTransaction.REVIEW_REQUIRED
-     • Payment (payload.id unique)  được giữ lại để admin xử lý Ngày 8
+     • Payment (payload.id unique)  được giữ lại để admin xử lý
      • Order.status = PAID, paidAt
      • trừ stock từng OrderItem
      • enqueue send-payment-confirmed
@@ -53,13 +53,13 @@ Khách CK ─► Ngân hàng ─► SePay phát hiện GD vào ─► POST /api/
   Queue warm-up lỗi vẫn để lại đúng một event `RECEIVED`. Retry chỉ dùng các
   cột đã persist; body đến sau không thể đổi code/amount. Thiếu/sai mã đơn,
   lệch tiền, đơn không pending hoặc thiếu tồn kho được đánh dấu
-  `REVIEW_REQUIRED`, không bị mất, để Ngày 8 xử lý.
+  `REVIEW_REQUIRED`, không bị mất, để nhân viên xử lý.
 - **Khớp số tiền nghiêm ngặt:** `transferAmount` phải bằng chính xác `Order.total`; nếu lệch thì không auto-confirm.
 - **Acknowledge chính xác:** matched, duplicate và review-required đều trả HTTP 200 với body `{"success":true}`. Email được đẩy vào job; lỗi authentication/validation/hạ tầng trả failure tương ứng thay vì giả thành success.
 
 ## Xác nhận và đối soát thủ công
 
-- `owner` và `staff` có quyền như nhau trên toàn bộ thao tác đơn hàng Ngày 8.
+- `owner` và `staff` có quyền như nhau trên toàn bộ thao tác vận hành đơn hàng.
 - Tại chi tiết đơn pending, admin có thể bấm **"Xác nhận thanh toán"**. Cùng
   logic transaction tạo `Payment(direction=IN, provider="manual")`, chuyển
   `PAID`, trừ kho và enqueue email. Đơn không còn pending không bị xử lý lại.

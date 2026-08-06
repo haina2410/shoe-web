@@ -32,6 +32,12 @@ Nguyên tắc: nền paper + chữ ink chiếm ~90% diện tích; evergreen làm
 - Lưới sản phẩm như gallery, nhiều khoảng trắng, card viền hairline (không đổ bóng nặng).
 - Trang chi tiết: ảnh lớn bên trái, chọn size/màu + tồn kho + nút thêm giỏ bên phải.
 
+Trang chủ theo cấu trúc curated storefront: navbar có tìm kiếm và số lượng giỏ,
+banner tĩnh, ba lối vào danh mục, sản phẩm mới, trust strip và footer doanh
+nghiệp. Không dùng carousel, giá giảm giả, countdown hoặc số liệu bán hàng không
+có nguồn dữ liệu thật. Search dùng GET tới `/products?q=<query>`; cart count là
+client island nhỏ, không biến toàn bộ header thành Client Component.
+
 ## Signature (điểm nhấn duy nhất)
 
 **Nét lá / gân lá hairline** — một motif đường mảnh hình gân lá dùng làm:
@@ -47,6 +53,10 @@ Chỉ dồn sự táo bạo vào chi tiết lá này; mọi thứ khác giữ k�
 - Focus bàn phím hiển thị rõ.
 - Tôn trọng `prefers-reduced-motion`.
 - Motion tiết chế: hover đổi ảnh sản phẩm, reveal nhẹ khi cuộn — không lạm dụng (dễ thành "AI-generated").
+- Có skip link và landmark `header`, `nav`, `main`, `footer` đúng nghĩa.
+- Touch target chính khoảng 44px trên mobile; lỗi không chỉ truyền đạt bằng màu.
+- Empty/error state luôn giải thích bước tiếp theo; ảnh thiếu có fallback ổn định.
+- Nội dung tự động không đổi slide hoặc giành focus.
 
 ## Giọng văn (copy)
 

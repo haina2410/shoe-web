@@ -1,6 +1,7 @@
 # leafshoes Việt Nam — Tài liệu dự án
 
-Website bán giày (e-commerce) cho **leafshoes Việt Nam**. Mục tiêu 10 ngày: **demo chạy được end-to-end**, không phải sản phẩm hoàn chỉnh cuối cùng.
+Website bán giày (e-commerce) cho **leafshoes Việt Nam**. Thư mục này chỉ giữ
+tài liệu tham chiếu bền vững về kiến trúc, nghiệp vụ, giao diện và vận hành.
 
 ## Phạm vi tính năng (MVP demo)
 
@@ -14,6 +15,15 @@ Website bán giày (e-commerce) cho **leafshoes Việt Nam**. Mục tiêu 10 ng�
 - ~50–100 đơn/ngày.
 - Deploy trên **dedicated server** bằng Docker Compose.
 
+## Cấu trúc
+
+- `01`–`03`: kiến trúc, lựa chọn công nghệ và dữ liệu nền.
+- `04` và `06`: invariant nghiệp vụ thanh toán, đối soát và vận hành đơn.
+- `05` và `07`: hệ thống giao diện cùng backlog sản phẩm.
+- `08`: runbook production dành cho người vận hành.
+
+Tài liệu dùng tên ổn định theo chủ đề, không lưu nhật ký triển khai theo ngày.
+
 ## Mục lục tài liệu
 
 | File | Nội dung |
@@ -23,12 +33,13 @@ Website bán giày (e-commerce) cho **leafshoes Việt Nam**. Mục tiêu 10 ng�
 | [03-data-model.md](03-data-model.md) | Mô hình dữ liệu (Prisma), trạng thái đơn |
 | [04-payment-checkout-flow.md](04-payment-checkout-flow.md) | Luồng checkout + thanh toán VietQR + webhook |
 | [05-design-direction.md](05-design-direction.md) | Hướng thiết kế thương hiệu (tối giản, "leaf") |
-| [06-plan-10-days.md](06-plan-10-days.md) | Kế hoạch triển khai 10 ngày + phạm vi/rủi ro/test |
-| [07-post-day10-storefront-backlog.md](07-post-day10-storefront-backlog.md) | Action item storefront sau khi hoàn tất deploy Ngày 10 |
+| [06-admin-order-domain.md](06-admin-order-domain.md) | Vòng đời đơn, phân quyền, đối soát và hoàn tiền |
+| [07-post-day10-storefront-backlog.md](07-post-day10-storefront-backlog.md) | Backlog storefront cần dữ liệu hoặc phạm vi bổ sung |
+| [08-production-runbook.md](08-production-runbook.md) | Deploy, backup, rollback và xử lý sự cố production |
 
 ## Ngoài phạm vi demo (YAGNI)
 
 Tích hợp hãng vận chuyển (GHN/GHTK), tài khoản khách hàng, đánh giá sản phẩm, mã giảm giá/khuyến mãi, đa ngôn ngữ.
 
----
-*Tài liệu tạo ngày 2026-07-22 qua quá trình brainstorming.*
+Các implementation plan do công cụ tạo dưới `docs/plans/` và
+`docs/superpowers/` không thuộc tài liệu dự án và được Git bỏ qua.
