@@ -7,9 +7,12 @@ import {
 
 describe("production environment validation", () => {
   it("returns only missing variable names in stable order", () => {
-    const env = Object.fromEntries(
-      REQUIRED_PRODUCTION_ENV.map((name) => [name, `${name}-value`]),
-    );
+    const env: NodeJS.ProcessEnv = {
+      NODE_ENV: "test",
+      ...Object.fromEntries(
+        REQUIRED_PRODUCTION_ENV.map((name) => [name, `${name}-value`]),
+      ),
+    };
     delete env.POSTGRES_PASSWORD;
     delete env.BOT_TOKEN;
     delete env.SEPAY_WEBHOOK_SECRET;
@@ -31,6 +34,7 @@ describe("production environment validation", () => {
         cwd: process.cwd(),
         encoding: "utf8",
         env: {
+          NODE_ENV: "test",
           PATH: process.env.PATH,
           POSTGRES_PASSWORD: secret,
           BOT_TOKEN: botToken,

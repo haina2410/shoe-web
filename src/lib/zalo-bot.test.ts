@@ -98,7 +98,7 @@ describe("zaloBotClientFromEnv", () => {
   it.each([undefined, "", "   "])(
     "rejects a missing or blank BOT_TOKEN without revealing its value",
     (botToken) => {
-      const env = { BOT_TOKEN: botToken } as NodeJS.ProcessEnv;
+      const env: NodeJS.ProcessEnv = { NODE_ENV: "test", BOT_TOKEN: botToken };
 
       expect(() => zaloBotClientFromEnv(env)).toThrow(
         "BOT_TOKEN",
