@@ -27,6 +27,7 @@ describe("SiteFooter", () => {
       ["Giới thiệu công ty", "/gioi-thieu"],
       ["Nhà máy & hoạt động kinh doanh", "/nha-may"],
       ["Chi nhánh", "/chi-nhanh"],
+      ["Tra cứu đơn hàng", "/orders"],
       ["Hướng dẫn thanh toán", "/chinh-sach/thanh-toan"],
       ["Chính sách giao hàng", "/chinh-sach/giao-hang"],
       ["Chính sách đổi trả", "/chinh-sach/doi-tra"],

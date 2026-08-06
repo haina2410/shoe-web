@@ -14,6 +14,15 @@ describe("SiteHeader", () => {
     expect(screen.getByRole("link", { name: /giỏ hàng/i })).toBeInTheDocument();
   });
 
+  it("có liên kết tra cứu đơn hàng", () => {
+    render(<SiteHeader />);
+
+    expect(screen.getByRole("link", { name: "Tra cứu đơn hàng" })).toHaveAttribute(
+      "href",
+      "/orders",
+    );
+  });
+
   it("cung cấp điều hướng và tìm kiếm sản phẩm bằng form GET", () => {
     render(<SiteHeader />);
 
@@ -49,6 +58,7 @@ describe("SiteHeader", () => {
     for (const target of [
       screen.getByRole("link", { name: "Trang chủ leafshoes" }),
       screen.getByRole("link", { name: "Sản phẩm" }),
+      screen.getByRole("link", { name: "Tra cứu đơn hàng" }),
       screen.getByRole("link", { name: "Giỏ hàng" }),
       screen.getByRole("searchbox", { name: "Tìm sản phẩm" }),
       screen.getByRole("button", { name: "Gửi tìm kiếm" }),

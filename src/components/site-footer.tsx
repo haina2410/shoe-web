@@ -7,6 +7,7 @@ import { STORE_INFO } from "@/lib/storefront-content";
 
 const SHOP_NAV: readonly ContentNavItem[] = [
   { label: "Sản phẩm", href: "/products" },
+  { label: "Tra cứu đơn hàng", href: "/orders" },
   { label: "Giỏ hàng", href: "/cart" },
 ];
 

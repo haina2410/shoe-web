@@ -36,6 +36,12 @@ export function SiteHeader() {
           >
             Sản phẩm
           </Link>
+          <Link
+            href="/orders"
+            className="inline-flex min-h-11 min-w-11 items-center whitespace-nowrap rounded-md px-2"
+          >
+            Tra cứu đơn hàng
+          </Link>
           <NavDisclosure
             items={COMPANY_NAV}
             label={COMPANY_NAV_LABEL}
