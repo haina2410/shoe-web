@@ -2,6 +2,7 @@ import type { PrismaClient } from "@/generated/prisma/client";
 import { paymentConfirmedJobSchema } from "@/jobs/queue";
 import type { Mailer } from "@/lib/mailer";
 import { renderPaymentConfirmedEmail } from "@/emails/payment-confirmed.render";
+import { buildOrderLookupUrl } from "@/lib/order-url";
 
 /** Tra dữ liệu khách từ DB bằng orderCode rồi gửi email xác nhận thanh toán. */
 export async function handleSendPaymentConfirmed(
@@ -18,7 +19,10 @@ export async function handleSendPaymentConfirmed(
     throw new Error(`Không tìm thấy đơn hàng (orderCode: ${orderCode}).`);
   }
 
-  const orderUrl = `${process.env.APP_BASE_URL ?? "http://localhost:3000"}/orders/${order.orderCode}`;
+  const orderUrl = buildOrderLookupUrl(
+    process.env.APP_BASE_URL ?? "http://localhost:3000",
+    order.orderCode,
+  );
   const { subject, html, text } = await renderPaymentConfirmedEmail({
     orderCode: order.orderCode,
     customerName: order.customerName,

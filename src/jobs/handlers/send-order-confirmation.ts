@@ -2,6 +2,7 @@ import type { PrismaClient } from "@/generated/prisma/client";
 import { orderConfirmationJobSchema } from "@/jobs/queue";
 import type { Mailer } from "@/lib/mailer";
 import { renderOrderConfirmationEmail } from "@/emails/order-confirmation.render";
+import { buildOrderLookupUrl } from "@/lib/order-url";
 import { buildVietQrImageUrl, vietQrConfigFromEnv } from "@/lib/vietqr";
 
 /**
@@ -39,7 +40,10 @@ export async function handleSendOrderConfirmation(
     addInfo: order.orderCode,
   });
 
-  const orderUrl = `${process.env.APP_BASE_URL ?? "http://localhost:3000"}/orders/${order.orderCode}`;
+  const orderUrl = buildOrderLookupUrl(
+    process.env.APP_BASE_URL ?? "http://localhost:3000",
+    order.orderCode,
+  );
 
   const { subject, html, text } = await renderOrderConfirmationEmail({
     orderCode: order.orderCode,

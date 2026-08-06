@@ -32,11 +32,17 @@ Nguyên tắc: nền paper + chữ ink chiếm ~90% diện tích; evergreen làm
 - Lưới sản phẩm như gallery, nhiều khoảng trắng, card viền hairline (không đổ bóng nặng).
 - Trang chi tiết: ảnh lớn bên trái, chọn size/màu + tồn kho + nút thêm giỏ bên phải.
 
-Trang chủ theo cấu trúc curated storefront: navbar có tìm kiếm và số lượng giỏ,
-banner tĩnh, ba lối vào danh mục, sản phẩm mới, trust strip và footer doanh
-nghiệp. Không dùng carousel, giá giảm giả, countdown hoặc số liệu bán hàng không
-có nguồn dữ liệu thật. Search dùng GET tới `/products?q=<query>`; cart count là
-client island nhỏ, không biến toàn bộ header thành Client Component.
+Trang chủ theo cấu trúc curated storefront: navbar có tìm kiếm, liên kết “Tra
+cứu đơn hàng” và số lượng giỏ, banner tĩnh, ba lối vào danh mục, sản phẩm mới,
+trust strip và footer doanh nghiệp. Footer cũng có liên kết “Tra cứu đơn hàng”.
+Không dùng carousel, giá giảm giả, countdown hoặc số liệu bán hàng không có nguồn
+dữ liệu thật. Search dùng GET tới `/products?q=<query>`; cart count là client
+island nhỏ, không biến toàn bộ header thành Client Component.
+
+Trang tra cứu công khai tại `/orders` nhận mã đơn từ biểu mẫu hoặc URL. Mã được
+cắt khoảng trắng, chuyển sang chữ hoa và, nếu tồn tại, chuyển hướng đến
+`/orders/[orderCode]`. Mã sai định dạng và mã không tồn tại cùng hiển thị một
+banner “Không tìm thấy đơn hàng”, để không tiết lộ mã nào đã tồn tại.
 
 ## Signature (điểm nhấn duy nhất)
 
