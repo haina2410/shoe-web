@@ -16,7 +16,7 @@ describe("renderPaymentConfirmedEmail", () => {
         },
       ],
       total: 630000,
-      orderUrl: "https://leafshoes.vn/orders/LEAFABC123",
+      orderUrl: "https://leafshoes.vn/orders?orderCode=LEAFABC123",
     });
 
     expect(rendered.subject).toContain("LEAFABC123");
@@ -24,6 +24,10 @@ describe("renderPaymentConfirmedEmail", () => {
     expect(rendered.text).toContain("LEAFABC123");
     expect(rendered.html).toContain("630.000");
     expect(rendered.text).toContain("630.000");
+    expect(rendered.html).toContain(
+      "https://leafshoes.vn/orders?orderCode=LEAFABC123".replaceAll("&", "&amp;"),
+    );
+    expect(rendered.text).toContain("https://leafshoes.vn/orders?orderCode=LEAFABC123");
     expect(rendered.text.toLocaleLowerCase("vi")).toContain("đã nhận thanh toán");
   });
 });

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { testPrisma, resetDb } from "@/test/db";
 import { createOrderCore } from "@/server/orders";
 import type { CreateOrderInput } from "@/lib/validation/checkout";
@@ -62,9 +62,14 @@ describe("handleSendPaymentConfirmed", () => {
     await resetDb();
   });
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("tra đơn và items từ DB rồi gửi email xác nhận thanh toán cho khách", async () => {
     const order = await makeOrder();
     const mailer = fakeMailer();
+    vi.stubEnv("APP_BASE_URL", "https://leafshoes.vn");
 
     await handleSendPaymentConfirmed(
       { db: testPrisma, mailer },
@@ -83,6 +88,12 @@ describe("handleSendPaymentConfirmed", () => {
       `payment-confirmed:${order.orderCode}`,
     );
     expect(mailer.messages[0].idempotencyKey).not.toContain(order.email);
+    expect(mailer.messages[0].html).toContain(
+      `https://leafshoes.vn/orders?orderCode=${order.orderCode}`,
+    );
+    expect(mailer.messages[0].text).toContain(
+      `https://leafshoes.vn/orders?orderCode=${order.orderCode}`,
+    );
   });
 
   it("orderCode không tồn tại → throw và không gửi email", async () => {

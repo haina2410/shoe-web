@@ -100,6 +100,8 @@ Khách CK ─► Ngân hàng ─► SePay phát hiện GD vào ─► POST /api/
 
 - **Đặt hàng thành công**: mã đơn, danh sách sản phẩm, tổng tiền, thông tin CK + QR, hướng dẫn.
 - **Đã thanh toán**: xác nhận đã nhận tiền, tóm tắt đơn, bước tiếp theo.
+- Cả hai email dùng liên kết tra cứu canonical `/orders?orderCode=<orderCode>`
+  theo `APP_BASE_URL`; mặc định là `http://localhost:3000`.
 - Email **đã thanh toán** dùng Resend idempotency key
   `payment-confirmed:<orderCode>` để provider retry không gửi trùng.
 - (Tuỳ chọn sau) **Đã giao/hoàn tất**.

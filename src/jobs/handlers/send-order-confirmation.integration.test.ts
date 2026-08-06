@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { testPrisma, resetDb } from "@/test/db";
 import { createOrderCore } from "@/server/orders";
 import type { CreateOrderInput } from "@/lib/validation/checkout";
@@ -106,9 +106,14 @@ describe("handleSendOrderConfirmation", () => {
     await resetDb();
   });
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("có order thật trong DB → gọi mailer.send đúng 1 lần với to/html đúng (orderCode, tổng tiền, QR addInfo=orderCode)", async () => {
     const order = await makeOrder();
     const mailer = fakeMailer();
+    vi.stubEnv("APP_BASE_URL", "https://leafshoes.vn");
 
     await handleSendOrderConfirmation(
       { db: testPrisma, mailer },
@@ -122,6 +127,12 @@ describe("handleSendOrderConfirmation", () => {
     expect(message.html).toContain("630.000"); // subtotal 600000 + ship 30000
     expect(message.html).toContain(encodeURIComponent(order.orderCode)); // addInfo trong URL QR
     expect(message.html).toContain("img.vietqr.io");
+    expect(message.html).toContain(
+      `https://leafshoes.vn/orders?orderCode=${order.orderCode}`,
+    );
+    expect(message.text).toContain(
+      `https://leafshoes.vn/orders?orderCode=${order.orderCode}`,
+    );
   });
 
   it("orderCode không tồn tại → throw (không gọi mailer.send)", async () => {
