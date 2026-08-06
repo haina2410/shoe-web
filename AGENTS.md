@@ -15,3 +15,25 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - **Watch the usual offenders** — migrations, rake tasks, service objects and serializers attract the most needless commentary.
 - **Never leave authoring scaffolding** — "changed to fix X", "added per review", or notes about the edit itself belong in the commit message or PR description, not in the code.
 - **Comments that stay**: `rubocop:disable` reasons, `# TODO`/`# NOTE` tied to a ticket.
+
+### Documentation
+
+`docs/` contains durable references to the current system, not implementation
+plans, dated progress reports, or change history. When behavior changes, update
+the matching document in the same change:
+
+- `01-overview-architecture.md`: runtime topology, components, module boundaries.
+- `02-tech-stack.md`: dependencies, platform choices, technical constraints.
+- `03-data-model.md`: Prisma entities, relationships, persistence invariants.
+- `04-payment-checkout-flow.md`: checkout, VietQR, SePay, jobs, email, payment states.
+- `05-design-direction.md`: storefront structure, visual rules, accessibility.
+- `06-admin-order-domain.md`: order transitions, RBAC, reconciliation, refunds.
+- `07-post-day10-storefront-backlog.md`: intentionally deferred product scope.
+- `08-production-runbook.md`: environment, deployment, CI/CD, backup, rollback, incidents.
+
+Update `docs/README.md` whenever a durable document is added, removed, renamed,
+or changes responsibility. Documentation must describe current behavior and
+invariants; do not add day-numbered logs, completed-task checklists, authoring
+notes, or duplicated implementation detail. `docs/plans/` and
+`docs/superpowers/` are ignored and must not be committed. Verify local Markdown
+links after changing documentation.
