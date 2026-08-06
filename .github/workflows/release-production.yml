@@ -20,7 +20,7 @@ jobs:
         uses: pandeptwidyaop/komodoactions@v1
         with:
           komodo-url: ${{ vars.KOMODO_PRODUCTION_URL }}
-          api-key: ${{ secrets.KOMODO_API_KEY }}
-          api-secret: ${{ secrets.KOMODO_API_SECRET }}
+          api-key: ${{ secrets.KOMODO_PRODUCTION_API_KEY }}
+          api-secret: ${{ secrets.KOMODO_PRODUCTION_API_SECRET }}
           stack-name: ${{ vars.KOMODO_PRODUCTION_STACK_NAME }}
           pull-before-deploy: true

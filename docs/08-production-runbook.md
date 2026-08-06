@@ -172,8 +172,10 @@ Trong GitHub Actions, cấu hình:
 
 - repository variable `KOMODO_STAGING_URL`: URL gốc của Komodo staging;
 - repository variable `KOMODO_PRODUCTION_URL`: URL gốc của Komodo production;
-- repository secret `KOMODO_API_KEY`: API key có quyền pull/deploy Stack;
-- repository secret `KOMODO_API_SECRET`: secret đi cùng API key;
+- repository secret `KOMODO_STAGING_API_KEY`: API key của Komodo staging;
+- repository secret `KOMODO_STAGING_API_SECRET`: secret của API key staging;
+- repository secret `KOMODO_PRODUCTION_API_KEY`: API key của Komodo production;
+- repository secret `KOMODO_PRODUCTION_API_SECRET`: secret của API key production;
 - repository variable `KOMODO_STAGING_STACK_NAME`: tên Stack staging;
 - repository variable `KOMODO_PRODUCTION_STACK_NAME`: tên Stack production.
 
