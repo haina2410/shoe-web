@@ -62,7 +62,7 @@ export default async function OrdersPage({
             id="order-code"
             name="orderCode"
             type="text"
-            value={rawOrderCode}
+            defaultValue={rawOrderCode}
             required
             className="mt-2 w-full rounded-md border px-3 py-2"
             style={{ borderColor: "var(--line)" }}

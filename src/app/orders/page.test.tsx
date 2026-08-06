@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { findUniqueMock, redirectMock } = vi.hoisted(() => ({
@@ -66,6 +67,17 @@ describe("OrdersPage", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(
       /^Không tìm thấy đơn hàng$/,
     );
+  });
+
+  it("cho phép khách thay thế mã không đúng định dạng", async () => {
+    await renderPage("leaf-abc123");
+    const input = screen.getByLabelText("Mã đơn hàng");
+    const user = userEvent.setup();
+
+    await user.clear(input);
+    await user.type(input, "LEAFABC123");
+
+    expect(input).toHaveValue("LEAFABC123");
   });
 
   it("báo lỗi khi mã hợp lệ không có đơn hàng tương ứng", async () => {
