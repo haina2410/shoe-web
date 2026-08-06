@@ -34,7 +34,6 @@ build năm target của [`Dockerfile`](Dockerfile) và push lên `ghcr.io` mỗi
 | `ghcr.io/<owner>/<repo>/dashboard` | `dashboard` | Dashboard vận hành pg-boss |
 
 Mỗi image được gắn tag bằng full commit SHA và thêm `latest` khi push `main`.
-Pull request chỉ build để chặn `Dockerfile` vỡ trước khi merge — không push.
 
 `docker-compose.prod.yml` pull chính những image này thay vì build trên VPS;
 `npm run deploy:production` chạy `docker compose pull` cho cả bốn service trước
