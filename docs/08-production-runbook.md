@@ -44,6 +44,7 @@ Tạo Stack từ Git repository, branch `main`, file
 COMPOSE_PROJECT_NAME=leafshoes
 RELEASE_TAG=latest
 APP_HOST_PORT=3000
+POSTGRES_HOST_PORT=5432
 ```
 
 `RELEASE_TAG` quyết định tag image được pull. Nếu không đặt, Compose dùng
@@ -82,9 +83,10 @@ up` đều migrate xong mới cho app lên. Hai hệ quả cần biết:
 `smoke` vẫn nằm trong profile `ops`, nên nó không xuất hiện khi Komodo parse
 config — đó là chủ đích, gọi tên tường minh (`compose run --rm smoke`) mới chạy.
 
-PostgreSQL không có public port. App chỉ bind
-`127.0.0.1:${APP_HOST_PORT}:3000`; database và upload là named volume bền vững
-theo project.
+PostgreSQL publish container port `5432` duy nhất trên
+`127.0.0.1:${POSTGRES_HOST_PORT:-5432}` để truy cập qua SSH; nó không lắng nghe
+trên interface public. App chỉ bind `127.0.0.1:${APP_HOST_PORT}:3000`; database
+và upload là named volume bền vững theo project.
 
 ### Staging bắt buộc trước production
 
@@ -94,6 +96,7 @@ Tạo Stack staging bằng **cùng** Compose file, nhưng environment riêng:
 COMPOSE_PROJECT_NAME=leafshoes-staging
 RELEASE_TAG=latest
 APP_HOST_PORT=3300
+POSTGRES_HOST_PORT=5433
 ```
 
 - Compose sẽ tạo PostgreSQL và uploads named volume riêng theo tên project.
@@ -102,8 +105,24 @@ APP_HOST_PORT=3300
   domain chưa verify.
 - Không chạy payment SePay thật có kiểm soát cho staging trước khi hoàn tất
   production acceptance.
-- Tuyệt đối không để staging và production dùng chung project name, host port,
-  database volume, uploads volume, hostname hoặc webhook URL.
+- Tuyệt đối không để staging và production dùng chung project name, app host
+  port, PostgreSQL host port, database volume, uploads volume, hostname hoặc
+  webhook URL.
+
+### Truy cập PostgreSQL qua SSH
+
+PostgreSQL chỉ bind loopback VPS. Từ máy operator, forward một local port tới
+host port của Stack production:
+
+```bash
+ssh -N -L 15432:127.0.0.1:5432 <user>@<vps>
+```
+
+Sau đó cấu hình công cụ local kết nối `127.0.0.1:15432`, dùng đúng
+`POSTGRES_DB`, `POSTGRES_USER` và `POSTGRES_PASSWORD` của Stack. Nếu production
+dùng `POSTGRES_HOST_PORT` khác `5432`, đổi port đích trong lệnh SSH cho khớp.
+Không bind PostgreSQL vào `0.0.0.0` hoặc thêm Cloudflare public hostname cho
+database.
 
 ## 3. Cloudflare Tunnel origin
 
@@ -122,9 +141,9 @@ sudo systemctl status cloudflared
 sudo journalctl -u cloudflared --since '30 minutes ago'
 ```
 
-Origin không được bind public interface. Không mở port PostgreSQL. Không áp
-Cloudflare `Cache Everything` cho `/api/*` hay `/admin/*`; nhất là health,
-auth và webhook phải đi tới origin theo request.
+Origin không được bind public interface. PostgreSQL chỉ được bind loopback cho
+SSH forwarding. Không áp Cloudflare `Cache Everything` cho `/api/*` hay
+`/admin/*`; nhất là health, auth và webhook phải đi tới origin theo request.
 
 ## 4. First launch
 
@@ -450,10 +469,11 @@ incident ticket.
 
 ## 13. Security checklist
 
-- [ ] Production and staging have distinct project name, loopback host port,
-  database/uploads volumes, hostname and SePay webhook secret.
-- [ ] App binds only `127.0.0.1`; PostgreSQL has no published port; no public
-  origin bypasses Cloudflare Tunnel.
+- [ ] Production and staging have distinct project name, app and PostgreSQL
+  loopback host ports, database/uploads volumes, hostname and SePay webhook
+  secret.
+- [ ] App and PostgreSQL bind only `127.0.0.1`; no public origin bypasses
+  Cloudflare Tunnel and database access goes through SSH forwarding.
 - [ ] `cloudflared` is healthy and only forwards the intended hostname/origin.
 - [ ] Cloudflare does not cache `/api/*` or `/admin/*` with `Cache Everything`.
 - [ ] Komodo alone holds real secrets; Git, images, build args, logs and test

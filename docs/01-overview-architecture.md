@@ -28,7 +28,9 @@ trì và không có glue code giữa nhiều ứng dụng khi quy mô hiện t�
 
 Production dùng `cloudflared` system service đã có trên VPS để kết thúc HTTPS
 ở Cloudflare và chuyển request tới app bind trên loopback. Stack không cần
-Caddy/Nginx và không mở origin web hoặc PostgreSQL ra Internet.
+Caddy/Nginx và không mở origin web hoặc PostgreSQL ra Internet. PostgreSQL chỉ
+publish trên loopback VPS tại `127.0.0.1:${POSTGRES_HOST_PORT:-5432}` để operator
+truy cập qua SSH port forwarding.
 
 ## Các thành phần
 
@@ -73,4 +75,4 @@ Caddy/Nginx và không mở origin web hoặc PostgreSQL ra Internet.
 
 ## Môi trường & cấu hình
 
-Biến môi trường chính: `DATABASE_URL`, `BETTER_AUTH_SECRET`, `RESEND_API_KEY`, `BOT_TOKEN`, `SEPAY_WEBHOOK_SECRET`, thông tin tài khoản ngân hàng nhận tiền (số TK, ngân hàng, tên) để sinh VietQR, `APP_BASE_URL`.
+Biến môi trường chính: `DATABASE_URL`, `POSTGRES_HOST_PORT`, `BETTER_AUTH_SECRET`, `RESEND_API_KEY`, `BOT_TOKEN`, `SEPAY_WEBHOOK_SECRET`, thông tin tài khoản ngân hàng nhận tiền (số TK, ngân hàng, tên) để sinh VietQR, `APP_BASE_URL`.
