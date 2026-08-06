@@ -17,6 +17,7 @@ import {
   QUEUE_SEND_ORDER_CONFIRMATION,
   QUEUE_SEND_PAYMENT_CONFIRMED,
   QUEUE_SEND_ZALO_ORDER_CREATED,
+  orderConfirmationJobSchema,
 } from "@/jobs/queue";
 import { expireUnpaidOrders } from "@/jobs/handlers/expire-unpaid";
 import { handleSendOrderConfirmation } from "@/jobs/handlers/send-order-confirmation";
@@ -97,11 +98,8 @@ export interface WorkCapableBoss {
  * đúng hình dạng mong đợi (vd. lỗi parse xảy ra TRƯỚC khi `orderCode` có ý
  * nghĩa). `orderCode` không phải PII — được phép xuất hiện trong log. */
 function orderCodeForLog(data: unknown): string {
-  if (data && typeof data === "object" && "orderCode" in data) {
-    const value = (data as { orderCode?: unknown }).orderCode;
-    if (typeof value === "string") return value;
-  }
-  return "?";
+  const parsed = orderConfirmationJobSchema.safeParse(data);
+  return parsed.success ? parsed.data.orderCode : "?";
 }
 
 /**

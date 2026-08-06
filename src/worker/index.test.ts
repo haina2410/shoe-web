@@ -357,6 +357,35 @@ describe("registerZaloOrderCreatedWorker", () => {
       consoleErrorSpy.mockRestore();
     }
   });
+
+  it("replaces a malformed orderCode with a safe placeholder in failure logs", async () => {
+    const boss = createCapturingBoss();
+    const bot = fakeZaloBot();
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      await registerZaloOrderCreatedWorker(boss, {
+        db: testPrisma,
+        bot,
+        recipients: [{ key: "staff-hanoi", chatId: "1000001" }],
+      });
+      const job = {
+        ...fakeJob("LEAFABC123"),
+        id: "zalo-job-malformed",
+        name: QUEUE_SEND_ZALO_ORDER_CREATED,
+        data: { orderCode: "customer@example.com", recipientKey: "staff-hanoi" },
+      };
+
+      await expect(boss.captured?.handler([job])).rejects.toThrow();
+
+      const logged = consoleErrorSpy.mock.calls.flat().join(" ");
+      expect(logged).toContain("zalo-job-malformed");
+      expect(logged).toContain("orderCode=?");
+      expect(logged).not.toContain("customer@example.com");
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
 });
 
 describe("registerExpireUnpaidWorker (hợp đồng đăng ký)", () => {
