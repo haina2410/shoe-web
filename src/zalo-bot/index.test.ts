@@ -21,6 +21,7 @@ describe("respondToGreeting", () => {
       expect(sendMessage).toHaveBeenCalledWith({
         chatId: "6ede9afa66b88fe6d6a9",
         text: "Hello Ted, chat id is 6ede9afa66b88fe6d6a9",
+        parseMode: "markdown",
       });
     },
   );
@@ -54,6 +55,31 @@ describe("runPolling", () => {
     await runPolling(client, controller.signal);
 
     expect(getUpdates).toHaveBeenCalledTimes(2);
+  });
+
+  it("waits one second before retrying a transient poll error", async () => {
+    vi.useFakeTimers();
+    const controller = new AbortController();
+    const getUpdates = vi
+      .fn<ZaloBotClient["getUpdates"]>()
+      .mockRejectedValueOnce(new Error("temporary failure"))
+      .mockImplementationOnce(async () => {
+        controller.abort();
+        return null;
+      });
+    const client: ZaloBotClient = {
+      getUpdates,
+      sendMessage: vi.fn().mockResolvedValue(undefined),
+    };
+
+    const polling = runPolling(client, controller.signal);
+    await vi.advanceTimersByTimeAsync(999);
+    expect(getUpdates).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1);
+    await polling;
+    expect(getUpdates).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
   });
 
   it("exits without polling when the signal is already aborted", async () => {
