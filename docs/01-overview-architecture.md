@@ -50,7 +50,7 @@ Caddy/Nginx và không mở origin web hoặc PostgreSQL ra Internet.
 - Tiến trình Node riêng (`worker.ts`), cùng repo, kết nối cùng Postgres.
 - Xử lý job: gửi email (đặt hàng, đã thanh toán), đối soát, cron **hết hạn đơn chưa thanh toán**.
 - Job `send-zalo-order-created` chỉ mang `orderCode` và khoá người nhận; worker tra đơn khi gửi thông báo Zalo cho nhân viên.
-- **Enqueue job nằm trong cùng transaction** với thao tác ghi đơn hàng → không mất job, không double-processing (xem [04](04-payment-checkout-flow.md)).
+- **Enqueue job nằm trong cùng transaction** với thao tác ghi đơn hàng nên đơn và job commit hoặc rollback cùng nhau. Worker phân phối at-least-once; handler phải chịu được việc xử lý lặp (xem [04](04-payment-checkout-flow.md)).
 
 ### 5. Zalo Bot API
 
@@ -73,4 +73,4 @@ Caddy/Nginx và không mở origin web hoặc PostgreSQL ra Internet.
 
 ## Môi trường & cấu hình
 
-Biến môi trường chính: `DATABASE_URL`, `BETTER_AUTH_SECRET`, `RESEND_API_KEY`, `BOT_TOKEN`, `SEPAY_WEBHOOK_API_KEY`, thông tin tài khoản ngân hàng nhận tiền (số TK, ngân hàng, tên) để sinh VietQR, `APP_URL`.
+Biến môi trường chính: `DATABASE_URL`, `BETTER_AUTH_SECRET`, `RESEND_API_KEY`, `BOT_TOKEN`, `SEPAY_WEBHOOK_SECRET`, thông tin tài khoản ngân hàng nhận tiền (số TK, ngân hàng, tên) để sinh VietQR, `APP_BASE_URL`.

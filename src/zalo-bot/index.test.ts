@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ZaloBotClient, ZaloUpdate } from "@/lib/zalo-bot";
+import {
+  createZaloBotClient,
+  type ZaloBotClient,
+  type ZaloUpdate,
+} from "@/lib/zalo-bot";
 import { respondToGreeting, runPolling } from "./index";
 
 const greetingUpdate: ZaloUpdate = {
@@ -28,7 +32,7 @@ describe("respondToGreeting", () => {
 
   it.each<ZaloUpdate>([
     { ...greetingUpdate, text: "hello there" },
-    { eventName: "message.image.received" },
+    { ...greetingUpdate, eventName: "message.image.received" },
   ])("does not reply to unrelated or non-text updates", async (update) => {
     const sendMessage = vi.fn().mockResolvedValue(undefined);
 
@@ -38,6 +42,44 @@ describe("respondToGreeting", () => {
 });
 
 describe("runPolling", () => {
+  it("aborts an active native fetch and exits promptly without logging", async () => {
+    const controller = new AbortController();
+    let markFetchStarted: (() => void) | undefined;
+    const fetchStarted = new Promise<void>((resolve) => {
+      markFetchStarted = resolve;
+    });
+    let fetchWasAborted = false;
+    const fetchImpl = vi.fn<typeof fetch>((_input, init) => {
+      return new Promise<Response>((_resolve, reject) => {
+        markFetchStarted?.();
+        init?.signal?.addEventListener(
+          "abort",
+          () => {
+            fetchWasAborted = true;
+            reject(new DOMException("The operation was aborted", "AbortError"));
+          },
+          { once: true },
+        );
+      });
+    });
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const polling = runPolling(createZaloBotClient("secret-token", fetchImpl), controller.signal);
+    let pollingExited = false;
+    void polling.then(() => {
+      pollingExited = true;
+    });
+
+    await fetchStarted;
+    controller.abort();
+    await vi.waitFor(() => {
+      expect(fetchWasAborted).toBe(true);
+      expect(pollingExited).toBe(true);
+    });
+
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    consoleErrorSpy.mockRestore();
+  });
+
   it("requests another update after an ignored message", async () => {
     const controller = new AbortController();
     const getUpdates = vi
@@ -79,6 +121,63 @@ describe("runPolling", () => {
     await vi.advanceTimersByTimeAsync(1);
     await polling;
     expect(getUpdates).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+
+  it("reports a mixed failure streak once without exposing error details", async () => {
+    vi.useFakeTimers();
+    const controller = new AbortController();
+    const sensitiveError =
+      "https://bot-api.zaloplatforms.com/botsecret-token provider-body";
+    const getUpdates = vi
+      .fn<ZaloBotClient["getUpdates"]>()
+      .mockRejectedValueOnce(new Error(sensitiveError))
+      .mockResolvedValueOnce(greetingUpdate)
+      .mockImplementationOnce(async () => {
+        controller.abort();
+        return null;
+      });
+    const client: ZaloBotClient = {
+      getUpdates,
+      sendMessage: vi.fn().mockRejectedValue(new Error(sensitiveError)),
+    };
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const polling = runPolling(client, controller.signal);
+    await vi.advanceTimersByTimeAsync(2_000);
+    await polling;
+
+    expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+    expect(consoleErrorSpy).toHaveBeenCalledWith("Zalo Bot polling failed; retrying");
+    expect(consoleErrorSpy.mock.calls.flat().join(" ")).not.toContain(sensitiveError);
+    consoleErrorSpy.mockRestore();
+    vi.useRealTimers();
+  });
+
+  it("reports a new failure after a successful polling iteration", async () => {
+    vi.useFakeTimers();
+    const controller = new AbortController();
+    const getUpdates = vi
+      .fn<ZaloBotClient["getUpdates"]>()
+      .mockRejectedValueOnce(new Error("first failure"))
+      .mockResolvedValueOnce(null)
+      .mockRejectedValueOnce(new Error("second failure"))
+      .mockImplementationOnce(async () => {
+        controller.abort();
+        return null;
+      });
+    const client: ZaloBotClient = {
+      getUpdates,
+      sendMessage: vi.fn().mockResolvedValue(undefined),
+    };
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const polling = runPolling(client, controller.signal);
+    await vi.advanceTimersByTimeAsync(2_000);
+    await polling;
+
+    expect(consoleErrorSpy).toHaveBeenCalledTimes(2);
+    consoleErrorSpy.mockRestore();
     vi.useRealTimers();
   });
 

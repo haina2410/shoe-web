@@ -20,7 +20,7 @@ export type ZaloUpdate = {
 };
 
 export type ZaloBotClient = {
-  getUpdates(): Promise<ZaloUpdate | null>;
+  getUpdates(signal?: AbortSignal): Promise<ZaloUpdate | null>;
   sendMessage(input: {
     chatId: string;
     text: string;
@@ -55,7 +55,11 @@ export function createZaloBotClient(
 ): ZaloBotClient {
   const baseUrl = `https://bot-api.zaloplatforms.com/bot${token}`;
 
-  async function request(path: string, body: Record<string, unknown>): Promise<unknown> {
+  async function request(
+    path: string,
+    body: Record<string, unknown>,
+    signal?: AbortSignal,
+  ): Promise<unknown> {
     let response: Response;
 
     try {
@@ -63,6 +67,7 @@ export function createZaloBotClient(
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        ...(signal === undefined ? {} : { signal }),
       });
     } catch {
       throw new Error("Zalo Bot API request failed");
@@ -92,8 +97,8 @@ export function createZaloBotClient(
   }
 
   return {
-    async getUpdates(): Promise<ZaloUpdate | null> {
-      const result = await request("getUpdates", { timeout: 30 });
+    async getUpdates(signal?: AbortSignal): Promise<ZaloUpdate | null> {
+      const result = await request("getUpdates", { timeout: 30 }, signal);
       if (result === undefined || result === null) return null;
 
       const parsed = updateSchema.safeParse(result);

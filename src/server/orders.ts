@@ -35,12 +35,6 @@ export class OrderBusinessError extends Error {
   }
 }
 
-/**
- * Dependencies tiêm được của `createOrderCore` — hiện chỉ có việc enqueue job
- * gửi email xác nhận đơn. Giá trị mặc định dùng `enqueueOrderConfirmation`
- * thật (`src/jobs/queue.ts`) nên mọi caller hiện có (Server Action, test cũ)
- * không cần đổi gì; test core tiêm fake để cô lập khỏi pg-boss thật.
- */
 export type CreateOrderDeps = {
   enqueueOrderConfirmation: (
     tx: Prisma.TransactionClient,
@@ -86,11 +80,6 @@ async function generateUniqueOrderCode(
  *    thay đổi sau này).
  * 3. Tính `subtotal`/`shippingFee`/`total`, sinh `orderCode` duy nhất, rồi
  *    tạo `Order` kèm `OrderItem` snapshot trong 1 lần `create` lồng nhau.
- * 4. Ngay sau khi `order.create` thành công (vẫn TRONG transaction),
- *    `deps.enqueueOrderConfirmation(tx, { orderCode })` ghi job gửi email xác
- *    nhận — job đi qua CÙNG `tx` nên nếu bước này throw, transaction rollback
- *    theo: không có đơn, không có job mồ côi.
- *
  * CỐ Ý VẪN CHƯA giảm `variant.stock` — việc đó thuộc Ngày 7 (xác nhận thanh
  * toán qua webhook SePay).
  */
@@ -174,8 +163,6 @@ export async function createOrderCore(
       include: { items: true },
     });
 
-    // Ghi job gửi email xác nhận TRONG cùng `tx` — enqueue throw ⇒ transaction
-    // rollback ⇒ không có đơn, không có job (xem docstring hàm ở trên).
     await deps.enqueueOrderConfirmation(tx, { orderCode: order.orderCode });
     await deps.enqueueZaloOrderCreatedNotifications(tx, { orderCode: order.orderCode });
 

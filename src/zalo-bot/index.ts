@@ -14,7 +14,12 @@ export async function respondToGreeting(
   const displayName = update.from?.displayName;
   const chatId = update.chat?.id;
 
-  if ((greeting !== "hi" && greeting !== "hello") || !displayName || !chatId) {
+  if (
+    update.eventName !== "message.text.received" ||
+    (greeting !== "hi" && greeting !== "hello") ||
+    !displayName ||
+    !chatId
+  ) {
     return false;
   }
 
@@ -48,12 +53,20 @@ export async function runPolling(
   client: ZaloBotClient,
   signal?: AbortSignal,
 ): Promise<void> {
+  let failureReported = false;
+
   while (!signal?.aborted) {
     try {
-      const update = await client.getUpdates();
+      const update = await client.getUpdates(signal);
       if (signal?.aborted) return;
       if (update) await respondToGreeting(client, update);
+      failureReported = false;
     } catch {
+      if (signal?.aborted) return;
+      if (!failureReported) {
+        console.error("Zalo Bot polling failed; retrying");
+        failureReported = true;
+      }
       await waitForRetry(signal);
     }
   }
