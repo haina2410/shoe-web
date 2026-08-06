@@ -21,6 +21,7 @@ export async function respondToGreeting(
   await client.sendMessage({
     chatId,
     text: `Hello ${displayName}, chat id is ${chatId}`,
+    parseMode: "markdown",
   });
   return true;
 }
