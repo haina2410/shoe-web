@@ -14,7 +14,8 @@
     "test:smoke": "playwright test --config playwright.smoke.config.ts",
     "deploy:production": "bash scripts/deploy-production.sh",
     "backup:production": "bash scripts/backup-production.sh",
-    "worker": "tsx src/worker/index.ts"
+    "worker": "tsx src/worker/index.ts",
+    "zalo-bot": "tsx src/zalo-bot/index.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
