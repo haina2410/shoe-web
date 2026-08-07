@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState, useTransition, type FormEvent } from "react";
+import { ConfirmActionDialog } from "@/components/admin/confirm-action-dialog";
+import { useAdminToast } from "@/components/admin/admin-toast-provider";
 import { Button } from "@/components/ui/button";
 import { matchReviewedTransactionAction } from "@/server/actions/bank-transactions";
 
@@ -9,19 +11,33 @@ const genericError = "Không thể ghép giao dịch lúc này. Vui lòng thử 
 export function MatchTransactionForm({
   bankTransactionId,
   initialPaymentCode,
+  transactionAmount,
+  transactionContent,
 }: {
   bankTransactionId: string;
   initialPaymentCode: string | null;
+  transactionAmount: string;
+  transactionContent: string;
 }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [orderCode, setOrderCode] = useState<string | null>(null);
+  const [dialogKey, setDialogKey] = useState(0);
   const inFlight = useRef(false);
+  const { show: showToast } = useAdminToast();
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (inFlight.current) return;
+    if (inFlight.current || isPending) return;
 
     const formData = new FormData(event.currentTarget);
+    setOrderCode(String(formData.get("orderCode") ?? ""));
+    setError(null);
+  }
+
+  function handleConfirm() {
+    if (inFlight.current || !orderCode) return;
+
     inFlight.current = true;
     setError(null);
 
@@ -29,16 +45,24 @@ export function MatchTransactionForm({
       try {
         const result = await matchReviewedTransactionAction({
           bankTransactionId,
-          orderCode: String(formData.get("orderCode") ?? ""),
+          orderCode,
         });
 
         if (!result.ok) {
           setError(result.error);
+          return;
         }
+        showToast({
+          title: "Đã ghép giao dịch",
+          description: "Danh sách giao dịch cần đối soát sẽ được làm mới.",
+          tone: "success",
+        });
       } catch {
         setError(genericError);
       } finally {
         inFlight.current = false;
+        setOrderCode(null);
+        setDialogKey((key) => key + 1);
       }
     });
   }
@@ -59,9 +83,28 @@ export function MatchTransactionForm({
         />
       </label>
       <div className="flex">
-        <Button className="w-full sm:w-auto" disabled={isPending} size="sm" type="submit">
-          {isPending ? "Đang ghép…" : "Ghép giao dịch"}
-        </Button>
+        <ConfirmActionDialog
+          key={dialogKey}
+          confirmLabel="Xác nhận ghép"
+          confirmVariant="warning"
+          description={`Giao dịch có số tiền ${transactionAmount} sẽ được ghép với mã đơn đã nhập.`}
+          isPending={isPending}
+          onConfirm={handleConfirm}
+          pendingLabel="Đang ghép…"
+          subject={transactionContent}
+          title="Xác nhận ghép giao dịch"
+          trigger={
+            <Button
+              className="h-10 min-h-10 w-full sm:w-auto"
+              disabled={isPending}
+              size="sm"
+              type="submit"
+              variant="warning"
+            >
+              {isPending ? "Đang ghép…" : "Ghép giao dịch"}
+            </Button>
+          }
+        />
       </div>
       {error && (
         <p role="alert" className="text-sm" style={{ color: "var(--destructive)" }}>
