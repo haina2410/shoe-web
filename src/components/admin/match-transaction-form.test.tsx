@@ -57,6 +57,19 @@ describe("MatchTransactionForm", () => {
     expect(screen.getByLabelText("Mã đơn")).toHaveValue("");
   });
 
+  it("gives the order-code input a 40px minimum touch target", () => {
+    render(
+      <MatchTransactionForm
+        bankTransactionId="cm12345678901234567890123"
+        initialPaymentCode="LEAFABC123"
+        transactionAmount="120.000 ₫"
+        transactionContent="Thanh toan LEAFABC123"
+      />,
+    );
+
+    expect(screen.getByLabelText("Mã đơn")).toHaveClass("h-10", "min-h-10");
+  });
+
   it("requires amber confirmation that names the transaction and amount without submitting after dismissal", async () => {
     const user = userEvent.setup();
     render(

@@ -72,7 +72,7 @@ export function MatchTransactionForm({
       <label className="grid gap-1 text-sm font-medium">
         Mã đơn
         <input
-          className="rounded-md border px-3 py-2 font-normal"
+          className="h-10 min-h-10 rounded-md border px-3 py-2 font-normal"
           defaultValue={initialPaymentCode ?? ""}
           disabled={isPending}
           maxLength={32}
