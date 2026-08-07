@@ -40,6 +40,15 @@ describe("ConfirmPaymentButton", () => {
     expect(confirmPaymentManuallyActionMock).not.toHaveBeenCalled();
   });
 
+  it("gives the payment trigger a 40px touch target", () => {
+    render(<ConfirmPaymentButton orderCode="LEAFCONFIRM" orderId="order-1" />);
+
+    expect(screen.getByRole("button", { name: "Xác nhận thanh toán" })).toHaveClass(
+      "h-10",
+      "min-h-10",
+    );
+  });
+
   it("submits after confirmation, locks the dialog while pending, and announces success", async () => {
     let resolveAction:
       | ((value: { ok: true } | { ok: false; error: string }) => void)

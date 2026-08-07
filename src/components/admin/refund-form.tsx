@@ -134,7 +134,7 @@ export function RefundForm({
           subject={`Đơn hàng ${orderCode}`}
           title="Xác nhận hoàn tiền"
           trigger={
-            <Button className="w-full sm:w-auto" disabled={isPending} size="sm" type="submit" variant="warning">
+            <Button className="h-10 min-h-10 w-full sm:w-auto" disabled={isPending} size="sm" type="submit" variant="warning">
               {isPending ? "Đang ghi nhận…" : "Ghi nhận hoàn tiền"}
             </Button>
           }

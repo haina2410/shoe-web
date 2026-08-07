@@ -118,7 +118,7 @@ export default async function AdminOrdersPage({
 
         <div className="sm:col-span-4">
           <button
-            className="rounded-md px-4 py-2 text-sm font-semibold text-white"
+            className="h-10 min-h-10 rounded-md px-4 py-2 text-sm font-semibold text-white"
             style={{ backgroundColor: "var(--evergreen)" }}
             type="submit"
           >

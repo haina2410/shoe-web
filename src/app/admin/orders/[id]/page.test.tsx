@@ -249,6 +249,11 @@ describe("AdminOrderDetailPage", () => {
     expect(
       screen.queryByRole("form", { name: "Hoàn tiền" }),
     ).not.toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Thao tác đơn hàng" })).toHaveClass(
+      "flex-col",
+      "sm:flex-row",
+      "sm:flex-wrap",
+    );
   });
 
   it("renders fulfillment and refund controls for a paid order", async () => {

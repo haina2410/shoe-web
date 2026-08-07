@@ -62,6 +62,24 @@ describe("OrderStatusActions", () => {
     );
   });
 
+  it("gives status action triggers 40px touch targets", () => {
+    render(
+      <OrderStatusActions
+        orderId="order-1"
+        targets={[OrderStatus.CANCELLED, OrderStatus.FULFILLED]}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Huỷ đơn" })).toHaveClass(
+      "h-10",
+      "min-h-10",
+    );
+    expect(screen.getByRole("button", { name: "Chuyển sang đang giao" })).toHaveClass(
+      "h-10",
+      "min-h-10",
+    );
+  });
+
   it("disables every action and blocks duplicate submissions while pending", async () => {
     let resolveAction:
       | ((value: { ok: true; status: OrderStatus }) => void)

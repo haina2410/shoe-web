@@ -32,6 +32,15 @@ describe("RefundForm", () => {
     });
   });
 
+  it("gives the refund trigger a 40px touch target", () => {
+    render(<RefundForm orderCode="LEAFREFUND" orderId="order-1" />);
+
+    expect(screen.getByRole("button", { name: "Ghi nhận hoàn tiền" })).toHaveClass(
+      "h-10",
+      "min-h-10",
+    );
+  });
+
   it("requires amber confirmation before submitting and leaves the action untouched on cancel or Escape", async () => {
     const user = userEvent.setup();
     render(<RefundForm orderCode="LEAFREFUND" orderId="order-1" />);

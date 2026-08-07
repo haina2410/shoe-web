@@ -9,6 +9,7 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminSection } from "@/components/admin/admin-section";
 import { AdminStatusBadge } from "@/components/admin/admin-status-badge";
 import { ConfirmPaymentButton } from "@/components/admin/confirm-payment-button";
+import { OrderActionGroup } from "@/components/admin/order-action-group";
 import { OrderStatusActions } from "@/components/admin/order-status-actions";
 import { RefundForm } from "@/components/admin/refund-form";
 import { requireAdmin } from "@/lib/auth-guard";
@@ -82,15 +83,21 @@ export default async function AdminOrderDetailPage({
       />
 
       <AdminSection title="Thao tác">
-        <div className="flex flex-wrap items-start gap-3">
-          {order.status === OrderStatus.PENDING_PAYMENT && (
-            <ConfirmPaymentButton orderCode={order.orderCode} orderId={order.id} />
-          )}
-          <OrderStatusActions
-            orderId={order.id}
-            targets={order.nextOrderStatuses}
-          />
-        </div>
+        <OrderActionGroup>
+          <div
+            aria-label="Thao tác đơn hàng"
+            className="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-start"
+            role="group"
+          >
+            {order.status === OrderStatus.PENDING_PAYMENT && (
+              <ConfirmPaymentButton orderCode={order.orderCode} orderId={order.id} />
+            )}
+            <OrderStatusActions
+              orderId={order.id}
+              targets={order.nextOrderStatuses}
+            />
+          </div>
+        </OrderActionGroup>
       </AdminSection>
 
       <div className="grid gap-6 lg:grid-cols-2">

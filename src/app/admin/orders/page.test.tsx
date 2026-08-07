@@ -92,6 +92,10 @@ describe("AdminOrdersPage", () => {
     expect(
       screen.getByRole("form", { name: "Bộ lọc đơn hàng" }),
     ).toHaveAttribute("method", "get");
+    expect(screen.getByRole("button", { name: "Lọc đơn hàng" })).toHaveClass(
+      "h-10",
+      "min-h-10",
+    );
     expect(
       screen.getByRole("region", { name: "Danh sách đơn hàng" }),
     ).toBeInTheDocument();

@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import type { OrderStatus as OrderStatusValue } from "@/generated/prisma/enums";
 import { ConfirmActionDialog } from "@/components/admin/confirm-action-dialog";
 import { useAdminToast } from "@/components/admin/admin-toast-provider";
+import { useOrderActionGroup } from "@/components/admin/order-action-group";
 import { Button } from "@/components/ui/button";
 import { updateOrderStatusAction } from "@/server/actions/order-status";
 
@@ -31,9 +32,12 @@ export function OrderStatusActions({
   const [dialogKey, setDialogKey] = useState(0);
   const inFlight = useRef(false);
   const { show: showToast } = useAdminToast();
+  const actionGroup = useOrderActionGroup();
+  const isDisabled = isPending || Boolean(actionGroup?.isLocked);
 
   function updateStatus(target: OrderStatusValue) {
     if (inFlight.current) return;
+    if (actionGroup && !actionGroup.claim()) return;
     inFlight.current = true;
     setActiveTarget(target);
     setError(null);
@@ -53,6 +57,7 @@ export function OrderStatusActions({
         setError(genericError);
       } finally {
         inFlight.current = false;
+        actionGroup?.release();
         setActiveTarget(null);
         setDialogKey((key) => key + 1);
       }
@@ -60,7 +65,7 @@ export function OrderStatusActions({
   }
 
   return (
-    <div className="grid gap-2">
+    <div className="grid w-full gap-2 sm:w-auto">
       <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         {targets.map((target) => {
           const label = ACTION_LABEL[target];
@@ -71,11 +76,11 @@ export function OrderStatusActions({
           const trigger = (
             <Button
               key={target}
-              disabled={isPending}
+              disabled={isDisabled}
               size="sm"
               type="button"
               variant={isCancellation ? "destructive" : "default"}
-              className="w-full sm:w-auto"
+              className="h-10 min-h-10 w-full sm:w-auto"
             >
               {isPending && activeTarget === target
                 ? target === "CANCELLED"
@@ -92,7 +97,7 @@ export function OrderStatusActions({
                 confirmLabel="Huỷ đơn hàng"
                 confirmVariant="destructive"
                 description="Đơn đang chờ thanh toán sẽ bị hủy và không thể khôi phục."
-                isPending={isPending}
+                isPending={isDisabled}
                 onConfirm={() => updateStatus(target)}
                 pendingLabel="Đang huỷ đơn…"
                 title="Huỷ đơn hàng"
@@ -104,11 +109,11 @@ export function OrderStatusActions({
           return (
             <span key={target}>
               <Button
-                disabled={isPending}
+                disabled={isDisabled}
                 onClick={() => updateStatus(target)}
                 size="sm"
                 type="button"
-                className="w-full sm:w-auto"
+                className="h-10 min-h-10 w-full sm:w-auto"
               >
                 {isPending && activeTarget === target ? "Đang cập nhật…" : label}
               </Button>
