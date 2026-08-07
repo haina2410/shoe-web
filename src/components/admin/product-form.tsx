@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminToast } from "@/components/admin/admin-toast-provider";
+import { AdminSpinner } from "@/components/admin/admin-spinner";
 import { Button } from "@/components/ui/button";
 import { productStatusValues } from "@/lib/validation/product";
 import {
@@ -129,14 +130,15 @@ export function ProductForm({
   );
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const isLocked = isPending || isUploading;
 
   function addVariantRow() {
-    if (isPending) return;
+    if (isLocked) return;
     setVariants((rows) => [...rows, emptyVariantRow()]);
   }
 
   function removeVariantRow(key: string) {
-    if (isPending) return;
+    if (isLocked) return;
     setVariants((rows) => (rows.length <= 1 ? rows : rows.filter((r) => r.key !== key)));
   }
 
@@ -145,13 +147,14 @@ export function ProductForm({
     field: keyof Omit<ProductFormVariant, "key" | "id">,
     value: string,
   ) {
-    if (isPending) return;
+    if (isLocked) return;
     setVariants((rows) =>
       rows.map((r) => (r.key === key ? { ...r, [field]: value } : r)),
     );
   }
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    if (isPending) return;
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
@@ -191,13 +194,13 @@ export function ProductForm({
   }
 
   function removeImage(key: string) {
-    if (isPending) return;
+    if (isLocked) return;
     setImages((imgs) => imgs.filter((i) => i.key !== key));
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (inFlight.current) return;
+    if (inFlight.current || isUploading) return;
     setError(null);
 
     const parsedBasePrice = Number(basePrice);
@@ -273,7 +276,7 @@ export function ProductForm({
             <input
               id="name"
               required
-              disabled={isPending}
+              disabled={isLocked}
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
@@ -288,7 +291,7 @@ export function ProductForm({
             <select
               id="categoryId"
               required
-              disabled={isPending}
+              disabled={isLocked}
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
               className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
@@ -312,7 +315,7 @@ export function ProductForm({
               min={0}
               step={1}
               required
-              disabled={isPending}
+              disabled={isLocked}
               value={basePrice}
               onChange={(e) => setBasePrice(e.target.value)}
               className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
@@ -327,7 +330,7 @@ export function ProductForm({
             <select
               id="status"
               value={status}
-              disabled={isPending}
+              disabled={isLocked}
               onChange={(e) => setStatus(e.target.value as (typeof productStatusValues)[number])}
               className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
               style={{ borderColor: "var(--line)", backgroundColor: "var(--paper)", color: "var(--ink)" }}
@@ -348,7 +351,7 @@ export function ProductForm({
               id="description"
               rows={3}
               value={description}
-              disabled={isPending}
+              disabled={isLocked}
               onChange={(e) => setDescription(e.target.value)}
               className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
               style={{ borderColor: "var(--line)", backgroundColor: "var(--paper)", color: "var(--ink)" }}
@@ -362,7 +365,7 @@ export function ProductForm({
           <h2 className="text-lg font-semibold" style={{ color: "var(--evergreen)" }}>
             Biến thể
           </h2>
-          <Button className="h-10 min-h-10" type="button" variant="outline" size="sm" onClick={addVariantRow} disabled={isPending}>
+          <Button className="h-10 min-h-10" type="button" variant="outline" size="sm" onClick={addVariantRow} disabled={isLocked}>
             Thêm biến thể
           </Button>
         </div>
@@ -397,7 +400,7 @@ export function ProductForm({
                   <td className="px-3 py-3">
                     <input
                       required
-                      disabled={isPending}
+                      disabled={isLocked}
                       aria-label="Size"
                       value={row.size}
                       onChange={(e) => updateVariantField(row.key, "size", e.target.value)}
@@ -408,7 +411,7 @@ export function ProductForm({
                   <td className="px-3 py-3">
                     <input
                       required
-                      disabled={isPending}
+                      disabled={isLocked}
                       aria-label="Màu"
                       value={row.color}
                       onChange={(e) => updateVariantField(row.key, "color", e.target.value)}
@@ -419,7 +422,7 @@ export function ProductForm({
                   <td className="px-3 py-3">
                     <input
                       required
-                      disabled={isPending}
+                      disabled={isLocked}
                       aria-label="SKU"
                       value={row.sku}
                       onChange={(e) => updateVariantField(row.key, "sku", e.target.value)}
@@ -433,7 +436,7 @@ export function ProductForm({
                       min={0}
                       step={1}
                       aria-label="Giá riêng"
-                      disabled={isPending}
+                      disabled={isLocked}
                       value={row.priceOverride}
                       onChange={(e) => updateVariantField(row.key, "priceOverride", e.target.value)}
                       className="w-28 rounded-md border px-2 py-1 text-sm outline-none focus:ring-2"
@@ -447,7 +450,7 @@ export function ProductForm({
                       step={1}
                       required
                       aria-label="Tồn kho"
-                      disabled={isPending}
+                      disabled={isLocked}
                       value={row.stock}
                       onChange={(e) => updateVariantField(row.key, "stock", e.target.value)}
                       className="w-24 rounded-md border px-2 py-1 text-sm outline-none focus:ring-2"
@@ -459,7 +462,7 @@ export function ProductForm({
                       type="button"
                       variant="destructive"
                       size="xs"
-                      disabled={isPending || variants.length <= 1}
+                      disabled={isLocked || variants.length <= 1}
                       onClick={() => removeVariantRow(row.key)}
                     >
                       Xoá dòng
@@ -490,7 +493,7 @@ export function ProductForm({
               <button
                 type="button"
                 onClick={() => removeImage(img.key)}
-                disabled={isPending}
+                disabled={isLocked}
                 className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full text-xs"
                 style={{ backgroundColor: "var(--destructive)", color: "white" }}
                 aria-label="Xoá ảnh"
@@ -510,7 +513,7 @@ export function ProductForm({
               accept="image/jpeg,image/png,image/webp"
               className="hidden"
               onChange={handleFileChange}
-              disabled={isPending || isUploading}
+              disabled={isLocked}
             />
           </label>
         </div>
@@ -528,14 +531,14 @@ export function ProductForm({
       )}
 
       <div className="flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center">
-        <Button className="h-10 min-h-10 w-full sm:w-auto" type="submit" disabled={isPending}>
-          {isPending ? "Đang lưu…" : mode === "create" ? "Tạo sản phẩm" : "Lưu thay đổi"}
+        <Button className="h-10 min-h-10 w-full sm:w-auto" type="submit" disabled={isLocked}>
+          {isPending ? <><AdminSpinner label="Đang lưu…" /><span aria-hidden="true">Đang lưu…</span></> : mode === "create" ? "Tạo sản phẩm" : "Lưu thay đổi"}
         </Button>
         <Button
           className="w-full sm:w-auto"
           type="button"
           variant="outline"
-          disabled={isPending}
+          disabled={isLocked}
           onClick={() => router.push("/admin/products")}
         >
           Huỷ

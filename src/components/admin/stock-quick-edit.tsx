@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminToast } from "@/components/admin/admin-toast-provider";
+import { AdminSpinner } from "@/components/admin/admin-spinner";
 import { updateVariantStockAction } from "@/server/actions/products";
 import { Button } from "@/components/ui/button";
 
@@ -76,7 +77,7 @@ export function StockQuickEdit({
         }}
       />
       <Button className="h-10 min-h-10" type="button" size="xs" onClick={handleSave} disabled={isPending}>
-        {isPending ? "Đang lưu…" : "Lưu"}
+        {isPending ? <><AdminSpinner label="Đang lưu…" /><span aria-hidden="true">Đang lưu…</span></> : "Lưu"}
       </Button>
       {saved && !error && (
         <span className="text-xs" style={{ color: "var(--evergreen)" }}>

@@ -183,6 +183,21 @@ describe("product actions — authz (role staff bị chặn)", () => {
     expect(redirectMock).not.toHaveBeenCalled();
   });
 
+  it("deleteProductAction: lỗi xoá sản phẩm bị tham chiếu trả thông báo an toàn", async () => {
+    requireAdminMock.mockResolvedValue(sessionWithRole("owner"));
+    deleteProductCoreMock.mockRejectedValue(
+      new Error("P2003 foreign key constraint failed: order item id=secret"),
+    );
+
+    await expect(deleteProductAction("prod-1")).resolves.toEqual({
+      ok: false,
+      error: "Không thể xoá sản phẩm đang có dữ liệu liên quan.",
+    });
+
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
   it("updateVariantStockAction: owner trả thành công sau khi giữ CAS và revalidate để client thông báo rồi làm mới", async () => {
     requireAdminMock.mockResolvedValue(sessionWithRole("owner"));
 

@@ -78,10 +78,10 @@ describe("DeleteProductButton", () => {
     await waitFor(() => expect(refreshMock).toHaveBeenCalledTimes(1));
   });
 
-  it("keeps safe deletion failures inline", async () => {
+  it("keeps the action's restricted-deletion result inline", async () => {
     deleteProductActionMock.mockResolvedValue({
       ok: false,
-      error: "Sản phẩm không hợp lệ.",
+      error: "Không thể xoá sản phẩm đang có dữ liệu liên quan.",
     });
     const user = userEvent.setup();
     render(<DeleteProductButton productId="product-1" productName="Giày chạy bộ" />);
@@ -90,8 +90,25 @@ describe("DeleteProductButton", () => {
     await user.click(screen.getByRole("button", { name: "Xác nhận xoá" }));
 
     expect(await screen.findByRole("alertdialog")).toHaveTextContent(
-      "Sản phẩm không hợp lệ.",
+      "Không thể xoá sản phẩm đang có dữ liệu liên quan.",
     );
+    expect(refreshMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps unexpected action rejections safe", async () => {
+    deleteProductActionMock.mockRejectedValue(
+      new Error("Prisma P2003 order item id=secret"),
+    );
+    const user = userEvent.setup();
+    render(<DeleteProductButton productId="product-1" productName="Giày chạy bộ" />);
+
+    await user.click(screen.getByRole("button", { name: "Xoá" }));
+    await user.click(screen.getByRole("button", { name: "Xác nhận xoá" }));
+
+    expect(await screen.findByRole("alertdialog")).toHaveTextContent(
+      "Không thể xoá sản phẩm lúc này. Vui lòng thử lại.",
+    );
+    expect(screen.queryByText(/P2003|secret/)).not.toBeInTheDocument();
     expect(refreshMock).not.toHaveBeenCalled();
   });
 

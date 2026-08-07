@@ -1,4 +1,4 @@
-import { beforeEach, describe, it, expect, vi } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -75,6 +75,10 @@ describe("ProductForm — biến thể inline", () => {
       ok: false,
       error: "test stop",
     });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("bắt đầu với đúng 1 dòng biến thể", () => {
@@ -172,9 +176,66 @@ describe("ProductForm — biến thể inline", () => {
     expect(screen.getByRole("button", { name: "Thêm biến thể" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Huỷ" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Đang lưu…" })).toBeDisabled();
+    expect(screen.getByRole("status", { name: "Đang lưu…" })).toBeInTheDocument();
 
     resolveAction?.({ ok: true });
     await screen.findByRole("button", { name: "Tạo sản phẩm" });
+  });
+
+  it("blocks product mutation and navigation until image upload completes", async () => {
+    let resolveUpload:
+      | ((response: { ok: boolean; json: () => Promise<{ url: string }> }) => void)
+      | undefined;
+    const fetchMock = vi.fn(
+      () =>
+        new Promise<{ ok: boolean; json: () => Promise<{ url: string }> }>((resolve) => {
+          resolveUpload = resolve;
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(
+      <ProductForm
+        mode="create"
+        categories={categories}
+        initial={{
+          ...editInitial,
+          images: [{ url: "/uploads/existing.webp", position: 0 }],
+        }}
+      />,
+    );
+
+    await user.upload(
+      screen.getByLabelText("+ Thêm ảnh"),
+      new File(["image"], "shoe.webp", { type: "image/webp" }),
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    expect(screen.getByRole("button", { name: "Tạo sản phẩm" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Huỷ" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Thêm biến thể" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Xoá ảnh" })).toBeDisabled();
+    fireEvent.submit(screen.getByRole("form", { name: "Thông tin sản phẩm" }));
+    expect(createProductActionMock).not.toHaveBeenCalled();
+    expect(pushMock).not.toHaveBeenCalled();
+
+    resolveUpload?.({
+      ok: true,
+      json: async () => ({ url: "/uploads/shoe.webp" }),
+    });
+    await screen.findByRole("button", { name: "Tạo sản phẩm" });
+    await user.click(screen.getByRole("button", { name: "Tạo sản phẩm" }));
+
+    await waitFor(() => {
+      expect(createProductActionMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          images: [
+            { url: "/uploads/existing.webp", position: 0 },
+            { url: "/uploads/shoe.webp", position: 1 },
+          ],
+        }),
+      );
+    });
   });
 
   it("retains entered values and shows a safe error when the save fails", async () => {

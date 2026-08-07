@@ -7,6 +7,8 @@ import { deleteProductAction } from "@/server/actions/products";
 import { ConfirmActionDialog } from "@/components/admin/confirm-action-dialog";
 import { Button } from "@/components/ui/button";
 
+const genericDeleteError = "Không thể xoá sản phẩm lúc này. Vui lòng thử lại.";
+
 export function DeleteProductButton({
   productId,
   productName,
@@ -37,6 +39,8 @@ export function DeleteProductButton({
           tone: "success",
         });
         router.refresh();
+      } catch {
+        setError(genericDeleteError);
       } finally {
         inFlight.current = false;
       }

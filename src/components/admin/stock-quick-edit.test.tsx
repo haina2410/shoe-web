@@ -68,6 +68,7 @@ describe("StockQuickEdit", () => {
     expect(updateVariantStockActionMock).toHaveBeenCalledTimes(1);
     expect(screen.getByLabelText("Tồn kho")).toBeDisabled();
     expect(screen.getByRole("button", { name: "Đang lưu…" })).toBeDisabled();
+    expect(screen.getByRole("status", { name: "Đang lưu…" })).toBeInTheDocument();
 
     resolveAction?.({ ok: true });
     await screen.findByRole("button", { name: "Lưu" });
