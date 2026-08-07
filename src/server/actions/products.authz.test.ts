@@ -29,6 +29,8 @@ const {
       super(
         code === "STALE_STOCK"
           ? "Tồn kho đã thay đổi. Hãy tải lại trang và thử lại."
+          : code === "PRODUCT_IN_USE"
+            ? "Không thể xoá sản phẩm đang có dữ liệu liên quan."
           : "Không thể xoá phân loại đã phát sinh đơn hàng. Hãy đặt tồn kho về 0.",
       );
       this.name = "ProductBusinessError";
@@ -186,13 +188,25 @@ describe("product actions — authz (role staff bị chặn)", () => {
   it("deleteProductAction: lỗi xoá sản phẩm bị tham chiếu trả thông báo an toàn", async () => {
     requireAdminMock.mockResolvedValue(sessionWithRole("owner"));
     deleteProductCoreMock.mockRejectedValue(
-      new Error("P2003 foreign key constraint failed: order item id=secret"),
+      new ProductBusinessError("PRODUCT_IN_USE"),
     );
 
     await expect(deleteProductAction("prod-1")).resolves.toEqual({
       ok: false,
       error: "Không thể xoá sản phẩm đang có dữ liệu liên quan.",
     });
+
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it("deleteProductAction: lỗi không phải ProductBusinessError được ném lại", async () => {
+    requireAdminMock.mockResolvedValue(sessionWithRole("owner"));
+    deleteProductCoreMock.mockRejectedValue(new Error("database unavailable"));
+
+    await expect(deleteProductAction("prod-1")).rejects.toThrow(
+      "database unavailable",
+    );
 
     expect(revalidatePathMock).not.toHaveBeenCalled();
     expect(redirectMock).not.toHaveBeenCalled();

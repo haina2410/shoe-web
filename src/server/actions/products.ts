@@ -27,7 +27,6 @@ export type ProductActionResult =
   | { ok: false; error: string };
 
 const productIdSchema = z.string().min(1);
-const deleteProductError = "Không thể xoá sản phẩm đang có dữ liệu liên quan.";
 
 export async function createProductAction(
   input: CreateProductInput,
@@ -94,8 +93,11 @@ export async function deleteProductAction(
 
   try {
     await deleteProductCore(prisma, parsed.data);
-  } catch {
-    return { ok: false, error: deleteProductError };
+  } catch (error: unknown) {
+    if (error instanceof ProductBusinessError) {
+      return { ok: false, error: error.message };
+    }
+    throw error;
   }
 
   revalidatePath("/admin/products");

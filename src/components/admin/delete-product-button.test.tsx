@@ -97,7 +97,7 @@ describe("DeleteProductButton", () => {
 
   it("keeps unexpected action rejections safe", async () => {
     deleteProductActionMock.mockRejectedValue(
-      new Error("Prisma P2003 order item id=secret"),
+      new Error("database connection reset"),
     );
     const user = userEvent.setup();
     render(<DeleteProductButton productId="product-1" productName="Giày chạy bộ" />);
@@ -108,7 +108,7 @@ describe("DeleteProductButton", () => {
     expect(await screen.findByRole("alertdialog")).toHaveTextContent(
       "Không thể xoá sản phẩm lúc này. Vui lòng thử lại.",
     );
-    expect(screen.queryByText(/P2003|secret/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/connection reset/)).not.toBeInTheDocument();
     expect(refreshMock).not.toHaveBeenCalled();
   });
 
