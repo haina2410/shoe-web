@@ -3,6 +3,8 @@ import { requireAdmin } from "@/lib/auth-guard";
 import { prisma } from "@/lib/prisma";
 import { formatVnd } from "@/lib/money";
 import { Button } from "@/components/ui/button";
+import { AdminSection } from "@/components/admin/admin-section";
+import { AdminStatusBadge } from "@/components/admin/admin-status-badge";
 import { DeleteProductButton } from "@/components/admin/delete-product-button";
 
 /**
@@ -27,6 +29,12 @@ const statusLabel: Record<string, string> = {
   ARCHIVED: "Đã ẩn",
 };
 
+const statusTone = {
+  DRAFT: "neutral",
+  ACTIVE: "success",
+  ARCHIVED: "warning",
+} as const;
+
 export default async function AdminProductsPage({
   searchParams,
 }: {
@@ -48,63 +56,64 @@ export default async function AdminProductsPage({
   });
 
   return (
-    <div>
+    <div className="space-y-6">
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: "var(--evergreen)" }}>
+          <h1 className="text-3xl font-bold tracking-tight" style={{ color: "var(--evergreen)" }}>
             Sản phẩm
           </h1>
           <p className="mt-1 text-sm text-neutral-600">
             Quản lý danh sách sản phẩm, tồn kho và trạng thái bán hàng.
           </p>
         </div>
-        <Button render={<Link href="/admin/products/new" />}>Thêm sản phẩm</Button>
+        <Button className="h-10 min-h-10" render={<Link href="/admin/products/new" />}>Thêm sản phẩm</Button>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
-        <span className="text-neutral-600">Sắp xếp:</span>
-        <Link
-          href="/admin/products?sort=createdAt"
-          className="underline-offset-2 hover:underline"
-          style={{
-            color: sort === "createdAt" ? "var(--evergreen)" : "var(--muted-foreground)",
-            fontWeight: sort === "createdAt" ? 600 : 400,
-          }}
-        >
-          Mới nhất
-        </Link>
-        <Link
-          href="/admin/products?sort=name"
-          className="underline-offset-2 hover:underline"
-          style={{
-            color: sort === "name" ? "var(--evergreen)" : "var(--muted-foreground)",
-            fontWeight: sort === "name" ? 600 : 400,
-          }}
-        >
-          Tên (A-Z)
-        </Link>
-      </div>
-
-      {products.length === 0 ? (
-        <div
-          className="mt-8 rounded-lg border border-dashed p-10 text-center"
-          style={{ borderColor: "var(--line)" }}
-        >
-          <p className="text-neutral-600">
-            Chưa có sản phẩm nào. Bấm &quot;Thêm sản phẩm&quot; để tạo sản phẩm đầu tiên.
-          </p>
+      <AdminSection>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+          <span className="font-medium text-neutral-700">Sắp xếp:</span>
+          <Link
+            href="/admin/products?sort=createdAt"
+            className="rounded-md px-2 py-1 underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2"
+            style={{
+              color: sort === "createdAt" ? "var(--evergreen)" : "var(--muted-foreground)",
+              fontWeight: sort === "createdAt" ? 600 : 400,
+            }}
+          >
+            Mới nhất
+          </Link>
+          <Link
+            href="/admin/products?sort=name"
+            className="rounded-md px-2 py-1 underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2"
+            style={{
+              color: sort === "name" ? "var(--evergreen)" : "var(--muted-foreground)",
+              fontWeight: sort === "name" ? 600 : 400,
+            }}
+          >
+            Tên (A-Z)
+          </Link>
         </div>
-      ) : (
-        <div
-          aria-label="Danh sách sản phẩm"
-          className="mt-6 overflow-x-auto rounded-lg border"
-          role="region"
-          style={{ borderColor: "var(--line)" }}
-        >
-          <table className="w-full min-w-max text-left text-sm">
+
+        {products.length === 0 ? (
+          <div
+            className="mt-6 rounded-lg border border-dashed p-10 text-center"
+            style={{ borderColor: "var(--line)" }}
+          >
+            <p className="text-neutral-600">
+              Chưa có sản phẩm nào. Bấm &quot;Thêm sản phẩm&quot; để tạo sản phẩm đầu tiên.
+            </p>
+          </div>
+        ) : (
+          <div
+            aria-label="Danh sách sản phẩm"
+            className="mt-6 overflow-x-auto rounded-lg border bg-white"
+            role="region"
+            style={{ borderColor: "var(--line)" }}
+          >
+            <table className="w-full min-w-max text-left text-sm">
             <thead>
-              <tr className="border-b" style={{ borderColor: "var(--line)" }}>
-                <th className="px-4 py-3 font-medium">
+              <tr className="border-b bg-neutral-50 text-xs font-semibold tracking-wide text-neutral-700 uppercase" style={{ borderColor: "var(--line)" }}>
+                <th className="px-4 py-3.5">
                   <Link
                     href={`/admin/products?sort=name`}
                     className="hover:underline"
@@ -113,12 +122,12 @@ export default async function AdminProductsPage({
                     Tên
                   </Link>
                 </th>
-                <th className="px-4 py-3 font-medium">Danh mục</th>
-                <th className="px-4 py-3 font-medium">Giá</th>
-                <th className="px-4 py-3 font-medium">Trạng thái</th>
-                <th className="px-4 py-3 font-medium">Tổng tồn</th>
-                <th className="px-4 py-3 font-medium">Số biến thể</th>
-                <th className="px-4 py-3 font-medium">
+                <th className="px-4 py-3.5">Danh mục</th>
+                <th className="px-4 py-3.5">Giá</th>
+                <th className="px-4 py-3.5">Trạng thái</th>
+                <th className="px-4 py-3.5">Tổng tồn</th>
+                <th className="px-4 py-3.5">Số biến thể</th>
+                <th className="px-4 py-3.5">
                   <span className="sr-only">Hành động</span>
                 </th>
               </tr>
@@ -127,8 +136,8 @@ export default async function AdminProductsPage({
               {products.map((product) => {
                 const totalStock = product.variants.reduce((sum, v) => sum + v.stock, 0);
                 return (
-                  <tr key={product.id} className="border-b last:border-0" style={{ borderColor: "var(--line)" }}>
-                    <td className="px-4 py-3">
+                  <tr key={product.id} className="border-b transition-colors hover:bg-neutral-50 focus-within:bg-neutral-50 last:border-0" style={{ borderColor: "var(--line)" }}>
+                    <td className="px-4 py-4">
                       <div className="flex items-center gap-3">
                         {product.images[0] ? (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -147,23 +156,21 @@ export default async function AdminProductsPage({
                         <span className="font-medium">{product.name}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-neutral-600">{product.category.name}</td>
-                    <td className="px-4 py-3">{formatVnd(product.basePrice)}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className="rounded-full px-2 py-0.5 text-xs font-medium"
-                        style={{
-                          backgroundColor: "var(--sage)",
-                          color: "var(--evergreen)",
-                        }}
-                      >
+                    <td className="px-4 py-4 text-neutral-600">{product.category.name}</td>
+                    <td className="px-4 py-4 font-semibold tabular-nums">{formatVnd(product.basePrice)}</td>
+                    <td className="px-4 py-4">
+                      <AdminStatusBadge tone={statusTone[product.status]}>
                         {statusLabel[product.status] ?? product.status}
-                      </span>
+                      </AdminStatusBadge>
                     </td>
-                    <td className="px-4 py-3">{totalStock}</td>
-                    <td className="px-4 py-3">{product.variants.length}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-2">
+                    <td className="px-4 py-4">
+                      <AdminStatusBadge tone={totalStock > 0 ? "success" : "warning"}>
+                        {totalStock} đôi
+                      </AdminStatusBadge>
+                    </td>
+                    <td className="px-4 py-4 font-medium tabular-nums">{product.variants.length}</td>
+                    <td className="px-4 py-4">
+                      <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
                         <Button
                           variant="outline"
                           size="sm"
@@ -179,8 +186,9 @@ export default async function AdminProductsPage({
               })}
             </tbody>
           </table>
-        </div>
-      )}
+          </div>
+        )}
+      </AdminSection>
     </div>
   );
 }

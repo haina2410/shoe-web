@@ -1,5 +1,5 @@
 import { beforeEach, describe, it, expect, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // `product-form.tsx` import `createProductAction`/`updateProductAction` từ
@@ -7,9 +7,16 @@ import userEvent from "@testing-library/user-event";
 // `next/headers`, `@/lib/auth` (Better Auth)… vốn không chạy được trong môi
 // trường jsdom của test này. Test ở đây CHỈ quan tâm hành vi state-client
 // (thêm/xoá dòng biến thể) nên mock action, không gọi Server Action thật.
-const { createProductActionMock, updateProductActionMock } = vi.hoisted(() => ({
+const {
+  createProductActionMock,
+  updateProductActionMock,
+  pushMock,
+  showToastMock,
+} = vi.hoisted(() => ({
   createProductActionMock: vi.fn(),
   updateProductActionMock: vi.fn(),
+  pushMock: vi.fn(),
+  showToastMock: vi.fn(),
 }));
 
 vi.mock("@/server/actions/products", () => ({
@@ -18,7 +25,11 @@ vi.mock("@/server/actions/products", () => ({
 }));
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: pushMock }),
+}));
+
+vi.mock("@/components/admin/admin-toast-provider", () => ({
+  useAdminToast: () => ({ show: showToastMock }),
 }));
 
 import { ProductForm } from "@/components/admin/product-form";
@@ -44,6 +55,14 @@ const editInitial = {
   ],
   images: [],
 };
+
+async function fillRequiredProductFields(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(screen.getByLabelText("Tên sản phẩm"), "Giày mới");
+  await user.type(screen.getByLabelText("Giá (VND)"), "250000");
+  await user.type(screen.getByLabelText("Size"), "42");
+  await user.type(screen.getByLabelText("Màu"), "Đen");
+  await user.type(screen.getByLabelText("SKU"), "SKU-002");
+}
 
 describe("ProductForm — biến thể inline", () => {
   beforeEach(() => {
@@ -127,6 +146,67 @@ describe("ProductForm — biến thể inline", () => {
           ],
         }),
       );
+    });
+  });
+
+  it("locks submitted fields and competing controls while a save is pending", async () => {
+    let resolveAction: ((value: { ok: true }) => void) | undefined;
+    createProductActionMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveAction = resolve;
+        }),
+    );
+    render(<ProductForm mode="create" categories={categories} />);
+
+    fireEvent.submit(screen.getByRole("form", { name: "Thông tin sản phẩm" }));
+    fireEvent.submit(screen.getByRole("form", { name: "Thông tin sản phẩm" }));
+
+    expect(createProductActionMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText("Tên sản phẩm")).toBeDisabled();
+    expect(screen.getByLabelText("Danh mục")).toBeDisabled();
+    expect(screen.getByLabelText("Giá (VND)")).toBeDisabled();
+    expect(screen.getByLabelText("Trạng thái")).toBeDisabled();
+    expect(screen.getByLabelText("Mô tả")).toBeDisabled();
+    expect(screen.getByLabelText("Size")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Thêm biến thể" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Huỷ" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Đang lưu…" })).toBeDisabled();
+
+    resolveAction?.({ ok: true });
+    await screen.findByRole("button", { name: "Tạo sản phẩm" });
+  });
+
+  it("retains entered values and shows a safe error when the save fails", async () => {
+    createProductActionMock.mockResolvedValue({
+      ok: false,
+      error: "SKU đã tồn tại.",
+    });
+    const user = userEvent.setup();
+    render(<ProductForm mode="create" categories={categories} />);
+
+    await fillRequiredProductFields(user);
+    await user.click(screen.getByRole("button", { name: "Tạo sản phẩm" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("SKU đã tồn tại.");
+    expect(screen.getByLabelText("Tên sản phẩm")).toHaveValue("Giày mới");
+  });
+
+  it("announces success before navigating to the product list", async () => {
+    createProductActionMock.mockResolvedValue({ ok: true });
+    const user = userEvent.setup();
+    render(<ProductForm mode="create" categories={categories} />);
+
+    await fillRequiredProductFields(user);
+    await user.click(screen.getByRole("button", { name: "Tạo sản phẩm" }));
+
+    await waitFor(() => {
+      expect(showToastMock).toHaveBeenCalledWith({
+        title: "Đã tạo sản phẩm",
+        description: "Sản phẩm đã được lưu.",
+        tone: "success",
+      });
+      expect(pushMock).toHaveBeenCalledWith("/admin/products");
     });
   });
 });

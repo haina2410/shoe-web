@@ -141,18 +141,62 @@ describe("product actions — authz (role staff bị chặn)", () => {
     expect(updateVariantStockCoreMock).not.toHaveBeenCalled();
   });
 
-  it("createProductAction: owner qua được authz — gọi createProductCore rồi revalidatePath + redirect thành công", async () => {
+  it("createProductAction: owner trả thành công sau khi ghi và revalidate để client thông báo rồi điều hướng", async () => {
     requireAdminMock.mockResolvedValue(sessionWithRole("owner"));
     createProductCoreMock.mockResolvedValue({ id: "new-1" });
 
-    await expect(createProductAction(validCreateInput)).rejects.toThrow(
-      "REDIRECT:/admin/products",
-    );
+    await expect(createProductAction(validCreateInput)).resolves.toEqual({ ok: true });
 
     expect(createProductCoreMock).toHaveBeenCalledTimes(1);
     expect(createProductCoreMock).toHaveBeenCalledWith({}, validCreateInput);
     expect(revalidatePathMock).toHaveBeenCalledWith("/admin/products");
-    expect(redirectMock).toHaveBeenCalledWith("/admin/products");
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it("updateProductAction: owner trả thành công sau khi ghi và revalidate để client thông báo rồi điều hướng", async () => {
+    requireAdminMock.mockResolvedValue(sessionWithRole("owner"));
+
+    await expect(
+      updateProductAction("prod-1", {
+        product: validCreateInput.product,
+        variants: validCreateInput.variants,
+        images: validCreateInput.images,
+      }),
+    ).resolves.toEqual({ ok: true });
+
+    expect(updateProductCoreMock).toHaveBeenCalledWith(
+      {},
+      "prod-1",
+      validCreateInput,
+    );
+    expect(revalidatePathMock).toHaveBeenCalledWith("/admin/products");
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it("deleteProductAction: owner trả thành công sau khi ghi và revalidate để client thông báo rồi làm mới", async () => {
+    requireAdminMock.mockResolvedValue(sessionWithRole("owner"));
+
+    await expect(deleteProductAction("prod-1")).resolves.toEqual({ ok: true });
+
+    expect(deleteProductCoreMock).toHaveBeenCalledWith({}, "prod-1");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/admin/products");
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it("updateVariantStockAction: owner trả thành công sau khi giữ CAS và revalidate để client thông báo rồi làm mới", async () => {
+    requireAdminMock.mockResolvedValue(sessionWithRole("owner"));
+
+    await expect(
+      updateVariantStockAction({
+        variantId: "v1",
+        stock: 8,
+        expectedStock: 10,
+      }),
+    ).resolves.toEqual({ ok: true });
+
+    expect(updateVariantStockCoreMock).toHaveBeenCalledWith({}, "v1", 8, 10);
+    expect(revalidatePathMock).toHaveBeenCalledWith("/admin/products");
+    expect(redirectMock).not.toHaveBeenCalled();
   });
 
   it("createProductAction: input không hợp lệ (zod) → trả {ok:false} và KHÔNG ghi DB, KHÔNG redirect", async () => {

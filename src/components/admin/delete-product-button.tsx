@@ -1,21 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { useAdminToast } from "@/components/admin/admin-toast-provider";
 import { deleteProductAction } from "@/server/actions/products";
+import { ConfirmActionDialog } from "@/components/admin/confirm-action-dialog";
 import { Button } from "@/components/ui/button";
 
-/**
- * Nút xoá sản phẩm trong danh sách admin.
- *
- * `deleteProductAction` là Server Action: khi thành công nó gọi `redirect()`
- * (ném lỗi control-flow `NEXT_REDIRECT`) — theo
- * `node_modules/next/dist/docs/01-app/02-guides/server-actions.md`, gọi Server
- * Action từ event handler PHẢI bọc trong `startTransition` để framework xử lý
- * đúng chuyển hướng/re-render; chỉ trả `{ ok: false, error }` khi input không hợp lệ.
- *
- * Xác nhận bằng `confirm()` gốc của trình duyệt trước khi gọi action, tránh
- * xoá nhầm do click lỡ tay.
- */
 export function DeleteProductButton({
   productId,
   productName,
@@ -23,42 +14,56 @@ export function DeleteProductButton({
   productId: string;
   productName: string;
 }) {
+  const router = useRouter();
+  const { show } = useAdminToast();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const inFlight = useRef(false);
 
-  function handleClick() {
-    const confirmed = window.confirm(
-      `Xoá sản phẩm "${productName}"? Hành động này không thể hoàn tác.`,
-    );
-    if (!confirmed) return;
-
+  function handleConfirm() {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setError(null);
     startTransition(async () => {
-      const result = await deleteProductAction(productId);
-      // Thành công → action đã redirect() (ném NEXT_REDIRECT), dòng dưới
-      // không chạy tới. Chỉ còn lại khi có lỗi validate.
-      if (result && !result.ok) {
-        setError(result.error);
+      try {
+        const result = await deleteProductAction(productId);
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+        show({
+          title: "Đã xoá sản phẩm",
+          description: "Sản phẩm đã được xoá khỏi danh mục.",
+          tone: "success",
+        });
+        router.refresh();
+      } finally {
+        inFlight.current = false;
       }
     });
   }
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <Button
-        type="button"
-        variant="destructive"
-        size="sm"
-        onClick={handleClick}
-        disabled={isPending}
-      >
-        {isPending ? "Đang xoá…" : "Xoá"}
-      </Button>
-      {error && (
-        <span className="text-xs" style={{ color: "var(--destructive)" }}>
-          {error}
-        </span>
-      )}
+      <ConfirmActionDialog
+        trigger={
+          <Button className="h-10 min-h-10" type="button" variant="destructive" size="sm" disabled={isPending}>
+            Xoá
+          </Button>
+        }
+        title="Xoá sản phẩm"
+        subject={productName}
+        description={
+          error
+            ? `Sản phẩm sẽ bị xoá khỏi danh mục và không thể hoàn tác. ${error}`
+            : "Sản phẩm sẽ bị xoá khỏi danh mục và không thể hoàn tác."
+        }
+        confirmLabel="Xác nhận xoá"
+        pendingLabel="Đang xoá…"
+        confirmVariant="destructive"
+        isPending={isPending}
+        onConfirm={handleConfirm}
+      />
     </div>
   );
 }

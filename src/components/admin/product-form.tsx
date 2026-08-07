@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition, type ChangeEvent } from "react";
+import { useRef, useState, useTransition, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
+import { useAdminToast } from "@/components/admin/admin-toast-provider";
 import { Button } from "@/components/ui/button";
 import { productStatusValues } from "@/lib/validation/product";
 import {
@@ -13,30 +14,15 @@ import type {
   UpdateProductInput,
 } from "@/lib/validation/product";
 
-/**
- * `ProductForm` — form dùng chung tạo mới / sửa sản phẩm.
- *
- * Biến thể được sửa INLINE (thêm/xoá dòng ngay trong form, state client, tối
- * thiểu 1 dòng — không cho xoá dòng cuối). Ảnh upload thật qua
- * `POST /api/admin/upload` (route handler, không phải Server Action, vì
- * Server Action giới hạn body ~1MB — không đủ cho file ảnh).
- *
- * Theo `node_modules/next/dist/docs/01-app/02-guides/server-actions.md`: gọi
- * một Server Action mà thành công sẽ `redirect()` (ném lỗi control-flow
- * NEXT_REDIRECT) từ trong event handler PHẢI bọc trong `startTransition` để
- * React/Next xử lý đúng — theo đúng idiom đã dùng ở `DeleteProductButton` /
- * `StockQuickEdit`.
- */
-
 export type ProductFormCategory = { id: string; name: string };
 
 export type ProductFormVariant = {
-  key: string; // key nội bộ cho React list — KHÔNG gửi lên server
-  id?: string; // có id → biến thể đã tồn tại (edit); không có → biến thể mới
+  key: string;
+  id?: string;
   size: string;
   color: string;
   sku: string;
-  priceOverride: string; // giữ dạng chuỗi để input điều khiển được, parse lúc submit
+  priceOverride: string;
   stock: string;
   expectedStock?: number;
 };
@@ -100,7 +86,9 @@ export function ProductForm({
   initial?: ProductFormInitial;
 }) {
   const router = useRouter();
+  const { show } = useAdminToast();
   const [isPending, startTransition] = useTransition();
+  const inFlight = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
   const [name, setName] = useState(initial?.product.name ?? "");
@@ -143,10 +131,12 @@ export function ProductForm({
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   function addVariantRow() {
+    if (isPending) return;
     setVariants((rows) => [...rows, emptyVariantRow()]);
   }
 
   function removeVariantRow(key: string) {
+    if (isPending) return;
     setVariants((rows) => (rows.length <= 1 ? rows : rows.filter((r) => r.key !== key)));
   }
 
@@ -155,6 +145,7 @@ export function ProductForm({
     field: keyof Omit<ProductFormVariant, "key" | "id">,
     value: string,
   ) {
+    if (isPending) return;
     setVariants((rows) =>
       rows.map((r) => (r.key === key ? { ...r, [field]: value } : r)),
     );
@@ -162,7 +153,7 @@ export function ProductForm({
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-    event.target.value = ""; // cho phép chọn lại cùng 1 file lần nữa
+    event.target.value = "";
     if (!file) return;
 
     setUploadError(null);
@@ -200,11 +191,13 @@ export function ProductForm({
   }
 
   function removeImage(key: string) {
+    if (isPending) return;
     setImages((imgs) => imgs.filter((i) => i.key !== key));
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (inFlight.current) return;
     setError(null);
 
     const parsedBasePrice = Number(basePrice);
@@ -232,30 +225,41 @@ export function ProductForm({
       position: index,
     }));
 
+    inFlight.current = true;
     startTransition(async () => {
-      const result =
-        mode === "create"
-          ? await createProductAction({
-              product,
-              variants: variantsPayload,
-              images: imagesPayload,
-            } satisfies CreateProductInput)
-          : await updateProductAction(productId as string, {
-              product,
-              variants: variantsPayload,
-              images: imagesPayload,
-            } satisfies UpdateProductInput);
+      try {
+        const result =
+          mode === "create"
+            ? await createProductAction({
+                product,
+                variants: variantsPayload,
+                images: imagesPayload,
+              } satisfies CreateProductInput)
+            : await updateProductAction(productId as string, {
+                product,
+                variants: variantsPayload,
+                images: imagesPayload,
+              } satisfies UpdateProductInput);
 
-      // Thành công → action đã redirect() (ném NEXT_REDIRECT), dòng dưới
-      // không chạy tới. Chỉ còn lại khi có lỗi validate.
-      if (result && !result.ok) {
-        setError(result.error);
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+
+        show({
+          title: mode === "create" ? "Đã tạo sản phẩm" : "Đã lưu thay đổi",
+          description: "Sản phẩm đã được lưu.",
+          tone: "success",
+        });
+        router.push("/admin/products");
+      } finally {
+        inFlight.current = false;
       }
     });
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-6 space-y-6 sm:space-y-8">
+    <form aria-label="Thông tin sản phẩm" onSubmit={handleSubmit} className="mt-6 space-y-6 sm:space-y-8">
       <section className="space-y-4">
         <h2 className="text-lg font-semibold" style={{ color: "var(--evergreen)" }}>
           Thông tin sản phẩm
@@ -269,6 +273,7 @@ export function ProductForm({
             <input
               id="name"
               required
+              disabled={isPending}
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
@@ -283,6 +288,7 @@ export function ProductForm({
             <select
               id="categoryId"
               required
+              disabled={isPending}
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
               className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
@@ -306,6 +312,7 @@ export function ProductForm({
               min={0}
               step={1}
               required
+              disabled={isPending}
               value={basePrice}
               onChange={(e) => setBasePrice(e.target.value)}
               className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
@@ -320,6 +327,7 @@ export function ProductForm({
             <select
               id="status"
               value={status}
+              disabled={isPending}
               onChange={(e) => setStatus(e.target.value as (typeof productStatusValues)[number])}
               className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
               style={{ borderColor: "var(--line)", backgroundColor: "var(--paper)", color: "var(--ink)" }}
@@ -340,6 +348,7 @@ export function ProductForm({
               id="description"
               rows={3}
               value={description}
+              disabled={isPending}
               onChange={(e) => setDescription(e.target.value)}
               className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
               style={{ borderColor: "var(--line)", backgroundColor: "var(--paper)", color: "var(--ink)" }}
@@ -353,7 +362,7 @@ export function ProductForm({
           <h2 className="text-lg font-semibold" style={{ color: "var(--evergreen)" }}>
             Biến thể
           </h2>
-          <Button type="button" variant="outline" size="sm" onClick={addVariantRow}>
+          <Button className="h-10 min-h-10" type="button" variant="outline" size="sm" onClick={addVariantRow} disabled={isPending}>
             Thêm biến thể
           </Button>
         </div>
@@ -366,13 +375,13 @@ export function ProductForm({
         >
           <table className="w-full min-w-max text-left text-sm" data-testid="variant-table">
             <thead>
-              <tr className="border-b" style={{ borderColor: "var(--line)" }}>
-                <th className="px-3 py-2 font-medium">Size</th>
-                <th className="px-3 py-2 font-medium">Màu</th>
-                <th className="px-3 py-2 font-medium">SKU</th>
-                <th className="px-3 py-2 font-medium">Giá riêng (tuỳ chọn)</th>
-                <th className="px-3 py-2 font-medium">Tồn kho</th>
-                <th className="px-3 py-2 font-medium">
+              <tr className="border-b bg-neutral-50 text-xs font-semibold tracking-wide text-neutral-700 uppercase" style={{ borderColor: "var(--line)" }}>
+                <th className="px-3 py-3">Size</th>
+                <th className="px-3 py-3">Màu</th>
+                <th className="px-3 py-3">SKU</th>
+                <th className="px-3 py-3">Giá riêng (tuỳ chọn)</th>
+                <th className="px-3 py-3">Tồn kho</th>
+                <th className="px-3 py-3">
                   <span className="sr-only">Hành động</span>
                 </th>
               </tr>
@@ -382,12 +391,13 @@ export function ProductForm({
                 <tr
                   key={row.key}
                   data-testid="variant-row"
-                  className="border-b last:border-0"
+                  className="border-b transition-colors hover:bg-neutral-50 focus-within:bg-neutral-50 last:border-0"
                   style={{ borderColor: "var(--line)" }}
                 >
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-3">
                     <input
                       required
+                      disabled={isPending}
                       aria-label="Size"
                       value={row.size}
                       onChange={(e) => updateVariantField(row.key, "size", e.target.value)}
@@ -395,9 +405,10 @@ export function ProductForm({
                       style={{ borderColor: "var(--line)", backgroundColor: "var(--paper)", color: "var(--ink)" }}
                     />
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-3">
                     <input
                       required
+                      disabled={isPending}
                       aria-label="Màu"
                       value={row.color}
                       onChange={(e) => updateVariantField(row.key, "color", e.target.value)}
@@ -405,9 +416,10 @@ export function ProductForm({
                       style={{ borderColor: "var(--line)", backgroundColor: "var(--paper)", color: "var(--ink)" }}
                     />
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-3">
                     <input
                       required
+                      disabled={isPending}
                       aria-label="SKU"
                       value={row.sku}
                       onChange={(e) => updateVariantField(row.key, "sku", e.target.value)}
@@ -415,37 +427,39 @@ export function ProductForm({
                       style={{ borderColor: "var(--line)", backgroundColor: "var(--paper)", color: "var(--ink)" }}
                     />
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-3">
                     <input
                       type="number"
                       min={0}
                       step={1}
                       aria-label="Giá riêng"
+                      disabled={isPending}
                       value={row.priceOverride}
                       onChange={(e) => updateVariantField(row.key, "priceOverride", e.target.value)}
                       className="w-28 rounded-md border px-2 py-1 text-sm outline-none focus:ring-2"
                       style={{ borderColor: "var(--line)", backgroundColor: "var(--paper)", color: "var(--ink)" }}
                     />
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-3">
                     <input
                       type="number"
                       min={0}
                       step={1}
                       required
                       aria-label="Tồn kho"
+                      disabled={isPending}
                       value={row.stock}
                       onChange={(e) => updateVariantField(row.key, "stock", e.target.value)}
                       className="w-24 rounded-md border px-2 py-1 text-sm outline-none focus:ring-2"
                       style={{ borderColor: "var(--line)", backgroundColor: "var(--paper)", color: "var(--ink)" }}
                     />
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-3">
                     <Button
                       type="button"
                       variant="destructive"
                       size="xs"
-                      disabled={variants.length <= 1}
+                      disabled={isPending || variants.length <= 1}
                       onClick={() => removeVariantRow(row.key)}
                     >
                       Xoá dòng
@@ -476,6 +490,7 @@ export function ProductForm({
               <button
                 type="button"
                 onClick={() => removeImage(img.key)}
+                disabled={isPending}
                 className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full text-xs"
                 style={{ backgroundColor: "var(--destructive)", color: "white" }}
                 aria-label="Xoá ảnh"
@@ -495,7 +510,7 @@ export function ProductForm({
               accept="image/jpeg,image/png,image/webp"
               className="hidden"
               onChange={handleFileChange}
-              disabled={isUploading}
+              disabled={isPending || isUploading}
             />
           </label>
         </div>
@@ -507,19 +522,20 @@ export function ProductForm({
       </section>
 
       {error && (
-        <p className="text-sm" style={{ color: "var(--destructive)" }}>
+        <p role="alert" className="text-sm" style={{ color: "var(--destructive)" }}>
           Dữ liệu không hợp lệ: {error}
         </p>
       )}
 
       <div className="flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center">
-        <Button className="w-full sm:w-auto" type="submit" disabled={isPending}>
+        <Button className="h-10 min-h-10 w-full sm:w-auto" type="submit" disabled={isPending}>
           {isPending ? "Đang lưu…" : mode === "create" ? "Tạo sản phẩm" : "Lưu thay đổi"}
         </Button>
         <Button
           className="w-full sm:w-auto"
           type="button"
           variant="outline"
+          disabled={isPending}
           onClick={() => router.push("/admin/products")}
         >
           Huỷ

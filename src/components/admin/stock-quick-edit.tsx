@@ -1,19 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { useAdminToast } from "@/components/admin/admin-toast-provider";
 import { updateVariantStockAction } from "@/server/actions/products";
 import { Button } from "@/components/ui/button";
 
-/**
- * Control chỉnh tồn kho nhanh cho một biến thể (variant): input số + nút lưu,
- * gọi `updateVariantStockAction({ variantId, stock, expectedStock })` để CAS
- * trên đúng tồn kho mà admin đã quan sát.
- *
- * Đặt độc lập (chưa gắn vào bảng danh sách): mỗi sản phẩm có thể có nhiều
- * biến thể trong khi bảng danh sách chỉ hiển thị "Tổng tồn" gộp — gắn control
- * theo từng biến thể vào đó không gọn, nên để dành cho trang sửa sản phẩm
- * (Task 6), nơi từng biến thể đã có hàng riêng.
- */
 export function StockQuickEdit({
   variantId,
   initialStock,
@@ -21,27 +13,42 @@ export function StockQuickEdit({
   variantId: string;
   initialStock: number;
 }) {
+  const router = useRouter();
+  const { show } = useAdminToast();
   const [stock, setStock] = useState(initialStock);
   const [expectedStock, setExpectedStock] = useState(initialStock);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const inFlight = useRef(false);
 
   function handleSave() {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setError(null);
     setSaved(false);
     startTransition(async () => {
-      const result = await updateVariantStockAction({
-        variantId,
-        stock,
-        expectedStock,
-      });
-      if (result && !result.ok) {
-        setError(result.error);
-        return;
+      try {
+        const result = await updateVariantStockAction({
+          variantId,
+          stock,
+          expectedStock,
+        });
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+        setExpectedStock(stock);
+        setSaved(true);
+        show({
+          title: "Đã cập nhật tồn kho",
+          description: "Tồn kho biến thể đã được lưu.",
+          tone: "success",
+        });
+        router.refresh();
+      } finally {
+        inFlight.current = false;
       }
-      setExpectedStock(stock);
-      setSaved(true);
     });
   }
 
@@ -56,6 +63,7 @@ export function StockQuickEdit({
         min={0}
         step={1}
         value={stock}
+        disabled={isPending}
         onChange={(e) => {
           setSaved(false);
           setStock(Number(e.target.value));
@@ -67,7 +75,7 @@ export function StockQuickEdit({
           color: "var(--ink)",
         }}
       />
-      <Button type="button" size="xs" onClick={handleSave} disabled={isPending}>
+      <Button className="h-10 min-h-10" type="button" size="xs" onClick={handleSave} disabled={isPending}>
         {isPending ? "Đang lưu…" : "Lưu"}
       </Button>
       {saved && !error && (
@@ -76,7 +84,7 @@ export function StockQuickEdit({
         </span>
       )}
       {error && (
-        <span className="text-xs" style={{ color: "var(--destructive)" }}>
+        <span role="alert" className="text-xs" style={{ color: "var(--destructive)" }}>
           {error}
         </span>
       )}
