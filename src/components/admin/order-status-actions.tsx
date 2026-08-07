@@ -2,6 +2,8 @@
 
 import { useRef, useState, useTransition } from "react";
 import type { OrderStatus as OrderStatusValue } from "@/generated/prisma/enums";
+import { ConfirmActionDialog } from "@/components/admin/confirm-action-dialog";
+import { useAdminToast } from "@/components/admin/admin-toast-provider";
 import { Button } from "@/components/ui/button";
 import { updateOrderStatusAction } from "@/server/actions/order-status";
 
@@ -26,7 +28,9 @@ export function OrderStatusActions({
     null,
   );
   const [error, setError] = useState<string | null>(null);
+  const [dialogKey, setDialogKey] = useState(0);
   const inFlight = useRef(false);
+  const { show: showToast } = useAdminToast();
 
   function updateStatus(target: OrderStatusValue) {
     if (inFlight.current) return;
@@ -39,12 +43,18 @@ export function OrderStatusActions({
         const result = await updateOrderStatusAction(orderId, target);
         if (!result.ok) {
           setError(result.error);
+        } else {
+          showToast({
+            title: "Đã cập nhật trạng thái đơn hàng",
+            description: "Thông tin đơn hàng sẽ được làm mới.",
+          });
         }
       } catch {
         setError(genericError);
       } finally {
         inFlight.current = false;
         setActiveTarget(null);
+        setDialogKey((key) => key + 1);
       }
     });
   }
@@ -56,17 +66,53 @@ export function OrderStatusActions({
           const label = ACTION_LABEL[target];
           if (!label) return null;
 
-          return (
+          const isCancellation = target === "CANCELLED";
+
+          const trigger = (
             <Button
               key={target}
               disabled={isPending}
-              onClick={() => updateStatus(target)}
               size="sm"
               type="button"
+              variant={isCancellation ? "destructive" : "default"}
               className="w-full sm:w-auto"
             >
-              {isPending && activeTarget === target ? "Đang cập nhật…" : label}
+              {isPending && activeTarget === target
+                ? target === "CANCELLED"
+                  ? "Đang huỷ đơn…"
+                  : "Đang cập nhật…"
+                : label}
             </Button>
+          );
+
+          if (isCancellation) {
+            return (
+              <ConfirmActionDialog
+                key={`${target}-${dialogKey}`}
+                confirmLabel="Huỷ đơn hàng"
+                confirmVariant="destructive"
+                description="Đơn đang chờ thanh toán sẽ bị hủy và không thể khôi phục."
+                isPending={isPending}
+                onConfirm={() => updateStatus(target)}
+                pendingLabel="Đang huỷ đơn…"
+                title="Huỷ đơn hàng"
+                trigger={trigger}
+              />
+            );
+          }
+
+          return (
+            <span key={target}>
+              <Button
+                disabled={isPending}
+                onClick={() => updateStatus(target)}
+                size="sm"
+                type="button"
+                className="w-full sm:w-auto"
+              >
+                {isPending && activeTarget === target ? "Đang cập nhật…" : label}
+              </Button>
+            </span>
           );
         })}
       </div>

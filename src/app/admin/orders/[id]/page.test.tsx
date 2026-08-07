@@ -12,6 +12,7 @@ const {
   notFoundMock,
   recordRefundActionMock,
   requireAdminMock,
+  showToastMock,
   updateOrderStatusActionMock,
 } = vi.hoisted(() => ({
   confirmPaymentManuallyActionMock: vi.fn(),
@@ -21,6 +22,7 @@ const {
   }),
   recordRefundActionMock: vi.fn(),
   requireAdminMock: vi.fn(),
+  showToastMock: vi.fn(),
   updateOrderStatusActionMock: vi.fn(),
 }));
 
@@ -39,6 +41,9 @@ vi.mock("@/server/actions/order-status", () => ({
 }));
 vi.mock("@/server/actions/refunds", () => ({
   recordRefundAction: recordRefundActionMock,
+}));
+vi.mock("@/components/admin/admin-toast-provider", () => ({
+  useAdminToast: () => ({ show: showToastMock }),
 }));
 
 import AdminOrderDetailPage from "./page";
@@ -150,7 +155,9 @@ describe("AdminOrderDetailPage", () => {
     expect(
       screen.getByRole("heading", { name: "Đơn hàng LEAFDETAIL1" }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/^Đã thanh toán · Tạo lúc/)).toBeInTheDocument();
+    expect(screen.getByText("Đã thanh toán")).toBeInTheDocument();
+    expect(screen.getByText(/^Tạo lúc/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Thao tác" })).toBeInTheDocument();
     expect(screen.getByText("Nguyễn Khách")).toBeInTheDocument();
     expect(screen.getByText("khach@example.com")).toBeInTheDocument();
     expect(screen.getByText("0901234567")).toBeInTheDocument();
@@ -163,6 +170,10 @@ describe("AdminOrderDetailPage", () => {
     expect(screen.getByText("30.000 ₫")).toBeInTheDocument();
     expect(screen.getAllByText("280.000 ₫").length).toBeGreaterThan(0);
     expect(screen.getByText("Hoàn tiền một phần")).toBeInTheDocument();
+    expect(screen.getByText("Tổng tiền")).toBeInTheDocument();
+    expect(screen.getByText("Đã nhận")).toBeInTheDocument();
+    expect(screen.getByText("Đã hoàn")).toBeInTheDocument();
+    expect(screen.getByText("Thực nhận")).toBeInTheDocument();
     expect(
       screen.getByRole("region", { name: "Sản phẩm trong đơn hàng" }),
     ).toBeInTheDocument();

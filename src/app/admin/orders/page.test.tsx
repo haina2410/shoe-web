@@ -74,6 +74,8 @@ describe("AdminOrdersPage", () => {
       "placeholder",
       "Ví dụ: LEAFABC123",
     );
+    expect(screen.getByRole("heading", { name: "Đơn hàng" })).toBeInTheDocument();
+    expect(screen.getByText("Danh sách đơn hàng")).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "Đã thanh toán" })).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "Đang giao" })).toBeInTheDocument();
     expect(screen.getByText("Hoàn tiền một phần")).toBeInTheDocument();
@@ -107,6 +109,7 @@ describe("AdminOrdersPage", () => {
     expect(
       screen.getByRole("heading", { name: "Không tìm thấy đơn hàng" }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Đơn hàng" })).toBeInTheDocument();
   });
 
   it("authenticates before querying orders", async () => {
