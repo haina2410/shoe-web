@@ -14,6 +14,7 @@ type AdminToastContextValue = {
 };
 
 const AdminToastContext = createContext<AdminToastContextValue | null>(null);
+const adminToastManager = Toast.createToastManager();
 
 function AdminToastViewport() {
   const { toasts } = Toast.useToastManager();
@@ -44,13 +45,11 @@ function AdminToastViewport() {
 }
 
 function AdminToastContents({ children }: { children: React.ReactNode }) {
-  const toastManager = Toast.useToastManager();
-
   return (
     <AdminToastContext.Provider
       value={{
         show: ({ title, description, tone = "success" }) => {
-          toastManager.add({
+          adminToastManager.add({
             title,
             description,
             type: tone,
@@ -67,7 +66,7 @@ function AdminToastContents({ children }: { children: React.ReactNode }) {
 
 export function AdminToastProvider({ children }: { children: React.ReactNode }) {
   return (
-    <Toast.Provider>
+    <Toast.Provider toastManager={adminToastManager}>
       <AdminToastContents>{children}</AdminToastContents>
     </Toast.Provider>
   );
