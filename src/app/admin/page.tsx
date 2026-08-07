@@ -1,17 +1,17 @@
 import Link from "next/link";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { AdminSection } from "@/components/admin/admin-section";
 
 export default function AdminDashboardPage() {
   return (
-    <div>
-      <h1 className="text-2xl font-bold" style={{ color: "var(--evergreen)" }}>
-        Vận hành cửa hàng
-      </h1>
-      <p className="mt-2 text-neutral-600">
-        Truy cập nhanh các công việc hiện có: quản lý sản phẩm, đơn hàng và đối soát
-        giao dịch ngân hàng.
-      </p>
+    <div className="space-y-6">
+      <AdminPageHeader
+        title="Vận hành cửa hàng"
+        description="Truy cập nhanh các công việc hiện có: quản lý sản phẩm, đơn hàng và đối soát giao dịch ngân hàng."
+      />
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <AdminSection>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Link
           href="/admin/products"
           className="block rounded-lg border p-4 transition-colors hover:bg-[var(--sage)]/40 focus-visible:bg-[var(--sage)]/40"
@@ -48,7 +48,8 @@ export default function AdminDashboardPage() {
             Kiểm tra các giao dịch cần ghép thủ công.
           </p>
         </Link>
-      </div>
+        </div>
+      </AdminSection>
     </div>
   );
 }
