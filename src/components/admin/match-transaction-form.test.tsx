@@ -70,6 +70,25 @@ describe("MatchTransactionForm", () => {
     expect(screen.getByLabelText("Mã đơn")).toHaveClass("h-10", "min-h-10");
   });
 
+  it("names the captured entered order code in the confirmation before matching", async () => {
+    const user = userEvent.setup();
+    render(
+      <MatchTransactionForm
+        bankTransactionId="cm12345678901234567890123"
+        initialPaymentCode="LEAFABC123"
+        transactionAmount="120.000 ₫"
+        transactionContent="Thanh toan LEAFABC123"
+      />,
+    );
+
+    await user.clear(screen.getByLabelText("Mã đơn"));
+    await user.type(screen.getByLabelText("Mã đơn"), "leafxyz789");
+    await user.click(screen.getByRole("button", { name: "Ghép giao dịch" }));
+
+    expect(screen.getByRole("alertdialog")).toHaveTextContent("leafxyz789");
+    expect(matchReviewedTransactionActionMock).not.toHaveBeenCalled();
+  });
+
   it("requires amber confirmation that names the transaction and amount without submitting after dismissal", async () => {
     const user = userEvent.setup();
     render(

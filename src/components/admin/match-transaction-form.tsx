@@ -87,7 +87,7 @@ export function MatchTransactionForm({
           key={dialogKey}
           confirmLabel="Xác nhận ghép"
           confirmVariant="warning"
-          description={`Giao dịch có số tiền ${transactionAmount} sẽ được ghép với mã đơn đã nhập.`}
+          description={`Giao dịch có số tiền ${transactionAmount} sẽ được ghép với mã đơn ${orderCode}.`}
           isPending={isPending}
           onConfirm={handleConfirm}
           pendingLabel="Đang ghép…"
