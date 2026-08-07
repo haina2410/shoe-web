@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AlertDialog } from "@base-ui/react/alert-dialog";
+import { AdminSpinner } from "@/components/admin/admin-spinner";
 import { Button } from "@/components/ui/button";
 
 type ConfirmActionDialogProps = {
@@ -50,9 +51,22 @@ export function ConfirmActionDialog({
             </AlertDialog.Description>
           </div>
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <AlertDialog.Close render={<Button variant="outline">Hủy</Button>} disabled={isPending} />
-            <Button variant={confirmVariant} disabled={isPending} onClick={onConfirm}>
-              {isPending ? pendingLabel : confirmLabel}
+            <AlertDialog.Close
+              render={
+                <Button className="h-10 min-h-10 min-w-10" variant="outline">
+                  Hủy
+                </Button>
+              }
+              disabled={isPending}
+            />
+            <Button
+              aria-label={isPending ? pendingLabel : undefined}
+              className="h-10 min-h-10 min-w-10"
+              variant={confirmVariant}
+              disabled={isPending}
+              onClick={onConfirm}
+            >
+              {isPending ? <AdminSpinner label={pendingLabel} /> : confirmLabel}
             </Button>
           </div>
         </AlertDialog.Popup>

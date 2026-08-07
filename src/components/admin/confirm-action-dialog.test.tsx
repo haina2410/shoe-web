@@ -58,9 +58,25 @@ describe("ConfirmActionDialog", () => {
     await user.keyboard("{Escape}");
 
     expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Đang xóa" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Đang xóa" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Hủy" })).toBeDisabled();
     expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it("gives confirmation and cancellation controls 40px touch targets", async () => {
+    const { user } = renderDialog();
+
+    await user.click(screen.getByRole("button", { name: "Xóa sản phẩm" }));
+
+    expect(screen.getByRole("button", { name: "Xóa" })).toHaveClass(
+      "min-h-10",
+      "min-w-10",
+    );
+    expect(screen.getByRole("button", { name: "Hủy" })).toHaveClass(
+      "min-h-10",
+      "min-w-10",
+    );
   });
 
   it("returns focus to the trigger after cancellation", async () => {
