@@ -75,6 +75,8 @@ const statusLabel: Record<string, string> = {
   ARCHIVED: "Đã ẩn",
 };
 
+const genericSaveError = "Không thể lưu sản phẩm lúc này. Vui lòng thử lại.";
+
 export function ProductForm({
   mode,
   productId,
@@ -186,6 +188,11 @@ export function ProductForm({
         return;
       }
       setImages((imgs) => [...imgs, { key: nextKey(), url }]);
+      show({
+        title: "Đã tải ảnh lên",
+        description: "Ảnh đã được thêm vào sản phẩm.",
+        tone: "success",
+      });
     } catch {
       setUploadError("Tải ảnh lên thất bại. Vui lòng thử lại.");
     } finally {
@@ -255,6 +262,8 @@ export function ProductForm({
           tone: "success",
         });
         router.push("/admin/products");
+      } catch {
+        setError(genericSaveError);
       } finally {
         inFlight.current = false;
       }
@@ -507,7 +516,14 @@ export function ProductForm({
             className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-md border border-dashed text-xs text-center"
             style={{ borderColor: "var(--line)", color: "var(--muted-foreground)" }}
           >
-            {isUploading ? "Đang tải…" : "+ Thêm ảnh"}
+            {isUploading ? (
+              <>
+                <AdminSpinner label="Đang tải ảnh…" />
+                <span aria-hidden="true">Đang tải ảnh…</span>
+              </>
+            ) : (
+              "+ Thêm ảnh"
+            )}
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp"
@@ -518,7 +534,7 @@ export function ProductForm({
           </label>
         </div>
         {uploadError && (
-          <p className="text-sm" style={{ color: "var(--destructive)" }}>
+          <p role="alert" className="text-sm" style={{ color: "var(--destructive)" }}>
             {uploadError}
           </p>
         )}

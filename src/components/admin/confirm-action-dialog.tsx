@@ -14,6 +14,7 @@ type ConfirmActionDialogProps = {
   pendingLabel: string;
   confirmVariant: "warning" | "destructive";
   isPending: boolean;
+  error?: string | null;
   onConfirm: () => void;
 };
 
@@ -26,6 +27,7 @@ export function ConfirmActionDialog({
   pendingLabel,
   confirmVariant,
   isPending,
+  error,
   onConfirm,
 }: ConfirmActionDialogProps) {
   const [open, setOpen] = useState(false);
@@ -49,6 +51,7 @@ export function ConfirmActionDialog({
             <AlertDialog.Description className="mt-2 text-sm text-neutral-600">
               {description}
             </AlertDialog.Description>
+            {error ? <p role="alert" className="mt-2 text-sm text-[var(--destructive)]">{error}</p> : null}
           </div>
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <AlertDialog.Close

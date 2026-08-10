@@ -57,14 +57,11 @@ export function DeleteProductButton({
         }
         title="Xoá sản phẩm"
         subject={productName}
-        description={
-          error
-            ? `Sản phẩm sẽ bị xoá khỏi danh mục và không thể hoàn tác. ${error}`
-            : "Sản phẩm sẽ bị xoá khỏi danh mục và không thể hoàn tác."
-        }
+        description="Sản phẩm sẽ bị xoá khỏi danh mục và không thể hoàn tác."
         confirmLabel="Xác nhận xoá"
         pendingLabel="Đang xoá…"
         confirmVariant="destructive"
+        error={error}
         isPending={isPending}
         onConfirm={handleConfirm}
       />

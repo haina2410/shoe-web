@@ -7,6 +7,8 @@ import { AdminSpinner } from "@/components/admin/admin-spinner";
 import { updateVariantStockAction } from "@/server/actions/products";
 import { Button } from "@/components/ui/button";
 
+const genericError = "Không thể cập nhật tồn kho lúc này. Vui lòng thử lại.";
+
 export function StockQuickEdit({
   variantId,
   initialStock,
@@ -47,6 +49,8 @@ export function StockQuickEdit({
           tone: "success",
         });
         router.refresh();
+      } catch {
+        setError(genericError);
       } finally {
         inFlight.current = false;
       }

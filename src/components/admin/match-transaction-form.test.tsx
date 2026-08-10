@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const { matchReviewedTransactionActionMock } = vi.hoisted(() => ({
@@ -199,6 +199,54 @@ describe("MatchTransactionForm", () => {
     expect(
       screen.queryByText(/review-transaction-secret/),
     ).not.toBeInTheDocument();
+  });
+
+  it("submits a second match after a returned error", async () => {
+    matchReviewedTransactionActionMock
+      .mockResolvedValueOnce({ ok: false, error: "Mã đơn hàng không hợp lệ." })
+      .mockResolvedValueOnce({ ok: true });
+    const user = userEvent.setup();
+    render(
+      <MatchTransactionForm
+        bankTransactionId="cm12345678901234567890123"
+        initialPaymentCode="LEAFRETRY123"
+        transactionAmount="120.000 ₫"
+        transactionContent="Thanh toan LEAFRETRY123"
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Ghép giao dịch" }));
+    await user.click(screen.getByRole("button", { name: "Xác nhận ghép" }));
+    await screen.findByRole("alert");
+
+    await user.click(screen.getByRole("button", { name: "Ghép giao dịch" }));
+    await user.click(screen.getByRole("button", { name: "Xác nhận ghép" }));
+
+    await waitFor(() => expect(matchReviewedTransactionActionMock).toHaveBeenCalledTimes(2));
+  });
+
+  it("submits a second match after a rejected action", async () => {
+    matchReviewedTransactionActionMock
+      .mockRejectedValueOnce(new Error("review connection reset"))
+      .mockResolvedValueOnce({ ok: true });
+    const user = userEvent.setup();
+    render(
+      <MatchTransactionForm
+        bankTransactionId="cm12345678901234567890123"
+        initialPaymentCode="LEAFRETRY456"
+        transactionAmount="120.000 ₫"
+        transactionContent="Thanh toan LEAFRETRY456"
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Ghép giao dịch" }));
+    await user.click(screen.getByRole("button", { name: "Xác nhận ghép" }));
+    await screen.findByRole("alert");
+
+    await user.click(screen.getByRole("button", { name: "Ghép giao dịch" }));
+    await user.click(screen.getByRole("button", { name: "Xác nhận ghép" }));
+
+    await waitFor(() => expect(matchReviewedTransactionActionMock).toHaveBeenCalledTimes(2));
   });
 
   it("announces successful matching without removing the form locally", async () => {

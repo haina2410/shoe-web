@@ -2,8 +2,6 @@ import { beforeEach, describe, it, expect, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-// `vi.mock` bị hoist lên đầu file — action giả trả `{ ok: true }` (action
-// thật chỉ trả giá trị khi validate lỗi; thành công thì redirect()).
 type StockActionResult = { ok: true } | { ok: false; error: string };
 
 const { updateVariantStockActionMock, refreshMock, showToastMock } = vi.hoisted(
@@ -88,6 +86,28 @@ describe("StockQuickEdit", () => {
       "Tồn kho đã thay đổi. Hãy tải lại trang và thử lại.",
     );
     expect(refreshMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps stock retryable after an unexpected action rejection", async () => {
+    updateVariantStockActionMock.mockRejectedValueOnce(
+      new Error("stock connection reset"),
+    );
+    updateVariantStockActionMock.mockResolvedValueOnce({ ok: true });
+    const user = userEvent.setup();
+    render(<StockQuickEdit variantId="variant-1" initialStock={5} />);
+
+    await user.clear(screen.getByLabelText("Tồn kho"));
+    await user.type(screen.getByLabelText("Tồn kho"), "12");
+    await user.click(screen.getByRole("button", { name: "Lưu" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Không thể cập nhật tồn kho lúc này. Vui lòng thử lại.",
+    );
+    expect(screen.getByLabelText("Tồn kho")).toHaveValue(12);
+    expect(screen.getByRole("button", { name: "Lưu" })).toBeEnabled();
+
+    await user.click(screen.getByRole("button", { name: "Lưu" }));
+    await waitFor(() => expect(updateVariantStockActionMock).toHaveBeenCalledTimes(2));
   });
 
   it("announces success and refreshes the current product view", async () => {

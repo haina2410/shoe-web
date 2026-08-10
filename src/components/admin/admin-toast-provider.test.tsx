@@ -47,6 +47,21 @@ function ScopedToastLauncher({ title }: { title: string }) {
   );
 }
 
+function SameScopeProviders({ showNewest }: { showNewest: boolean }) {
+  return (
+    <>
+      <AdminToastProvider scope="admin-resume-owner">
+        <ScopedToastLauncher title="Phiên cũ tiếp quản" />
+      </AdminToastProvider>
+      {showNewest ? (
+        <AdminToastProvider scope="admin-resume-owner">
+          <span>Phiên mới nhất</span>
+        </AdminToastProvider>
+      ) : null}
+    </>
+  );
+}
+
 describe("AdminToastProvider", () => {
   it("announces a toast through a live region and allows dismissal", async () => {
     const user = userEvent.setup();
@@ -146,6 +161,17 @@ describe("AdminToastProvider", () => {
 
     await user.click(screen.getByRole("button", { name: "Hiện Đơn hàng đã được lưu" }));
 
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+  });
+
+  it("returns same-scope toast ownership to the older provider when the newest unmounts", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<SameScopeProviders showNewest />);
+
+    rerender(<SameScopeProviders showNewest={false} />);
+    await user.click(screen.getByRole("button", { name: "Hiện Phiên cũ tiếp quản" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Phiên cũ tiếp quản");
     expect(screen.getAllByRole("alert")).toHaveLength(1);
   });
 });

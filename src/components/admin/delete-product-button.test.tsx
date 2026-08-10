@@ -89,9 +89,12 @@ describe("DeleteProductButton", () => {
     await user.click(screen.getByRole("button", { name: "Xoá" }));
     await user.click(screen.getByRole("button", { name: "Xác nhận xoá" }));
 
-    expect(await screen.findByRole("alertdialog")).toHaveTextContent(
+    expect(await screen.findByRole("alert")).toHaveTextContent(
       "Không thể xoá sản phẩm đang có dữ liệu liên quan.",
     );
+    expect(screen.getByText(
+      "Sản phẩm sẽ bị xoá khỏi danh mục và không thể hoàn tác.",
+    )).toBeInTheDocument();
     expect(refreshMock).not.toHaveBeenCalled();
   });
 

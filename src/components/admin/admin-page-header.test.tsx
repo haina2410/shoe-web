@@ -14,6 +14,7 @@ describe("AdminPageHeader", () => {
     );
 
     expect(screen.getByRole("heading", { name: "Đơn hàng" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Đơn hàng" })).toHaveClass("text-3xl");
     expect(screen.getByText("Theo dõi các đơn hàng đang xử lý.")).toBeInTheDocument();
     expect(screen.getByText("12 mới")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Tạo đơn hàng" })).toBeInTheDocument();

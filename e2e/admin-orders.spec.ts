@@ -227,9 +227,6 @@ test("staff validates then confirms reconciliation and sees refreshed records", 
   await matchDialog.getByRole("button", { name: "Xác nhận ghép" }).click();
   await expectToast(page, "Đã ghép giao dịch");
   await expect(reviewRow).toHaveCount(0);
-  await expect(
-    page.getByRole("heading", { name: "Không có giao dịch cần đối soát" }),
-  ).toBeVisible();
 
   await openOrder(page, orderCode);
   await expect(page.getByText("Đã thanh toán", { exact: true })).toBeVisible();

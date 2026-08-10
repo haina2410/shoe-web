@@ -211,6 +211,7 @@ describe("ProductForm — biến thể inline", () => {
     );
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
 
+    expect(screen.getByRole("status", { name: "Đang tải ảnh…" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Tạo sản phẩm" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Huỷ" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Thêm biến thể" })).toBeDisabled();
@@ -224,6 +225,11 @@ describe("ProductForm — biến thể inline", () => {
       json: async () => ({ url: "/uploads/shoe.webp" }),
     });
     await screen.findByRole("button", { name: "Tạo sản phẩm" });
+    expect(showToastMock).toHaveBeenCalledWith({
+      title: "Đã tải ảnh lên",
+      description: "Ảnh đã được thêm vào sản phẩm.",
+      tone: "success",
+    });
     await user.click(screen.getByRole("button", { name: "Tạo sản phẩm" }));
 
     await waitFor(() => {
@@ -236,6 +242,32 @@ describe("ProductForm — biến thể inline", () => {
         }),
       );
     });
+  });
+
+  it("reports rejected uploads accessibly without removing existing images", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("upload connection reset")));
+    const user = userEvent.setup();
+    render(
+      <ProductForm
+        mode="create"
+        categories={categories}
+        initial={{
+          ...editInitial,
+          images: [{ url: "/uploads/existing.webp", position: 0 }],
+        }}
+      />,
+    );
+
+    await user.upload(
+      screen.getByLabelText("+ Thêm ảnh"),
+      new File(["image"], "shoe.webp", { type: "image/webp" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Tải ảnh lên thất bại. Vui lòng thử lại.",
+    );
+    expect(document.querySelector("img")).toHaveAttribute("src", "/uploads/existing.webp");
+    expect(screen.getByLabelText("+ Thêm ảnh")).toBeEnabled();
   });
 
   it("retains entered values and shows a safe error when the save fails", async () => {
@@ -251,6 +283,25 @@ describe("ProductForm — biến thể inline", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("SKU đã tồn tại.");
     expect(screen.getByLabelText("Tên sản phẩm")).toHaveValue("Giày mới");
+  });
+
+  it("keeps entered values retryable after an unexpected save rejection", async () => {
+    createProductActionMock.mockRejectedValueOnce(new Error("database connection reset"));
+    createProductActionMock.mockResolvedValueOnce({ ok: false, error: "SKU đã tồn tại." });
+    const user = userEvent.setup();
+    render(<ProductForm mode="create" categories={categories} />);
+
+    await fillRequiredProductFields(user);
+    await user.click(screen.getByRole("button", { name: "Tạo sản phẩm" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Không thể lưu sản phẩm lúc này. Vui lòng thử lại.",
+    );
+    expect(screen.getByLabelText("Tên sản phẩm")).toHaveValue("Giày mới");
+    expect(screen.getByRole("button", { name: "Tạo sản phẩm" })).toBeEnabled();
+
+    await user.click(screen.getByRole("button", { name: "Tạo sản phẩm" }));
+    await waitFor(() => expect(createProductActionMock).toHaveBeenCalledTimes(2));
   });
 
   it("announces success before navigating to the product list", async () => {

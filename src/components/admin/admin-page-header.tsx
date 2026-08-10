@@ -19,7 +19,7 @@ export function AdminPageHeader({
     <header className={cn("flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between", className)}>
       <div>
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-bold text-[var(--evergreen)]">{title}</h1>
+          <h1 className="text-3xl font-bold text-[var(--evergreen)]">{title}</h1>
           {status}
         </div>
         {description ? <p className="mt-2 text-neutral-600">{description}</p> : null}
