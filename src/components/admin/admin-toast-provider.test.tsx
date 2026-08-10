@@ -37,6 +37,16 @@ function ToastCallbackCapture({
   return null;
 }
 
+function ScopedToastLauncher({ title }: { title: string }) {
+  const { show } = useAdminToast();
+
+  return (
+    <button type="button" onClick={() => show({ title })}>
+      {`Hiện ${title}`}
+    </button>
+  );
+}
+
 describe("AdminToastProvider", () => {
   it("announces a toast through a live region and allows dismissal", async () => {
     const user = userEvent.setup();
@@ -66,7 +76,7 @@ describe("AdminToastProvider", () => {
     };
 
     const { rerender } = render(
-      <AdminToastProvider key="first">
+      <AdminToastProvider key="first" scope="admin-orders">
         <ToastCallbackCapture onCapture={captureFirstShow} />
       </AdminToastProvider>,
     );
@@ -76,7 +86,7 @@ describe("AdminToastProvider", () => {
     });
 
     rerender(
-      <AdminToastProvider key="second">
+      <AdminToastProvider key="second" scope="admin-orders">
         <ToastCallbackCapture onCapture={captureFirstShow} />
       </AdminToastProvider>,
     );
@@ -95,5 +105,47 @@ describe("AdminToastProvider", () => {
     await waitFor(() => {
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     });
+  });
+
+  it("keeps concurrently mounted logical scopes isolated", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <>
+        <AdminToastProvider scope="admin-products">
+          <ScopedToastLauncher title="Sản phẩm đã được lưu" />
+        </AdminToastProvider>
+        <AdminToastProvider scope="admin-orders">
+          <ScopedToastLauncher title="Đơn hàng đã được lưu" />
+        </AdminToastProvider>
+      </>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Hiện Sản phẩm đã được lưu" }));
+
+    const alerts = screen.getAllByRole("alert");
+
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toHaveTextContent("Sản phẩm đã được lưu");
+    expect(screen.queryByText("Đơn hàng đã được lưu")).not.toBeInTheDocument();
+  });
+
+  it("renders one live toast for concurrent mounts of the same logical scope", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <>
+        <AdminToastProvider scope="admin-orders">
+          <ScopedToastLauncher title="Đơn hàng đã được lưu" />
+        </AdminToastProvider>
+        <AdminToastProvider scope="admin-orders">
+          <span>Phiên bản mới hơn</span>
+        </AdminToastProvider>
+      </>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Hiện Đơn hàng đã được lưu" }));
+
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
   });
 });
