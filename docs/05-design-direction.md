@@ -44,6 +44,36 @@ cắt khoảng trắng, chuyển sang chữ hoa và, nếu tồn tại, chuyển
 `/orders/[orderCode]`. Mã sai định dạng và mã không tồn tại cùng hiển thị một
 banner “Không tìm thấy đơn hàng”, để không tiết lộ mã nào đã tồn tại.
 
+## Bề mặt quản trị
+
+Admin là giao diện vận hành, ưu tiên khả năng quét thông tin và thao tác an
+toàn thay vì mô phỏng storefront. Tiêu đề trang dùng cỡ 28–32px; mã đơn, tổng
+tiền, tiền đã nhận/hoàn và tồn kho quan trọng dùng cỡ 20–24px, đậm hơn; tiêu đề
+khối dùng 18–20px; metadata và thời điểm dùng 13–14px. Nội dung được nhóm trong
+card trắng viền mảnh, đệm 20–24px. Bảng có header rõ, khoảng đệm hàng đủ rộng,
+hover/focus rõ ràng và cuộn ngang khi cần.
+
+Màu hành động diễn đạt hậu quả: xanh cho lưu và chuyển tiếp an toàn, amber cho
+xác nhận thanh toán, hoàn tiền và ghép giao dịch, đỏ cho huỷ đơn và xoá sản
+phẩm; nút viền trung tính dành cho lọc, đóng và điều hướng. Badge luôn có nhãn
+chữ: chờ thanh toán/review và hoàn một phần là amber; đã thanh toán/đã ghép là
+xanh dương; đang giao là tím; hoàn tất/đã hoàn toàn bộ là xanh; huỷ, hết hàng là
+đỏ; trạng thái trung tính là xám. Không truyền đạt trạng thái chỉ bằng màu.
+
+Thao tác amber và đỏ mở hộp thoại xác nhận nêu rõ đối tượng và hệ quả; nút hủy
+không làm thay đổi dữ liệu. Lưu thông thường và chuyển tiếp an toàn là một
+bước. Khi mutation đang chạy, nút khởi tạo hiển thị nhãn chờ và spinner, các
+thao tác cạnh tranh bị khóa và trường đang gửi bị vô hiệu hóa. Thành công hiển
+thị toast live ngắn, lỗi nằm cạnh thao tác với alert/live region; cả hai không
+thay thế dữ liệu đã được làm mới từ server. Admin không optimistic-update đơn,
+payment ledger, tồn kho hoặc đối soát.
+
+Điều hướng admin giữ trạng thái active, có cuộn ngang khi hẹp và mọi thao tác
+chính cao tối thiểu 40px. Trên mobile, summary và action xếp dọc theo thứ tự
+đọc, không thu nhỏ mục tiêu chạm; bảng tiếp tục cuộn ngang. Dialog giữ focus
+bên trong, trả focus về trigger khi đóng, cho Escape/hủy khi không pending.
+Toast không cướp focus; keyboard focus và pending state luôn nhìn thấy được.
+
 ## Signature (điểm nhấn duy nhất)
 
 **Nét lá / gân lá hairline** — một motif đường mảnh hình gân lá dùng làm:

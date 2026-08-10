@@ -1,74 +1,116 @@
-import "dotenv/config";
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
-/**
- * Headline E2E Ngày 3: đăng nhập bằng owner seed → tạo sản phẩm mới (kèm 1
- * biến thể) qua form → thấy sản phẩm trong danh sách `/admin/products`.
- *
- * Chứng minh xuyên suốt: Task 1 (seed user + disableSignUp + login + guard)
- * + Task 3 (product actions) + Task 5 (list UI) + Task 6 (form UI).
- *
- * Bỏ qua upload ảnh trong test này để ổn định (đã có integration test riêng
- * cho việc persist ảnh — xem `src/server/products.integration.test.ts`).
- *
- * Cần chuẩn bị trước khi chạy: `npx prisma db seed` (owner + category) trên
- * DB dev mà `npm run build && npm run start` (xem `playwright.config.ts`) sẽ
- * dùng.
- */
+const ownerEmail = process.env.SEED_OWNER_EMAIL || "owner@leafshoes.local";
+const ownerPassword = process.env.SEED_OWNER_PASSWORD;
 
-const OWNER_EMAIL = process.env.SEED_OWNER_EMAIL || "owner@leafshoes.local";
-const OWNER_PASSWORD = process.env.SEED_OWNER_PASSWORD;
+async function expectToast(page: import("@playwright/test").Page, title: string) {
+  const liveRegion = page.getByRole("region", { name: "Notifications" });
+  await expect(liveRegion).toBeVisible();
+  await expect(liveRegion.getByText(title, { exact: true })).toBeVisible();
+}
 
-test("owner đăng nhập → tạo sản phẩm mới kèm 1 biến thể → thấy trong danh sách", async ({
-  page,
-}) => {
-  test.skip(
-    !OWNER_PASSWORD,
-    "Thiếu SEED_OWNER_PASSWORD trong môi trường — không thể đăng nhập owner seed.",
-  );
-
-  const runId = Math.floor(Math.random() * 1_000_000);
-  const productName = `Giày Thử Nghiệm E2E ${runId}`;
-  const sku = `E2E-SKU-${runId}`;
-
-  // 1) Đăng nhập bằng owner seed.
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(OWNER_EMAIL);
-  await page.getByLabel("Mật khẩu").fill(OWNER_PASSWORD as string);
-  await page.getByRole("button", { name: "Đăng nhập" }).click();
-
-  await expect(page).toHaveURL(/\/admin(\/products)?$/, { timeout: 15_000 });
-
-  // 2) Vào /admin/products → "Thêm sản phẩm".
-  await page.goto("/admin/products");
-  await page.getByRole("link", { name: "Thêm sản phẩm" }).click();
-  await expect(page).toHaveURL(/\/admin\/products\/new/);
-
-  // 3) Điền thông tin sản phẩm.
-  await page.getByLabel("Tên sản phẩm").fill(productName);
-  await page.getByLabel("Giá (VND)").fill("199000");
-  // Chọn danh mục đầu tiên có sẵn (đã seed ≥ 1 category).
-  const categorySelect = page.getByLabel("Danh mục");
-  const firstCategoryValue = await categorySelect
-    .locator("option")
-    .first()
-    .getAttribute("value");
-  if (firstCategoryValue) {
-    await categorySelect.selectOption(firstCategoryValue);
+async function loginAsOwner(page: import("@playwright/test").Page) {
+  if (!ownerPassword) {
+    throw new Error("E2E cần SEED_OWNER_PASSWORD trong môi trường test.");
   }
 
-  // 4) Điền 1 biến thể (size 40, màu Đen, sku duy nhất, tồn 10).
+  await page.context().setExtraHTTPHeaders({ "x-forwarded-for": "198.51.100.11" });
+  await page.goto("/login");
+  await page.getByLabel("Email").fill(ownerEmail);
+  await page.getByLabel("Mật khẩu").fill(ownerPassword);
+  await page.getByRole("button", { name: "Đăng nhập" }).click();
+  await expect(page).toHaveURL(/\/admin$/);
+}
+
+test("owner creates, edits, updates stock, and confirms product deletion", async ({
+  page,
+}) => {
+  const runId = `${Date.now()}-${process.pid}`;
+  const productName = `Giày Thử Nghiệm E2E ${runId}`;
+  const updatedProductName = `${productName} đã sửa`;
+  const sku = `E2E-SKU-${runId}`;
+
+  await loginAsOwner(page);
+  await page.goto("/admin/products");
+  await page.getByRole("link", { name: "Thêm sản phẩm" }).click();
+  await expect(page).toHaveURL(/\/admin\/products\/new$/);
+
+  await page.getByLabel("Tên sản phẩm").fill(productName);
+  await page.getByLabel("Giá (VND)").fill("199000");
+  const category = page.getByLabel("Danh mục");
+  await category.selectOption(await category.locator("option").first().getAttribute("value") ?? "");
   await page.getByLabel("Size").fill("40");
   await page.getByLabel("Màu").fill("Đen");
   await page.getByLabel("SKU").fill(sku);
   await page.getByLabel("Tồn kho").fill("10");
-
-  // 5) Submit → về /admin/products.
   await page.getByRole("button", { name: "Tạo sản phẩm" }).click();
-  await expect(page).toHaveURL(/\/admin\/products$/, { timeout: 15_000 });
 
-  // 6) Thấy sản phẩm mới trong bảng.
-  const row = page.getByRole("row", { name: new RegExp(productName) });
-  await expect(row).toBeVisible();
-  await expect(row.getByText("10", { exact: true })).toBeVisible(); // tổng tồn = 10 (1 biến thể)
+  await expect(page).toHaveURL(/\/admin\/products$/, { timeout: 15_000 });
+  await expectToast(page, "Đã tạo sản phẩm");
+  let productRow = page.getByRole("row").filter({ hasText: productName });
+  await expect(productRow).toContainText("10 đôi");
+
+  await productRow.getByRole("link", { name: "Sửa" }).click();
+  await expect(page.getByRole("heading", { name: "Sửa sản phẩm" })).toBeVisible();
+  await page.getByLabel("Tên sản phẩm").fill(updatedProductName);
+  await page.getByRole("button", { name: "Lưu thay đổi" }).click();
+
+  await expect(page).toHaveURL(/\/admin\/products$/, { timeout: 15_000 });
+  await expectToast(page, "Đã lưu thay đổi");
+  productRow = page.getByRole("row").filter({ hasText: updatedProductName });
+  await expect(productRow).toBeVisible();
+
+  await productRow.getByRole("link", { name: "Sửa" }).click();
+  const stockSection = page
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { name: "Chỉnh nhanh tồn kho" }) });
+  const stockRow = stockSection.getByRole("row").filter({ hasText: sku });
+  const stockInput = stockRow.getByLabel("Tồn kho");
+  await stockInput.fill("14");
+  await stockRow.getByRole("button", { name: "Lưu" }).click();
+  await expectToast(page, "Đã cập nhật tồn kho");
+  await expect(stockInput).toHaveValue("14");
+
+  await page.goto("/admin/products");
+  productRow = page.getByRole("row").filter({ hasText: updatedProductName });
+  await productRow.getByRole("button", { name: "Xoá" }).click();
+  const deletionDialog = page.getByRole("alertdialog", { name: "Xoá sản phẩm" });
+  await expect(deletionDialog).toContainText(updatedProductName);
+  await deletionDialog.getByRole("button", { name: "Hủy" }).click();
+  await expect(deletionDialog).toBeHidden();
+  await expect(productRow).toBeVisible();
+
+  await productRow.getByRole("button", { name: "Xoá" }).click();
+  await deletionDialog.getByRole("button", { name: "Xác nhận xoá" }).click();
+  await expectToast(page, "Đã xoá sản phẩm");
+  await expect(productRow).toHaveCount(0);
+});
+
+test.describe("mobile product administration", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("keeps navigation and product controls reachable", async ({ page }) => {
+    await loginAsOwner(page);
+    await page.goto("/admin/products");
+
+    const navigation = page.getByRole("navigation", {
+      name: "Điều hướng quản trị",
+    });
+    await expect(navigation).toBeVisible();
+    await expect(
+      navigation.getByRole("link", { name: "Sản phẩm" }),
+    ).toHaveAttribute("aria-current", "page");
+
+    for (const label of ["Sản phẩm", "Đơn hàng", "Đối soát"]) {
+      const link = navigation.getByRole("link", { name: label });
+      await link.scrollIntoViewIfNeeded();
+      const box = await link.boundingBox();
+      expect(box?.height).toBeGreaterThanOrEqual(40);
+    }
+
+    const addProduct = page.getByRole("link", { name: "Thêm sản phẩm" });
+    const addProductBox = await addProduct.boundingBox();
+    expect(addProductBox?.height).toBeGreaterThanOrEqual(40);
+    await expect(page.getByRole("region", { name: "Danh sách sản phẩm" })).toBeVisible();
+  });
 });
