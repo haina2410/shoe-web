@@ -18,9 +18,11 @@ const genericError =
   "Không thể cập nhật trạng thái đơn hàng lúc này. Vui lòng thử lại.";
 
 export function OrderStatusActions({
+  orderCode,
   orderId,
   targets,
 }: {
+  orderCode: string;
   orderId: string;
   targets: readonly OrderStatusValue[];
 }) {
@@ -100,6 +102,7 @@ export function OrderStatusActions({
                 isPending={isDisabled}
                 onConfirm={() => updateStatus(target)}
                 pendingLabel="Đang huỷ đơn…"
+                subject={`Đơn hàng ${orderCode}`}
                 title="Huỷ đơn hàng"
                 trigger={trigger}
               />

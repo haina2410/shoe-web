@@ -9,6 +9,44 @@ async function expectToast(page: import("@playwright/test").Page, title: string)
   await expect(liveRegion.getByText(title, { exact: true })).toBeVisible();
 }
 
+async function pauseServerAction(page: import("@playwright/test").Page) {
+  let start: () => void;
+  let finish: () => void;
+  let release: () => void;
+  let held = false;
+  const started = new Promise<void>((resolve) => {
+    start = resolve;
+  });
+  const finished = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const unblocked = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const handler = async (route: import("@playwright/test").Route) => {
+    if (!held && route.request().headers()["next-action"]) {
+      held = true;
+      start();
+      await unblocked;
+      await route.continue();
+      finish();
+      return;
+    }
+    await route.continue();
+  };
+
+  await page.route("**/*", handler);
+
+  return {
+    waitForStart: () => started,
+    async release() {
+      release();
+      await finished;
+      await page.unroute("**/*", handler);
+    },
+  };
+}
+
 async function loginAsOwner(page: import("@playwright/test").Page) {
   if (!ownerPassword) {
     throw new Error("E2E cần SEED_OWNER_PASSWORD trong môi trường test.");
@@ -67,12 +105,18 @@ test("owner creates, edits, updates stock, and confirms product deletion", async
   const stockRow = stockSection.getByRole("row").filter({ hasText: sku });
   const stockInput = stockRow.getByLabel("Tồn kho");
   await stockInput.fill("14");
+  const pendingStockUpdate = await pauseServerAction(page);
   await stockRow.getByRole("button", { name: "Lưu" }).click();
+  await pendingStockUpdate.waitForStart();
+  await expect(stockInput).toBeDisabled();
+  await expect(stockRow.getByRole("button", { name: "Đang lưu…" })).toBeDisabled();
+  await expect(stockRow.getByRole("status", { name: "Đang lưu…" })).toBeVisible();
+  await pendingStockUpdate.release();
   await expectToast(page, "Đã cập nhật tồn kho");
-  await expect(stockInput).toHaveValue("14");
 
   await page.goto("/admin/products");
   productRow = page.getByRole("row").filter({ hasText: updatedProductName });
+  await expect(productRow).toContainText("14 đôi");
   await productRow.getByRole("button", { name: "Xoá" }).click();
   const deletionDialog = page.getByRole("alertdialog", { name: "Xoá sản phẩm" });
   await expect(deletionDialog).toContainText(updatedProductName);

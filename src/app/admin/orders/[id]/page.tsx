@@ -93,6 +93,7 @@ export default async function AdminOrderDetailPage({
               <ConfirmPaymentButton orderCode={order.orderCode} orderId={order.id} />
             )}
             <OrderStatusActions
+              orderCode={order.orderCode}
               orderId={order.id}
               targets={order.nextOrderStatuses}
             />

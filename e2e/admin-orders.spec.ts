@@ -15,6 +15,44 @@ async function expectToast(page: import("@playwright/test").Page, title: string)
   await expect(liveRegion.getByText(title, { exact: true })).toBeVisible();
 }
 
+async function pauseServerAction(page: import("@playwright/test").Page) {
+  let start: () => void;
+  let finish: () => void;
+  let release: () => void;
+  let held = false;
+  const started = new Promise<void>((resolve) => {
+    start = resolve;
+  });
+  const finished = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const unblocked = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const handler = async (route: import("@playwright/test").Route) => {
+    if (!held && route.request().headers()["next-action"]) {
+      held = true;
+      start();
+      await unblocked;
+      await route.continue();
+      finish();
+      return;
+    }
+    await route.continue();
+  };
+
+  await page.route("**/*", handler);
+
+  return {
+    waitForStart: () => started,
+    async release() {
+      release();
+      await finished;
+      await page.unroute("**/*", handler);
+    },
+  };
+}
+
 async function loginAsStaffForE2E(page: import("@playwright/test").Page) {
   await page.context().setExtraHTTPHeaders({ "x-forwarded-for": "198.51.100.10" });
   await loginAsStaff(page);
@@ -48,7 +86,17 @@ test("staff confirms payment, applies safe transitions, and records a refund", a
   });
   await expect(paymentDialog).toContainText(orderCode);
   await expect(page.getByText("Chờ thanh toán", { exact: true })).toBeVisible();
+  const pendingPayment = await pauseServerAction(page);
   await paymentDialog.getByRole("button", { name: "Xác nhận" }).click();
+  await pendingPayment.waitForStart();
+  await expect(
+    paymentDialog.getByRole("button", { name: "Đang xác nhận…" }),
+  ).toBeDisabled();
+  await expect(
+    paymentDialog.getByRole("status", { name: "Đang xác nhận…" }),
+  ).toBeVisible();
+  await expect(page.locator("button").filter({ hasText: "Huỷ đơn" })).toBeDisabled();
+  await pendingPayment.release();
   await expectToast(page, "Đã xác nhận thanh toán");
   await expect(page.getByText("Đã thanh toán", { exact: true })).toBeVisible();
 
@@ -97,6 +145,7 @@ test("staff leaves a pending order unchanged until cancellation is confirmed", a
   await page.getByRole("button", { name: "Huỷ đơn" }).click();
   const cancellationDialog = page.getByRole("alertdialog", { name: "Huỷ đơn hàng" });
   await expect(cancellationDialog).toBeVisible();
+  await expect(cancellationDialog).toContainText(orderCode);
   await cancellationDialog.getByRole("button", { name: "Hủy" }).click();
   await expect(page.getByText("Chờ thanh toán", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Xác nhận thanh toán" })).toBeVisible();
@@ -178,6 +227,9 @@ test("staff validates then confirms reconciliation and sees refreshed records", 
   await matchDialog.getByRole("button", { name: "Xác nhận ghép" }).click();
   await expectToast(page, "Đã ghép giao dịch");
   await expect(reviewRow).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Không có giao dịch cần đối soát" }),
+  ).toBeVisible();
 
   await openOrder(page, orderCode);
   await expect(page.getByText("Đã thanh toán", { exact: true })).toBeVisible();

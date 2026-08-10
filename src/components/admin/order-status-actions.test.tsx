@@ -30,6 +30,7 @@ describe("OrderStatusActions", () => {
     const user = userEvent.setup();
     render(
       <OrderStatusActions
+        orderCode="LEAFABC123"
         orderId="order-1"
         targets={[OrderStatus.CANCELLED, OrderStatus.COMPLETED]}
       />,
@@ -47,7 +48,9 @@ describe("OrderStatusActions", () => {
 
     await user.click(screen.getByRole("button", { name: "Huỷ đơn" }));
 
-    expect(screen.getByRole("alertdialog", { name: "Huỷ đơn hàng" })).toBeInTheDocument();
+    expect(screen.getByRole("alertdialog", { name: "Huỷ đơn hàng" })).toHaveTextContent(
+      "Đơn hàng LEAFABC123",
+    );
     expect(updateOrderStatusActionMock).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: "Hủy" }));
@@ -65,6 +68,7 @@ describe("OrderStatusActions", () => {
   it("gives status action triggers 40px touch targets", () => {
     render(
       <OrderStatusActions
+        orderCode="LEAFABC124"
         orderId="order-1"
         targets={[OrderStatus.CANCELLED, OrderStatus.FULFILLED]}
       />,
@@ -93,6 +97,7 @@ describe("OrderStatusActions", () => {
     const user = userEvent.setup();
     render(
       <OrderStatusActions
+        orderCode="LEAFABC125"
         orderId="order-2"
         targets={[OrderStatus.CANCELLED, OrderStatus.FULFILLED]}
       />,
@@ -121,6 +126,7 @@ describe("OrderStatusActions", () => {
     const user = userEvent.setup();
     render(
       <OrderStatusActions
+        orderCode="LEAFABC126"
         orderId="order-3"
         targets={[OrderStatus.FULFILLED]}
       />,
@@ -142,6 +148,7 @@ describe("OrderStatusActions", () => {
     const user = userEvent.setup();
     render(
       <OrderStatusActions
+        orderCode="LEAFABC127"
         orderId="order-4"
         targets={[OrderStatus.COMPLETED]}
       />,
@@ -163,6 +170,7 @@ describe("OrderStatusActions", () => {
     const user = userEvent.setup();
     render(
       <OrderStatusActions
+        orderCode="LEAFABC128"
         orderId="order-5"
         targets={[OrderStatus.FULFILLED]}
       />,
