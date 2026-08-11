@@ -2,7 +2,7 @@ import { STORE_INFO } from "@/lib/storefront-content";
 import { toNavItems, type ContentPage } from "@/lib/content-page";
 
 /**
- * Bốn trang chính sách bắt buộc của một shop bán hàng online tại Việt Nam.
+ * Năm trang chính sách bắt buộc của một shop bán hàng online tại Việt Nam.
  *
  * Nội dung ở đây phải khớp với hành vi THẬT của hệ thống, vì khách sẽ đọc rồi
  * làm theo:
@@ -14,15 +14,55 @@ import { toNavItems, type ContentPage } from "@/lib/content-page";
  * Sửa hành vi trong code thì phải sửa cả trang tương ứng ở đây.
  */
 
-export const POLICY_SLUGS = ["thanh-toan", "giao-hang", "doi-tra", "bao-mat"] as const;
+export const POLICY_SLUGS = [
+  "huong-dan-mua-hang",
+  "giao-hang",
+  "thanh-toan",
+  "doi-tra",
+  "bao-mat",
+] as const;
 
 export type PolicySlug = (typeof POLICY_SLUGS)[number];
 
 export const POLICY_PAGES: Readonly<Record<PolicySlug, ContentPage>> = {
+  "huong-dan-mua-hang": {
+    href: "/chinh-sach/huong-dan-mua-hang",
+    navLabel: "Hướng dẫn mua hàng",
+    title: "Hướng dẫn mua hàng",
+    metaDescription:
+      "Các bước chọn sản phẩm, đặt hàng, thanh toán VietQR và tra cứu đơn hàng tại leafshoes Việt Nam.",
+    lead: "Bạn có thể đặt hàng trực tiếp trên website mà không cần tạo tài khoản. Hãy lưu mã đơn để thanh toán và theo dõi trạng thái sau khi đặt.",
+    sections: [
+      {
+        heading: "Các bước mua hàng",
+        bullets: [
+          "Xem danh sách sản phẩm, mở sản phẩm bạn muốn mua rồi chọn đúng màu, size và số lượng còn hàng.",
+          "Bấm “Thêm vào giỏ”, mở giỏ hàng và kiểm tra lại sản phẩm, phiên bản cùng số lượng. Bạn có thể tăng, giảm hoặc xoá sản phẩm trước khi tiếp tục.",
+          "Tới trang thanh toán, điền họ tên, email, số điện thoại và địa chỉ nhận hàng đầy đủ. Email được dùng để gửi xác nhận đơn và xác nhận thanh toán.",
+          "Kiểm tra tiền hàng rồi bấm “Đặt hàng”. Hệ thống tạo mã đơn và chuyển bạn tới trang xác nhận, nơi hiển thị sản phẩm, phí giao hàng và tổng tiền cần thanh toán.",
+          "Quét mã VietQR và chuyển đúng số tiền, đúng nội dung là mã đơn. Đơn chỉ được đóng gói sau khi hệ thống xác nhận đã nhận tiền.",
+        ],
+      },
+      {
+        heading: "Sau khi đặt hàng",
+        bullets: [
+          "Trang xác nhận và email đặt hàng đều có mã đơn. Bạn có thể nhập mã này tại trang Tra cứu đơn hàng để xem trạng thái mới nhất.",
+          "Khi giao dịch khớp, hệ thống chuyển đơn sang trạng thái đã thanh toán và gửi email xác nhận.",
+          "Đơn chưa thanh toán tự hết hạn sau 24 giờ và không còn giữ hàng. Nếu vẫn muốn mua, bạn cần đặt lại đơn mới.",
+        ],
+      },
+      {
+        heading: "Cần thay đổi thông tin đơn hàng",
+        paragraphs: [
+          `Website chưa hỗ trợ tự sửa đơn đã đặt. Bạn hãy liên hệ Zalo hoặc gọi ${STORE_INFO.phoneDisplay}, hoặc gửi email tới ${STORE_INFO.email}, kèm mã đơn và nội dung cần hỗ trợ. Khả năng thay đổi phụ thuộc trạng thái xử lý thực tế của đơn.`,
+        ],
+      },
+    ],
+  },
   "thanh-toan": {
     href: "/chinh-sach/thanh-toan",
-    navLabel: "Hướng dẫn thanh toán",
-    title: "Hướng dẫn thanh toán",
+    navLabel: "Hình thức thanh toán",
+    title: "Hình thức thanh toán",
     metaDescription:
       "Cách thanh toán đơn hàng leafshoes bằng chuyển khoản VietQR: chuyển đúng số tiền, nội dung đúng mã đơn, hệ thống tự đối soát.",
     lead: "Chúng tôi chỉ nhận chuyển khoản ngân hàng qua VietQR. Không thu tiền khi nhận hàng (COD), không thanh toán thẻ.",
@@ -32,7 +72,7 @@ export const POLICY_PAGES: Readonly<Record<PolicySlug, ContentPage>> = {
         bullets: [
           "Đặt hàng trên website. Sau khi đặt, bạn được chuyển tới trang đơn hàng có mã QR, số tiền cần chuyển và nội dung chuyển khoản.",
           "Quét mã VietQR bằng app ngân hàng, hoặc chuyển thủ công đúng số tiền tới số tài khoản hiển thị trên trang đơn.",
-          "Nội dung chuyển khoản phải là mã đơn hàng (dạng LEAF-XXXXXX). Đây là căn cứ duy nhất để hệ thống biết tiền thuộc đơn nào.",
+          "Nội dung chuyển khoản phải là mã đơn hàng (dạng LEAFXXXXXX). Đây là căn cứ duy nhất để hệ thống biết tiền thuộc đơn nào.",
           "Khi tiền về và khớp mã đơn, hệ thống tự chuyển đơn sang trạng thái đã thanh toán và gửi email xác nhận cho bạn.",
         ],
       },
@@ -64,7 +104,7 @@ export const POLICY_PAGES: Readonly<Record<PolicySlug, ContentPage>> = {
     title: "Chính sách giao hàng",
     metaDescription:
       "Phí giao hàng phẳng 30.000 ₫ toàn quốc, phạm vi 34 tỉnh thành, chỉ gửi hàng sau khi xác nhận thanh toán.",
-    lead: "Phí giao hàng là 30.000 ₫ cho mọi đơn và mọi tỉnh thành, hiển thị rõ trước khi bạn xác nhận đặt hàng.",
+    lead: "Phí giao hàng là 30.000 ₫ cho mọi đơn và mọi tỉnh thành. Phí được cộng vào tổng đơn và hiển thị trên trang xác nhận trước khi bạn chuyển khoản.",
     sections: [
       {
         heading: "Phạm vi và phí",
@@ -91,12 +131,37 @@ export const POLICY_PAGES: Readonly<Record<PolicySlug, ContentPage>> = {
   },
   "doi-tra": {
     href: "/chinh-sach/doi-tra",
-    navLabel: "Chính sách đổi trả",
-    title: "Chính sách đổi trả",
+    navLabel: "Chính sách bảo hành và đổi trả",
+    title: "Chính sách bảo hành và đổi trả",
     metaDescription:
-      "Điều kiện đổi trả giày leafshoes trong 7 ngày, cách gửi yêu cầu qua Zalo và cách hoàn tiền.",
-    lead: "Bạn có thể yêu cầu đổi hoặc trả hàng trong 7 ngày kể từ khi nhận, với điều kiện hàng còn nguyên trạng.",
+      "Bảo hành lỗi sản xuất trong 30 ngày, điều kiện đổi trả trong 7 ngày và cách gửi yêu cầu tới leafshoes Việt Nam.",
+    lead: "Sản phẩm được bảo hành lỗi sản xuất trong 30 ngày kể từ khi nhận hàng. Bạn có thể yêu cầu đổi hoặc trả trong 7 ngày đầu nếu đáp ứng điều kiện bên dưới.",
     sections: [
+      {
+        heading: "Bảo hành lỗi sản xuất trong 30 ngày",
+        bullets: [
+          "Thời hạn 30 ngày được tính từ ngày bạn nhận hàng.",
+          "Bảo hành áp dụng cho lỗi phát sinh từ quá trình sản xuất như bong keo bất thường, bung hoặc đứt đường may, hỏng phụ kiện hay chi tiết sản phẩm khi sử dụng đúng cách.",
+          "Bạn cần cung cấp mã đơn, mô tả tình trạng và ảnh rõ phần bị lỗi để chúng tôi xác định đúng sản phẩm.",
+          "Từ ngày thứ 8 đến ngày thứ 30, cửa hàng chỉ tiếp nhận bảo hành lỗi sản xuất, không áp dụng đổi trả vì chọn sai size hoặc thay đổi nhu cầu.",
+        ],
+      },
+      {
+        heading: "Phạm vi không bảo hành",
+        bullets: [
+          "Hao mòn tự nhiên, trầy xước hoặc biến dạng phát sinh trong quá trình sử dụng.",
+          "Hư hỏng do dùng sai mục đích, va đập, cắt rách hoặc bảo quản không đúng cách.",
+          "Hư hỏng do tiếp xúc với nước, nhiệt hoặc hoá chất không phù hợp với hướng dẫn sử dụng thông thường của sản phẩm.",
+          "Sản phẩm đã được tự sửa hoặc sửa tại nơi khác trước khi cửa hàng kiểm tra.",
+        ],
+      },
+      {
+        heading: "Cách xử lý bảo hành",
+        paragraphs: [
+          `Bạn nhắn Zalo hoặc gọi ${STORE_INFO.phoneDisplay}, hoặc gửi email tới ${STORE_INFO.email}, kèm mã đơn, mô tả và ảnh sản phẩm. Sau khi kiểm tra, chúng tôi sẽ thông báo phương án sửa chữa, đổi sản phẩm tương đương hoặc giải pháp khác được hai bên thống nhất.`,
+          "Nếu xác nhận là lỗi sản xuất thuộc phạm vi bảo hành, chúng tôi chịu chi phí gửi sản phẩm về và gửi lại cho bạn.",
+        ],
+      },
       {
         heading: "Điều kiện đổi trả",
         bullets: [
@@ -130,15 +195,15 @@ export const POLICY_PAGES: Readonly<Record<PolicySlug, ContentPage>> = {
         bullets: [
           "Hàng đã sử dụng, đã giặt hoặc hư hỏng do quá trình sử dụng.",
           "Hàng thiếu hộp, nhãn hoặc phụ kiện.",
-          "Yêu cầu gửi sau 7 ngày kể từ khi nhận hàng.",
+          "Yêu cầu đổi trả gửi sau 7 ngày kể từ khi nhận hàng. Lỗi sản xuất vẫn được tiếp nhận bảo hành trong thời hạn 30 ngày.",
         ],
       },
     ],
   },
   "bao-mat": {
     href: "/chinh-sach/bao-mat",
-    navLabel: "Chính sách bảo mật",
-    title: "Chính sách bảo mật",
+    navLabel: "Chính sách bảo mật thông tin",
+    title: "Chính sách bảo mật thông tin",
     metaDescription:
       "Thông tin leafshoes thu thập khi bạn đặt hàng, mục đích sử dụng, cách lưu trữ và quyền của bạn.",
     lead: "Chúng tôi chỉ thu thập thông tin cần thiết để giao được đơn hàng của bạn, và không dùng cho mục đích nào khác.",

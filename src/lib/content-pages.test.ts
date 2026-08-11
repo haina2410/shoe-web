@@ -14,7 +14,7 @@ const ALL_PAGES: readonly ContentPage[] = [...COMPANY_PAGES, ...POLICY_PAGE_LIST
  * Các trang nội dung là dữ liệu tĩnh, nên lỗi hay gặp nhất không phải lỗi
  * render mà là lỗi nội dung: quên viết một section, để lại chỗ trống, hoặc đặt
  * href lệch với route thật (link chết trong navbar). Test này chốt các bất biến
- * đó một lần cho cả bảy trang.
+ * đó một lần cho cả tám trang.
  */
 describe("nội dung trang tĩnh", () => {
   it("có đủ tiêu đề, mô tả và đoạn mở đầu cho mọi trang", () => {
@@ -43,7 +43,7 @@ describe("nội dung trang tĩnh", () => {
   });
 
   it("không còn chỗ trống chờ điền nội dung", () => {
-    // Không dùng "xxx" làm dấu hiệu: mã đơn thật có dạng LEAF-XXXXXX.
+    // Không dùng "xxx" làm dấu hiệu: mã đơn thật có dạng LEAFXXXXXX.
     const placeholder = /(TODO|TBD|FIXME|\[cần|\(điền|Lorem ipsum)/i;
 
     for (const page of ALL_PAGES) {

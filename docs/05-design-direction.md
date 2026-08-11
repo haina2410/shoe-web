@@ -44,6 +44,23 @@ cắt khoảng trắng, chuyển sang chữ hoa và, nếu tồn tại, chuyển
 `/orders/[orderCode]`. Mã sai định dạng và mã không tồn tại cùng hiển thị một
 banner “Không tìm thấy đơn hàng”, để không tiết lộ mã nào đã tồn tại.
 
+## Trang nội dung công khai
+
+Footer công khai đủ năm trang thông tin bán hàng: “Hướng dẫn mua hàng” tại
+`/chinh-sach/huong-dan-mua-hang`, “Chính sách giao hàng” tại
+`/chinh-sach/giao-hang`, “Hình thức thanh toán” tại
+`/chinh-sach/thanh-toan`, “Chính sách bảo hành và đổi trả” tại
+`/chinh-sach/doi-tra` và “Chính sách bảo mật thông tin” tại
+`/chinh-sach/bao-mat`. Nội dung dùng chung khung `ContentPageView` và được giữ
+tập trung trong `src/lib/policy-content.ts` để metadata, route render sẵn và
+điều hướng luôn cùng một nguồn.
+
+Nội dung công bố phải khớp hành vi thật của checkout và vận hành: khách đặt
+hàng không cần tài khoản, thanh toán duy nhất bằng chuyển khoản VietQR, phí giao
+hàng phẳng 30.000 ₫, đơn chưa thanh toán hết hạn sau 24 giờ, đổi trả đủ điều
+kiện trong 7 ngày và bảo hành lỗi sản xuất trong 30 ngày. Khi thay đổi một hành
+vi này, cập nhật trang chính sách tương ứng trong cùng thay đổi.
+
 ## Bề mặt quản trị
 
 Admin là giao diện vận hành, ưu tiên khả năng quét thông tin và thao tác an
