@@ -148,6 +148,16 @@ body {
   outline-offset: 3px;
 }
 
+@keyframes admin-spinner-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.admin-spinner {
+  animation: admin-spinner-rotate 0.75s linear infinite;
+}
+
 .skip-link {
   position: fixed;
   left: 1rem;

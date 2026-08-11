@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { OrderStatus } from "@/generated/prisma/enums";
 import { EmptyState } from "@/components/empty-state";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { AdminSection } from "@/components/admin/admin-section";
+import { AdminStatusBadge } from "@/components/admin/admin-status-badge";
 import { requireAdmin } from "@/lib/auth-guard";
 import { formatVnd } from "@/lib/money";
 import { ORDER_STATUS_LABEL } from "@/lib/order-status";
@@ -28,6 +31,21 @@ function refundLabel(order: AdminOrderListItem): string {
   return REFUND_LABEL[summarizePaymentLedger(order.payments).refundState];
 }
 
+function orderStatusTone(status: OrderStatus) {
+  if (status === OrderStatus.PENDING_PAYMENT) return "warning" as const;
+  if (status === OrderStatus.PAID) return "info" as const;
+  if (status === OrderStatus.FULFILLED) return "violet" as const;
+  if (status === OrderStatus.COMPLETED) return "success" as const;
+  return "danger" as const;
+}
+
+function refundTone(order: AdminOrderListItem) {
+  const refundState = summarizePaymentLedger(order.payments).refundState;
+  if (refundState === "FULL") return "success" as const;
+  if (refundState === "PARTIAL") return "warning" as const;
+  return "neutral" as const;
+}
+
 export default async function AdminOrdersPage({
   searchParams,
 }: {
@@ -42,17 +60,16 @@ export default async function AdminOrdersPage({
   const orders = await listAdminOrders(prisma, filters);
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold" style={{ color: "var(--evergreen)" }}>
-        Đơn hàng
-      </h1>
-      <p className="mt-2 text-neutral-600">
-        Theo dõi đơn hàng, trạng thái thanh toán và hoàn tiền.
-      </p>
+    <div className="grid gap-6">
+      <AdminPageHeader
+        description="Theo dõi đơn hàng, trạng thái thanh toán và hoàn tiền."
+        title="Đơn hàng"
+      />
 
-      <form
+      <AdminSection title="Lọc đơn hàng">
+        <form
         aria-label="Bộ lọc đơn hàng"
-        className="mt-6 grid gap-4 rounded-lg border p-4 sm:grid-cols-4"
+        className="grid gap-4 sm:grid-cols-4"
         method="get"
         style={{ borderColor: "var(--line)" }}
       >
@@ -101,25 +118,29 @@ export default async function AdminOrdersPage({
 
         <div className="sm:col-span-4">
           <button
-            className="rounded-md px-4 py-2 text-sm font-semibold text-white"
+            className="h-10 min-h-10 rounded-md px-4 py-2 text-sm font-semibold text-white"
             style={{ backgroundColor: "var(--evergreen)" }}
             type="submit"
           >
             Lọc đơn hàng
           </button>
         </div>
-      </form>
+        </form>
+      </AdminSection>
 
       {orders.length === 0 ? (
-        <EmptyState
-          action={{ href: "/admin/orders", label: "Xem tất cả đơn hàng" }}
-          description="Thử thay đổi bộ lọc hoặc xem lại tất cả đơn hàng."
-          title="Không tìm thấy đơn hàng"
-        />
+        <AdminSection title="Danh sách đơn hàng">
+          <EmptyState
+            action={{ href: "/admin/orders", label: "Xem tất cả đơn hàng" }}
+            description="Thử thay đổi bộ lọc hoặc xem lại tất cả đơn hàng."
+            title="Không tìm thấy đơn hàng"
+          />
+        </AdminSection>
       ) : (
-        <div
+        <AdminSection title="Danh sách đơn hàng">
+          <div
           aria-label="Danh sách đơn hàng"
-          className="mt-6 overflow-x-auto rounded-lg border"
+          className="overflow-x-auto rounded-lg border"
           role="region"
           style={{ borderColor: "var(--line)" }}
         >
@@ -152,32 +173,21 @@ export default async function AdminOrdersPage({
                   </td>
                   <td className="px-4 py-3">{formatVnd(order.total)}</td>
                   <td className="px-4 py-3">
-                    <span
-                      className="rounded-full px-2 py-1 text-xs font-medium"
-                      style={{
-                        backgroundColor: "var(--sage)",
-                        color: "var(--evergreen)",
-                      }}
-                    >
+                    <AdminStatusBadge tone={orderStatusTone(order.status)}>
                       {ORDER_STATUS_LABEL[order.status]}
-                    </span>
+                    </AdminStatusBadge>
                   </td>
                   <td className="px-4 py-3">
-                    <span
-                      className="rounded-full px-2 py-1 text-xs font-medium"
-                      style={{
-                        backgroundColor: "var(--sage)",
-                        color: "var(--evergreen)",
-                      }}
-                    >
+                    <AdminStatusBadge tone={refundTone(order)}>
                       {refundLabel(order)}
-                    </span>
+                    </AdminStatusBadge>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+          </div>
+        </AdminSection>
       )}
     </div>
   );

@@ -17,11 +17,19 @@ vi.mock("@/components/admin/match-transaction-form", () => ({
   MatchTransactionForm: ({
     bankTransactionId,
     initialPaymentCode,
+    transactionAmount,
+    transactionContent,
   }: {
     bankTransactionId: string;
     initialPaymentCode: string | null;
+    transactionAmount: string;
+    transactionContent: string;
   }) => (
-    <form aria-label={`Ghép ${bankTransactionId}`}>
+    <form
+      aria-label={`Ghép ${bankTransactionId}`}
+      data-transaction-amount={transactionAmount}
+      data-transaction-content={transactionContent}
+    >
       <input defaultValue={initialPaymentCode ?? ""} name="orderCode" />
     </form>
   ),
@@ -81,8 +89,17 @@ describe("ReviewedBankTransactionsPage", () => {
     expect(screen.getByText("•••• 6789")).toBeInTheDocument();
     expect(screen.getByText("120.000 ₫")).toBeInTheDocument();
     expect(screen.getByText("150.000 ₫")).toBeInTheDocument();
+    expect(screen.getByText("Đang chờ đối soát")).toBeInTheDocument();
     expect(screen.getByRole("form", { name: "Ghép review-oldest" })).toBeInTheDocument();
     expect(screen.getByRole("form", { name: "Ghép review-newer" })).toBeInTheDocument();
+    expect(screen.getByRole("form", { name: "Ghép review-oldest" })).toHaveAttribute(
+      "data-transaction-content",
+      "Thanh toan LEAFABC123",
+    );
+    expect(screen.getByRole("form", { name: "Ghép review-oldest" })).toHaveAttribute(
+      "data-transaction-amount",
+      "120.000 ₫",
+    );
     expect(
       screen.getByRole("region", { name: "Danh sách giao dịch cần đối soát" }),
     ).toBeInTheDocument();

@@ -20,12 +20,22 @@ export type ProductWithVariants = Product & { variants: Variant[] };
 
 export const VARIANT_IN_USE_ERROR =
   "Không thể xoá phân loại đã phát sinh đơn hàng. Hãy đặt tồn kho về 0.";
+export const PRODUCT_IN_USE_ERROR =
+  "Không thể xoá sản phẩm đang có dữ liệu liên quan.";
 export const STALE_STOCK_ERROR =
   "Tồn kho đã thay đổi. Hãy tải lại trang và thử lại.";
 
 export class ProductBusinessError extends Error {
-  constructor(public readonly code: "VARIANT_IN_USE" | "STALE_STOCK") {
-    super(code === "STALE_STOCK" ? STALE_STOCK_ERROR : VARIANT_IN_USE_ERROR);
+  constructor(
+    public readonly code: "VARIANT_IN_USE" | "PRODUCT_IN_USE" | "STALE_STOCK",
+  ) {
+    super(
+      code === "STALE_STOCK"
+        ? STALE_STOCK_ERROR
+        : code === "PRODUCT_IN_USE"
+          ? PRODUCT_IN_USE_ERROR
+          : VARIANT_IN_USE_ERROR,
+    );
     this.name = "ProductBusinessError";
   }
 }
@@ -202,12 +212,11 @@ export async function updateProductCore(
 export async function deleteProductCore(db: PrismaClient, id: string): Promise<void> {
   try {
     await db.product.delete({ where: { id } });
-  } catch (err) {
-    throw new Error(
-      `Không thể xoá sản phẩm: có thể một biến thể của sản phẩm này đang được tham chiếu bởi đơn hàng (${
-        err instanceof Error ? err.message : String(err)
-      })`,
-    );
+  } catch (error: unknown) {
+    if (isForeignKeyConstraintError(error)) {
+      throw new ProductBusinessError("PRODUCT_IN_USE");
+    }
+    throw error;
   }
 }
 

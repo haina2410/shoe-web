@@ -6,9 +6,13 @@ import { OrderStatus } from "@/generated/prisma/enums";
 const { updateOrderStatusActionMock } = vi.hoisted(() => ({
   updateOrderStatusActionMock: vi.fn(),
 }));
+const { showToastMock } = vi.hoisted(() => ({ showToastMock: vi.fn() }));
 
 vi.mock("@/server/actions/order-status", () => ({
   updateOrderStatusAction: updateOrderStatusActionMock,
+}));
+vi.mock("@/components/admin/admin-toast-provider", () => ({
+  useAdminToast: () => ({ show: showToastMock }),
 }));
 
 import { OrderStatusActions } from "./order-status-actions";
@@ -22,10 +26,11 @@ describe("OrderStatusActions", () => {
     });
   });
 
-  it("renders only supplied targets and submits the exact order and target", async () => {
+  it("requires a destructive confirmation before cancelling but keeps green transitions direct", async () => {
     const user = userEvent.setup();
     render(
       <OrderStatusActions
+        orderCode="LEAFABC123"
         orderId="order-1"
         targets={[OrderStatus.CANCELLED, OrderStatus.COMPLETED]}
       />,
@@ -43,10 +48,39 @@ describe("OrderStatusActions", () => {
 
     await user.click(screen.getByRole("button", { name: "Huỷ đơn" }));
 
+    expect(screen.getByRole("alertdialog", { name: "Huỷ đơn hàng" })).toHaveTextContent(
+      "Đơn hàng LEAFABC123",
+    );
+    expect(updateOrderStatusActionMock).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Hủy" }));
+    expect(updateOrderStatusActionMock).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Đánh dấu hoàn tất" }));
+
     expect(updateOrderStatusActionMock).toHaveBeenCalledTimes(1);
     expect(updateOrderStatusActionMock).toHaveBeenCalledWith(
       "order-1",
-      OrderStatus.CANCELLED,
+      OrderStatus.COMPLETED,
+    );
+  });
+
+  it("gives status action triggers 40px touch targets", () => {
+    render(
+      <OrderStatusActions
+        orderCode="LEAFABC124"
+        orderId="order-1"
+        targets={[OrderStatus.CANCELLED, OrderStatus.FULFILLED]}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Huỷ đơn" })).toHaveClass(
+      "h-10",
+      "min-h-10",
+    );
+    expect(screen.getByRole("button", { name: "Chuyển sang đang giao" })).toHaveClass(
+      "h-10",
+      "min-h-10",
     );
   });
 
@@ -63,17 +97,19 @@ describe("OrderStatusActions", () => {
     const user = userEvent.setup();
     render(
       <OrderStatusActions
+        orderCode="LEAFABC125"
         orderId="order-2"
         targets={[OrderStatus.CANCELLED, OrderStatus.FULFILLED]}
       />,
     );
 
-    await user.dblClick(screen.getByRole("button", { name: "Huỷ đơn" }));
+    await user.click(screen.getByRole("button", { name: "Huỷ đơn" }));
+    await user.dblClick(screen.getByRole("button", { name: "Huỷ đơn hàng" }));
 
     expect(updateOrderStatusActionMock).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("button", { name: "Đang cập nhật…" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Đang huỷ đơn…" })).toBeDisabled();
     expect(
-      screen.getByRole("button", { name: "Chuyển sang đang giao" }),
+      screen.getByRole("button", { name: "Chuyển sang đang giao", hidden: true }),
     ).toBeDisabled();
 
     resolveAction?.({ ok: true, status: OrderStatus.CANCELLED });
@@ -90,6 +126,7 @@ describe("OrderStatusActions", () => {
     const user = userEvent.setup();
     render(
       <OrderStatusActions
+        orderCode="LEAFABC126"
         orderId="order-3"
         targets={[OrderStatus.FULFILLED]}
       />,
@@ -111,6 +148,7 @@ describe("OrderStatusActions", () => {
     const user = userEvent.setup();
     render(
       <OrderStatusActions
+        orderCode="LEAFABC127"
         orderId="order-4"
         targets={[OrderStatus.COMPLETED]}
       />,
@@ -126,5 +164,24 @@ describe("OrderStatusActions", () => {
     expect(
       screen.queryByText(/Failed to find Server Action/),
     ).not.toBeInTheDocument();
+  });
+
+  it("announces a successful direct transition without updating the order locally", async () => {
+    const user = userEvent.setup();
+    render(
+      <OrderStatusActions
+        orderCode="LEAFABC128"
+        orderId="order-5"
+        targets={[OrderStatus.FULFILLED]}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Chuyển sang đang giao" }));
+
+    expect(showToastMock).toHaveBeenCalledWith({
+      title: "Đã cập nhật trạng thái đơn hàng",
+      description: "Thông tin đơn hàng sẽ được làm mới.",
+    });
+    expect(screen.getByRole("button", { name: "Chuyển sang đang giao" })).toBeInTheDocument();
   });
 });

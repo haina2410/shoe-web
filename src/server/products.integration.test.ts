@@ -233,6 +233,25 @@ describe("deleteProductCore", () => {
       await testPrisma.productImage.count({ where: { productId: product.id } }),
     ).toBe(0);
   });
+
+  it("đổi lỗi P2003 khi product có đơn hàng thành ProductBusinessError", async () => {
+    const category = await makeCategory();
+    const product = await createProductCore(testPrisma, baseCreateInput({}, category.id));
+
+    await payOneUnit({ product, variantId: product.variants[0].id });
+
+    await expect(deleteProductCore(testPrisma, product.id)).rejects.toMatchObject({
+      name: "ProductBusinessError",
+      code: "PRODUCT_IN_USE",
+    });
+    await expect(testPrisma.product.findUnique({ where: { id: product.id } })).resolves.not.toBeNull();
+  });
+
+  it("rethrows a non-P2003 deletion error", async () => {
+    await expect(deleteProductCore(testPrisma, "missing-product")).rejects.toMatchObject({
+      code: "P2025",
+    });
+  });
 });
 
 describe("updateVariantStockCore", () => {

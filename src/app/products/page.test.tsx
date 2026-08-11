@@ -17,6 +17,10 @@ vi.mock("@/components/filters", () => ({
   Filters: () => <aside aria-label="Bộ lọc sản phẩm" />,
 }));
 
+vi.mock("@/components/product-card", () => ({
+  ProductCard: () => <article aria-label="Sản phẩm thử" />,
+}));
+
 const { default: ProductsPage } = await import("./page");
 
 beforeEach(() => {
@@ -41,6 +45,16 @@ describe("ProductsPage", () => {
     expect(screen.getByRole("link", { name: "Xem tất cả sản phẩm" })).toHaveAttribute(
       "href",
       "/products",
+    );
+  });
+
+  it("keeps the public product grid independent of the admin alignment change", async () => {
+    listProductsMock.mockResolvedValue([{ id: "product-1" }]);
+
+    render(await ProductsPage({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByRole("article", { name: "Sản phẩm thử" }).parentElement).not.toHaveClass(
+      "self-start",
     );
   });
 });

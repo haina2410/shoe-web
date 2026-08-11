@@ -4,12 +4,12 @@ import { ContentPageView } from "@/components/content-page-view";
 import { POLICY_PAGES, POLICY_SLUGS, type PolicySlug } from "@/lib/policy-content";
 
 /**
- * `/chinh-sach/[slug]` — bốn trang chính sách dùng chung một route vì cấu trúc
+ * `/chinh-sach/[slug]` — năm trang chính sách dùng chung một route vì cấu trúc
  * hoàn toàn giống nhau (tiêu đề + đoạn mở đầu + các section).
  *
  * Theo `node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/dynamic-routes.md`
  * (Next 16): `params` là một Promise, phải `await`. `generateStaticParams` khai
- * báo đúng bốn slug nên bốn trang này được render sẵn lúc build; slug lạ dẫn tới
+ * báo đúng năm slug nên năm trang này được render sẵn lúc build; slug lạ dẫn tới
  * `notFound()`.
  */
 

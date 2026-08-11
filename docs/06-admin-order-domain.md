@@ -89,7 +89,11 @@ thể kiểm tra và thử lại.
 - `/admin/bank-transactions/review`: event cũ nhất trước, reason và form ghép
   mã đơn; không hiển thị raw JSON đầy đủ.
 
-Mutation UI có pending state, chặn double submit và công bố lỗi qua `aria-live`.
+Các mutation tài chính, huỷ đơn và ghép giao dịch mở xác nhận nêu rõ đối tượng
+và hệ quả; hủy dialog không thay đổi dữ liệu. Chuyển tiếp an toàn là một bước.
+UI có pending state, chặn double submit, khóa các action cạnh tranh và công bố
+lỗi cạnh thao tác qua `aria-live`. Thành công hiện toast ngắn nhưng dữ liệu có
+thẩm quyền vẫn là status, ledger và hàng danh sách được revalidate từ server;
 UI không optimistic-update tiền hoặc trạng thái đơn.
 
 ## Concurrency, audit và dữ liệu nhạy cảm

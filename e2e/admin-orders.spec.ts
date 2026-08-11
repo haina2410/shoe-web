@@ -9,7 +9,66 @@ function uniqueNumericProviderId(): number {
   return Date.now() * 1_000 + (process.pid % 1_000);
 }
 
-test("staff: xác nhận thanh toán → giao hàng → hoàn tất → hoàn tiền một phần", async ({
+async function expectToast(page: import("@playwright/test").Page, title: string) {
+  const liveRegion = page.getByRole("region", { name: "Notifications" });
+  await expect(liveRegion).toBeVisible();
+  await expect(liveRegion.getByText(title, { exact: true })).toBeVisible();
+}
+
+async function pauseServerAction(page: import("@playwright/test").Page) {
+  let start: () => void;
+  let finish: () => void;
+  let release: () => void;
+  let held = false;
+  const started = new Promise<void>((resolve) => {
+    start = resolve;
+  });
+  const finished = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const unblocked = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const handler = async (route: import("@playwright/test").Route) => {
+    if (!held && route.request().headers()["next-action"]) {
+      held = true;
+      start();
+      await unblocked;
+      await route.continue();
+      finish();
+      return;
+    }
+    await route.continue();
+  };
+
+  await page.route("**/*", handler);
+
+  return {
+    waitForStart: () => started,
+    async release() {
+      release();
+      await finished;
+      await page.unroute("**/*", handler);
+    },
+  };
+}
+
+async function loginAsStaffForE2E(page: import("@playwright/test").Page) {
+  await page.context().setExtraHTTPHeaders({ "x-forwarded-for": "198.51.100.10" });
+  await loginAsStaff(page);
+}
+
+async function openOrder(page: import("@playwright/test").Page, orderCode: string) {
+  await page.goto("/admin/orders");
+  await page.getByLabel("Mã đơn").fill(orderCode);
+  await page.getByRole("button", { name: "Lọc đơn hàng" }).click();
+  await page.getByRole("link", { name: orderCode }).click();
+  await expect(
+    page.getByRole("heading", { name: `Đơn hàng ${orderCode}` }),
+  ).toBeVisible();
+}
+
+test("staff confirms payment, applies safe transitions, and records a refund", async ({
   page,
 }) => {
   const runId = `${Date.now()}-${process.pid}`;
@@ -18,26 +77,36 @@ test("staff: xác nhận thanh toán → giao hàng → hoàn tất → hoàn ti
     `fulfillment-${runId}`,
   );
 
-  await loginAsStaff(page);
-  await page.goto("/admin/orders");
-  await page.getByLabel("Mã đơn").fill(orderCode);
-  await page.getByRole("button", { name: "Lọc đơn hàng" }).click();
-
-  const orderLink = page.getByRole("link", { name: orderCode });
-  await expect(orderLink).toBeVisible();
-  await orderLink.click();
-  await expect(
-    page.getByRole("heading", { name: `Đơn hàng ${orderCode}` }),
-  ).toBeVisible();
+  await loginAsStaffForE2E(page);
+  await openOrder(page, orderCode);
 
   await page.getByRole("button", { name: "Xác nhận thanh toán" }).click();
-  await expect(page.getByText(/^Đã thanh toán · Tạo lúc/)).toBeVisible();
+  const paymentDialog = page.getByRole("alertdialog", {
+    name: "Xác nhận thanh toán",
+  });
+  await expect(paymentDialog).toContainText(orderCode);
+  await expect(page.getByText("Chờ thanh toán", { exact: true })).toBeVisible();
+  const pendingPayment = await pauseServerAction(page);
+  await paymentDialog.getByRole("button", { name: "Xác nhận" }).click();
+  await pendingPayment.waitForStart();
+  await expect(
+    paymentDialog.getByRole("button", { name: "Đang xác nhận…" }),
+  ).toBeDisabled();
+  await expect(
+    paymentDialog.getByRole("status", { name: "Đang xác nhận…" }),
+  ).toBeVisible();
+  await expect(page.locator("button").filter({ hasText: "Huỷ đơn" })).toBeDisabled();
+  await pendingPayment.release();
+  await expectToast(page, "Đã xác nhận thanh toán");
+  await expect(page.getByText("Đã thanh toán", { exact: true })).toBeVisible();
 
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
   await page.getByRole("button", { name: "Chuyển sang đang giao" }).click();
-  await expect(page.getByText(/^Đang giao · Tạo lúc/)).toBeVisible();
+  await expectToast(page, "Đã cập nhật trạng thái đơn hàng");
+  await expect(page.getByText("Đang giao", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Đánh dấu hoàn tất" }).click();
-  await expect(page.getByText(/^Hoàn tất · Tạo lúc/)).toBeVisible();
+  await expect(page.getByText("Hoàn tất", { exact: true })).toBeVisible();
 
   const refundReference = `E2E-REFUND-${runId}`;
   const refundForm = page.getByRole("form", { name: "Hoàn tiền" });
@@ -49,19 +118,46 @@ test("staff: xác nhận thanh toán → giao hàng → hoàn tất → hoàn ti
   await refundForm
     .getByRole("button", { name: "Ghi nhận hoàn tiền" })
     .click();
+  const refundDialog = page.getByRole("alertdialog", { name: "Xác nhận hoàn tiền" });
+  await expect(refundDialog).toContainText(orderCode);
+  await refundDialog.getByRole("button", { name: "Xác nhận hoàn tiền" }).click();
 
-  const paymentSection = page
-    .getByRole("heading", { name: "Thanh toán và hoàn tiền" })
-    .locator("..");
-  await expect(paymentSection).toContainText("Hoàn tiền một phần");
-  await expect(
-    paymentSection.getByText("Tiền hoàn", { exact: true }).locator(".."),
-  ).toContainText("10.000 ₫");
-  await expect(paymentSection).toContainText(refundReference);
-  await expect(page.getByText(/^Hoàn tất · Tạo lúc/)).toBeVisible();
+  await expectToast(page, "Đã ghi nhận hoàn tiền");
+  await expect(page.getByText("Hoàn tiền một phần", { exact: true })).toBeVisible();
+  const paymentHistory = page.getByRole("region", { name: "Lịch sử thanh toán" });
+  await expect(paymentHistory).toContainText("Hoàn tiền");
+  await expect(paymentHistory).toContainText("10.000 ₫");
+  await expect(paymentHistory).toContainText(refundReference);
+  await expect(page.getByText("Hoàn tất", { exact: true })).toBeVisible();
 });
 
-test("staff: ghép giao dịch cần đối soát vào đúng đơn pending", async ({
+test("staff leaves a pending order unchanged until cancellation is confirmed", async ({
+  page,
+}) => {
+  const { orderCode } = await createPendingOrderViaCheckout(
+    page,
+    `cancellation-${Date.now()}-${process.pid}`,
+  );
+
+  await loginAsStaffForE2E(page);
+  await openOrder(page, orderCode);
+
+  await page.getByRole("button", { name: "Huỷ đơn" }).click();
+  const cancellationDialog = page.getByRole("alertdialog", { name: "Huỷ đơn hàng" });
+  await expect(cancellationDialog).toBeVisible();
+  await expect(cancellationDialog).toContainText(orderCode);
+  await cancellationDialog.getByRole("button", { name: "Hủy" }).click();
+  await expect(page.getByText("Chờ thanh toán", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Xác nhận thanh toán" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Huỷ đơn" }).click();
+  await cancellationDialog.getByRole("button", { name: "Huỷ đơn hàng" }).click();
+  await expectToast(page, "Đã cập nhật trạng thái đơn hàng");
+  await expect(page.getByText("Đã huỷ", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Huỷ đơn" })).toHaveCount(0);
+});
+
+test("staff validates then confirms reconciliation and sees refreshed records", async ({
   page,
 }) => {
   const providerId = uniqueNumericProviderId();
@@ -69,7 +165,6 @@ test("staff: ghép giao dịch cần đối soát vào đúng đơn pending", as
     page,
     `review-${providerId}`,
   );
-
   const webhookSecret = process.env.SEPAY_WEBHOOK_SECRET;
   const accountNumber = process.env.VIETQR_ACCOUNT_NO;
   if (!webhookSecret || !accountNumber) {
@@ -79,7 +174,7 @@ test("staff: ghép giao dịch cần đối soát vào đúng đơn pending", as
   }
 
   const uniqueContent = `E2E review ${providerId}`;
-  const payload = {
+  const rawBody = JSON.stringify({
     id: providerId,
     gateway: "MBBank",
     transactionDate: "2026-07-28 14:30:45",
@@ -92,8 +187,7 @@ test("staff: ghép giao dịch cần đối soát vào đúng đơn pending", as
     transferAmount: total,
     accumulated: total,
     referenceCode: `E2E-REVIEW-${providerId}`,
-  };
-  const rawBody = JSON.stringify(payload);
+  });
   const timestamp = String(Math.floor(Date.now() / 1_000));
   const signature = createHmac("sha256", webhookSecret)
     .update(`${timestamp}.${rawBody}`)
@@ -110,18 +204,33 @@ test("staff: ghép giao dịch cần đối soát vào đúng đơn pending", as
   expect(webhookResponse.status()).toBe(200);
   expect(await webhookResponse.json()).toEqual({ success: true });
 
-  await loginAsStaff(page);
+  await loginAsStaffForE2E(page);
   await page.goto("/admin/bank-transactions/review");
-
   const reviewRow = page.getByRole("row").filter({ hasText: uniqueContent });
   await expect(reviewRow).toBeVisible();
-  await reviewRow.getByLabel("Mã đơn").fill(orderCode);
-  await reviewRow.getByRole("button", { name: "Ghép giao dịch" }).click();
+  const matchForm = reviewRow.getByRole("form", { name: "Ghép giao dịch" });
+  await matchForm.getByLabel("Mã đơn").fill("invalid");
+  await matchForm.getByRole("button", { name: "Ghép giao dịch" }).click();
+  await page
+    .getByRole("alertdialog", { name: "Xác nhận ghép giao dịch" })
+    .getByRole("button", { name: "Xác nhận ghép" })
+    .click();
+  await expect(matchForm.getByRole("alert")).toHaveText("Mã đơn hàng không hợp lệ.");
+  await expect(reviewRow).toBeVisible();
+
+  await matchForm.getByLabel("Mã đơn").fill(orderCode);
+  await matchForm.getByRole("button", { name: "Ghép giao dịch" }).click();
+  const matchDialog = page.getByRole("alertdialog", {
+    name: "Xác nhận ghép giao dịch",
+  });
+  await expect(matchDialog).toContainText(orderCode);
+  await matchDialog.getByRole("button", { name: "Xác nhận ghép" }).click();
+  await expectToast(page, "Đã ghép giao dịch");
   await expect(reviewRow).toHaveCount(0);
 
-  await page.goto("/admin/orders");
-  await page.getByLabel("Mã đơn").fill(orderCode);
-  await page.getByRole("button", { name: "Lọc đơn hàng" }).click();
-  await page.getByRole("link", { name: orderCode }).click();
-  await expect(page.getByText(/^Đã thanh toán · Tạo lúc/)).toBeVisible();
+  await openOrder(page, orderCode);
+  await expect(page.getByText("Đã thanh toán", { exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Lịch sử thanh toán" })).toContainText(
+    "Tiền vào",
+  );
 });

@@ -1,12 +1,13 @@
 import { requireAdmin } from "@/lib/auth-guard";
 import { AdminNav } from "@/components/admin/admin-nav";
+import { AdminToastProvider } from "@/components/admin/admin-toast-provider";
 
 export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  await requireAdmin(); // chốt bảo mật thật: session thật + role (owner/staff)
+  await requireAdmin();
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-8 sm:py-10">
@@ -20,7 +21,9 @@ export default async function AdminLayout({
           </p>
           <AdminNav />
         </div>
-        <div className="px-4 py-6 sm:px-6 sm:py-8">{children}</div>
+        <AdminToastProvider scope="admin">
+          <div className="px-4 py-6 sm:px-6 sm:py-8">{children}</div>
+        </AdminToastProvider>
       </div>
     </section>
   );

@@ -4,7 +4,12 @@ import {
   OrderStatus,
   PaymentDirection,
 } from "@/generated/prisma/enums";
+import { AdminMetric } from "@/components/admin/admin-metric";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { AdminSection } from "@/components/admin/admin-section";
+import { AdminStatusBadge } from "@/components/admin/admin-status-badge";
 import { ConfirmPaymentButton } from "@/components/admin/confirm-payment-button";
+import { OrderActionGroup } from "@/components/admin/order-action-group";
 import { OrderStatusActions } from "@/components/admin/order-status-actions";
 import { RefundForm } from "@/components/admin/refund-form";
 import { requireAdmin } from "@/lib/auth-guard";
@@ -32,6 +37,20 @@ function maskAccountNumber(accountNumber: string): string {
   return `•••• ${accountNumber.slice(-4)}`;
 }
 
+function orderStatusTone(status: OrderStatus) {
+  if (status === OrderStatus.PENDING_PAYMENT) return "warning" as const;
+  if (status === OrderStatus.PAID) return "info" as const;
+  if (status === OrderStatus.FULFILLED) return "violet" as const;
+  if (status === OrderStatus.COMPLETED) return "success" as const;
+  return "danger" as const;
+}
+
+function refundTone(refundState: "NONE" | "PARTIAL" | "FULL") {
+  if (refundState === "FULL") return "success" as const;
+  if (refundState === "PARTIAL") return "warning" as const;
+  return "neutral" as const;
+}
+
 export default async function AdminOrderDetailPage({
   params,
 }: {
@@ -53,41 +72,37 @@ export default async function AdminOrderDetailPage({
 
   return (
     <div className="grid gap-8">
-      <header>
-        <h1
-          className="text-2xl font-bold"
-          style={{ color: "var(--evergreen)" }}
-        >
-          Đơn hàng {order.orderCode}
-        </h1>
-        <p className="mt-2 text-neutral-600">
-          {ORDER_STATUS_LABEL[order.status]} · Tạo lúc{" "}
-          {dateFormatter.format(order.createdAt)}
-        </p>
-      </header>
+      <AdminPageHeader
+        description={`Tạo lúc ${dateFormatter.format(order.createdAt)}`}
+        status={
+          <AdminStatusBadge tone={orderStatusTone(order.status)}>
+            {ORDER_STATUS_LABEL[order.status]}
+          </AdminStatusBadge>
+        }
+        title={`Đơn hàng ${order.orderCode}`}
+      />
 
-      <section
-        className="grid gap-3 rounded-lg border p-4"
-        style={{ borderColor: "var(--line)" }}
-      >
-        <h2 className="text-lg font-semibold">Thao tác</h2>
-        <div className="flex flex-wrap items-start gap-3">
-          {order.status === OrderStatus.PENDING_PAYMENT && (
-            <ConfirmPaymentButton orderId={order.id} />
-          )}
-          <OrderStatusActions
-            orderId={order.id}
-            targets={order.nextOrderStatuses}
-          />
-        </div>
-      </section>
+      <AdminSection title="Thao tác">
+        <OrderActionGroup>
+          <div
+            aria-label="Thao tác đơn hàng"
+            className="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-start"
+            role="group"
+          >
+            {order.status === OrderStatus.PENDING_PAYMENT && (
+              <ConfirmPaymentButton orderCode={order.orderCode} orderId={order.id} />
+            )}
+            <OrderStatusActions
+              orderCode={order.orderCode}
+              orderId={order.id}
+              targets={order.nextOrderStatuses}
+            />
+          </div>
+        </OrderActionGroup>
+      </AdminSection>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <section
-          className="rounded-lg border p-4"
-          style={{ borderColor: "var(--line)" }}
-        >
-          <h2 className="text-lg font-semibold">Khách hàng</h2>
+        <AdminSection title="Khách hàng">
           <dl className="mt-3 grid gap-2 text-sm">
             <div>
               <dt className="text-neutral-500">Họ tên</dt>
@@ -114,13 +129,9 @@ export default async function AdminOrderDetailPage({
               </div>
             )}
           </dl>
-        </section>
+        </AdminSection>
 
-        <section
-          className="rounded-lg border p-4"
-          style={{ borderColor: "var(--line)" }}
-        >
-          <h2 className="text-lg font-semibold">Tổng tiền</h2>
+        <AdminSection title="Chi tiết tổng tiền">
           <dl className="mt-3 grid gap-2 text-sm">
             <div className="flex justify-between gap-4">
               <dt>Tạm tính</dt>
@@ -135,11 +146,10 @@ export default async function AdminOrderDetailPage({
               <dd>{formatVnd(order.total)}</dd>
             </div>
           </dl>
-        </section>
+        </AdminSection>
       </div>
 
-      <section>
-        <h2 className="text-lg font-semibold">Sản phẩm</h2>
+      <AdminSection title="Sản phẩm">
         <div
           aria-label="Sản phẩm trong đơn hàng"
           className="mt-3 overflow-x-auto rounded-lg border"
@@ -177,35 +187,26 @@ export default async function AdminOrderDetailPage({
             </tbody>
           </table>
         </div>
-      </section>
+      </AdminSection>
 
-      <section
-        className="grid gap-4 rounded-lg border p-4"
-        style={{ borderColor: "var(--line)" }}
-      >
-        <h2 className="text-lg font-semibold">Thanh toán và hoàn tiền</h2>
-        <dl className="grid gap-2 text-sm sm:grid-cols-4">
-          <div>
-            <dt className="text-neutral-500">Tiền vào</dt>
-            <dd>{formatVnd(order.ledgerSummary.totalIn)}</dd>
-          </div>
-          <div>
-            <dt className="text-neutral-500">Tiền hoàn</dt>
-            <dd>{formatVnd(order.ledgerSummary.totalOut)}</dd>
-          </div>
-          <div>
-            <dt className="text-neutral-500">Thực nhận</dt>
-            <dd>{formatVnd(order.ledgerSummary.netReceived)}</dd>
-          </div>
-          <div>
-            <dt className="text-neutral-500">Tình trạng</dt>
-            <dd>{REFUND_LABEL[order.ledgerSummary.refundState]}</dd>
-          </div>
-        </dl>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <AdminMetric label="Tổng tiền" value={formatVnd(order.total)} />
+        <AdminMetric label="Đã nhận" value={formatVnd(order.ledgerSummary.totalIn)} />
+        <AdminMetric label="Đã hoàn" value={formatVnd(order.ledgerSummary.totalOut)} />
+        <AdminMetric label="Thực nhận" value={formatVnd(order.ledgerSummary.netReceived)} />
+      </div>
+
+      <AdminSection title="Thanh toán và hoàn tiền">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-neutral-500">Tình trạng</span>
+          <AdminStatusBadge tone={refundTone(order.ledgerSummary.refundState)}>
+            {REFUND_LABEL[order.ledgerSummary.refundState]}
+          </AdminStatusBadge>
+        </div>
 
         {hasRefundableBalance && (
           <div className="max-w-lg border-t pt-4" style={{ borderColor: "var(--line)" }}>
-            <RefundForm orderId={order.id} />
+            <RefundForm orderCode={order.orderCode} orderId={order.id} />
           </div>
         )}
 
@@ -271,10 +272,9 @@ export default async function AdminOrderDetailPage({
             </table>
           </div>
         )}
-      </section>
+      </AdminSection>
 
-      <section>
-        <h2 className="text-lg font-semibold">Giao dịch ngân hàng liên kết</h2>
+      <AdminSection title="Giao dịch ngân hàng liên kết">
         {order.bankTransactions.length === 0 ? (
           <p className="mt-3 text-sm text-neutral-600">
             Chưa có giao dịch ngân hàng liên kết.
@@ -322,7 +322,7 @@ export default async function AdminOrderDetailPage({
             </table>
           </div>
         )}
-      </section>
+      </AdminSection>
     </div>
   );
 }

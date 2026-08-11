@@ -5,9 +5,13 @@ import userEvent from "@testing-library/user-event";
 const { confirmPaymentManuallyActionMock } = vi.hoisted(() => ({
   confirmPaymentManuallyActionMock: vi.fn(),
 }));
+const { showToastMock } = vi.hoisted(() => ({ showToastMock: vi.fn() }));
 
 vi.mock("@/server/actions/payments", () => ({
   confirmPaymentManuallyAction: confirmPaymentManuallyActionMock,
+}));
+vi.mock("@/components/admin/admin-toast-provider", () => ({
+  useAdminToast: () => ({ show: showToastMock }),
 }));
 
 import { ConfirmPaymentButton } from "./confirm-payment-button";
@@ -18,7 +22,34 @@ describe("ConfirmPaymentButton", () => {
     confirmPaymentManuallyActionMock.mockResolvedValue({ ok: true });
   });
 
-  it("khóa nút trong lúc chờ và không gửi trùng khi người dùng bấm liên tiếp", async () => {
+  it("requires amber confirmation and does not submit when the dialog is dismissed", async () => {
+    const user = userEvent.setup();
+    render(<ConfirmPaymentButton orderCode="LEAFCONFIRM" orderId="order-1" />);
+
+    await user.click(screen.getByRole("button", { name: "Xác nhận thanh toán" }));
+
+    expect(screen.getByRole("alertdialog", { name: "Xác nhận thanh toán" })).toBeInTheDocument();
+    expect(screen.getByText("Đơn hàng LEAFCONFIRM")).toBeInTheDocument();
+    expect(confirmPaymentManuallyActionMock).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Hủy" }));
+    expect(confirmPaymentManuallyActionMock).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Xác nhận thanh toán" }));
+    await user.keyboard("{Escape}");
+    expect(confirmPaymentManuallyActionMock).not.toHaveBeenCalled();
+  });
+
+  it("gives the payment trigger a 40px touch target", () => {
+    render(<ConfirmPaymentButton orderCode="LEAFCONFIRM" orderId="order-1" />);
+
+    expect(screen.getByRole("button", { name: "Xác nhận thanh toán" })).toHaveClass(
+      "h-10",
+      "min-h-10",
+    );
+  });
+
+  it("submits after confirmation, locks the dialog while pending, and announces success", async () => {
     let resolveAction:
       | ((value: { ok: true } | { ok: false; error: string }) => void)
       | undefined;
@@ -29,14 +60,15 @@ describe("ConfirmPaymentButton", () => {
         }),
     );
     const user = userEvent.setup();
-    render(<ConfirmPaymentButton orderId="order-1" />);
+    render(<ConfirmPaymentButton orderCode="LEAFCONFIRM" orderId="order-1" />);
 
     const button = screen.getByRole("button", { name: "Xác nhận thanh toán" });
-    await user.dblClick(button);
+    await user.click(button);
+    await user.dblClick(screen.getByRole("button", { name: "Xác nhận" }));
 
     expect(confirmPaymentManuallyActionMock).toHaveBeenCalledTimes(1);
     expect(confirmPaymentManuallyActionMock).toHaveBeenCalledWith("order-1");
-    expect(button).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Hủy" })).toBeDisabled();
     expect(
       screen.getByRole("button", { name: "Đang xác nhận…" }),
     ).toBeDisabled();
@@ -45,6 +77,10 @@ describe("ConfirmPaymentButton", () => {
     expect(
       await screen.findByRole("button", { name: "Xác nhận thanh toán" }),
     ).toBeEnabled();
+    expect(showToastMock).toHaveBeenCalledWith({
+      title: "Đã xác nhận thanh toán",
+      description: "Đơn hàng LEAFCONFIRM sẽ được làm mới.",
+    });
   });
 
   it("hiển thị lỗi an toàn action trả về và cho phép thử lại", async () => {
@@ -53,11 +89,12 @@ describe("ConfirmPaymentButton", () => {
       error: "Đơn hàng không còn ở trạng thái chờ thanh toán.",
     });
     const user = userEvent.setup();
-    render(<ConfirmPaymentButton orderId="order-1" />);
+    render(<ConfirmPaymentButton orderCode="LEAFCONFIRM" orderId="order-1" />);
 
     await user.click(
       screen.getByRole("button", { name: "Xác nhận thanh toán" }),
     );
+    await user.click(screen.getByRole("button", { name: "Xác nhận" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Đơn hàng không còn ở trạng thái chờ thanh toán.",
@@ -72,11 +109,12 @@ describe("ConfirmPaymentButton", () => {
       new Error("Failed to find Server Action 012345"),
     );
     const user = userEvent.setup();
-    render(<ConfirmPaymentButton orderId="order-1" />);
+    render(<ConfirmPaymentButton orderCode="LEAFCONFIRM" orderId="order-1" />);
 
     await user.click(
       screen.getByRole("button", { name: "Xác nhận thanh toán" }),
     );
+    await user.click(screen.getByRole("button", { name: "Xác nhận" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Không thể xác nhận thanh toán lúc này. Vui lòng thử lại.",
