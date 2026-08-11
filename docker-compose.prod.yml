@@ -62,6 +62,7 @@ services:
       <<: *runtime-environment
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?required}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:?required}
+      CRAWL_POLICY: ${CRAWL_POLICY:-disallow}
       SEPAY_WEBHOOK_SECRET: ${SEPAY_WEBHOOK_SECRET:?required}
       UPLOAD_DIR: ${UPLOAD_DIR:-/data/uploads}
       MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-5242880}

@@ -45,6 +45,7 @@ COMPOSE_PROJECT_NAME=leafshoes
 RELEASE_TAG=latest
 APP_HOST_PORT=3000
 POSTGRES_HOST_PORT=5432
+CRAWL_POLICY=allow
 ```
 
 `RELEASE_TAG` quyết định tag image được pull. Nếu không đặt, Compose dùng
@@ -88,6 +89,13 @@ PostgreSQL publish container port `5432` duy nhất trên
 trên interface public. App chỉ bind `127.0.0.1:${APP_HOST_PORT}:3000`; database
 và upload là named volume bền vững theo project.
 
+`/robots.txt` đọc `CRAWL_POLICY` lúc chạy: chỉ `allow` mới cho crawler truy cập
+toàn site; `disallow`, giá trị sai hoặc thiếu đều chặn toàn site. Response được
+cache 5 phút ở client và 1 giờ ở shared cache. Khi đổi policy mà cần áp dụng
+trước khi TTL hết, purge đúng URL `/robots.txt` trên Cloudflare. Production
+bắt buộc dùng `allow`; staging dùng `disallow`. Đây là tín hiệu tự nguyện cho
+crawler, không thay thế xác thực nếu staging cần giữ kín.
+
 ### Staging bắt buộc trước production
 
 Tạo Stack staging bằng **cùng** Compose file, nhưng environment riêng:
@@ -97,6 +105,7 @@ COMPOSE_PROJECT_NAME=leafshoes-staging
 RELEASE_TAG=latest
 APP_HOST_PORT=3300
 POSTGRES_HOST_PORT=5433
+CRAWL_POLICY=disallow
 ```
 
 - Compose sẽ tạo PostgreSQL và uploads named volume riêng theo tên project.
@@ -488,6 +497,9 @@ incident ticket.
   Cloudflare Tunnel and database access goes through SSH forwarding.
 - [ ] `cloudflared` is healthy and only forwards the intended hostname/origin.
 - [ ] Cloudflare does not cache `/api/*` or `/admin/*` with `Cache Everything`.
+- [ ] Production uses `CRAWL_POLICY=allow`; staging uses
+  `CRAWL_POLICY=disallow`, and `/robots.txt` is purged when a policy change must
+  take effect before its cache TTL expires.
 - [ ] Komodo alone holds real secrets; Git, images, build args, logs and test
   reports do not contain them.
 - [ ] Release images carry no secrets: build arguments are placeholders only and

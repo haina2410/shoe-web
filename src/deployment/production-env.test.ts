@@ -12,6 +12,7 @@ describe("production environment validation", () => {
       ...Object.fromEntries(
         REQUIRED_PRODUCTION_ENV.map((name) => [name, `${name}-value`]),
       ),
+      CRAWL_POLICY: "allow",
     };
     delete env.POSTGRES_PASSWORD;
     delete env.BOT_TOKEN;
@@ -22,6 +23,15 @@ describe("production environment validation", () => {
       "BOT_TOKEN",
       "SEPAY_WEBHOOK_SECRET",
     ]);
+  });
+
+  it("rejects a crawler policy that would block production", () => {
+    const env: NodeJS.ProcessEnv = Object.fromEntries(
+      REQUIRED_PRODUCTION_ENV.map((name) => [name, `${name}-value`]),
+    );
+    env.CRAWL_POLICY = "disallow";
+
+    expect(validateProductionEnv(env)).toEqual(["CRAWL_POLICY"]);
   });
 
   it("CLI never echoes present secret values when validation fails", () => {
