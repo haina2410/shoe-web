@@ -4,7 +4,7 @@ export const STORE_INFO = {
   businessLine: "Sản xuất giày dép, phụ liệu dép",
   phoneDisplay: "0395.069.089",
   phoneDigits: "0395069089",
-  email: "leafshoes.vn@gmail.com",
+  email: "leafshoesvn@gmail.com",
   address: "Số 14, Đường Phú Sơn 3, Xã Bình Minh, TP. Đồng Nai",
   zaloUrl: "https://zalo.me/0395069089",
 } as const;

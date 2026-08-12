@@ -73,7 +73,7 @@ Thông tin doanh nghiệp hiển thị ở footer public:
 - **CÔNG TY TNHH LEAFSHOES VIỆT NAM**
 - Sản xuất giày dép, phụ liệu dép
 - Điện thoại: `0395.069.089`
-- Email: `leafshoes.vn@gmail.com`
+- Email: `leafshoesvn@gmail.com`
 - Địa chỉ: Số 14, Đường Phú Sơn 3, Xã Bình Minh, TP. Đồng Nai
 
 ## Chuẩn bị

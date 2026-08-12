@@ -16,7 +16,7 @@ describe("SiteFooter", () => {
     );
     expect(screen.getByRole("link", { name: STORE_INFO.email })).toHaveAttribute(
       "href",
-      "mailto:leafshoes.vn@gmail.com",
+      "mailto:leafshoesvn@gmail.com",
     );
   });
 

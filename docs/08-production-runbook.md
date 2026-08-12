@@ -367,7 +367,7 @@ After Resend verifies `leafshoesvietnam.com`, change to:
 
 ```dotenv
 MAIL_FROM=no-reply@leafshoesvietnam.com
-MAIL_REPLY_TO=leafshoesvietnam@gmail.com
+MAIL_REPLY_TO=leafshoesvn@gmail.com
 ```
 
 Confirm one controlled order causes the worker to send the expected email,
