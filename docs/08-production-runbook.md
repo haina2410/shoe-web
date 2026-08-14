@@ -221,13 +221,13 @@ Trước khi release production:
 3. Mở GitHub Actions, chọn `Release production` trên branch `main`, rồi bấm
    `Run workflow`.
 
-Manual run checkout lại `main`, chạy `script/release`, tạo annotated Git tag và
-GitHub Release cùng tên full commit SHA. Release có title
-`Leaf Shoes - <full commit SHA>` và generated notes bắt đầu từ release trước.
-Script từ chối checkout không còn là commit mới nhất và không force tag đã tồn
-tại. Sau khi tạo release thành công, cùng workflow run mới deploy production.
-Release tạo bằng `GITHUB_TOKEN` không sinh workflow run thứ hai, nên không deploy
-trùng.
+Manual run checkout lại `main`, chạy `script/release`, rồi tạo annotated Git tag
+và GitHub Release tên `leafshoes-<7 ký tự SHA>`. Release có title
+`Leaf Shoes - <7 ký tự SHA>` và generated notes bắt đầu từ release trước. Image
+và Komodo `RELEASE_TAG` vẫn dùng full 40 ký tự SHA. Script từ chối checkout không
+còn là commit mới nhất và không force tag đã tồn tại. Sau khi tạo release thành
+công, cùng workflow run mới deploy production. Release tạo bằng `GITHUB_TOKEN`
+không sinh workflow run thứ hai, nên không deploy trùng.
 
 API action không sửa environment của Stack và không truyền GitHub Release tag
 vào Compose. Tag deploy là `RELEASE_TAG` đang cấu hình trong Komodo; bỏ trống thì

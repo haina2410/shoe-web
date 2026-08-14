@@ -3,13 +3,15 @@ set -euo pipefail
 
 git fetch origin main --tags
 
-release_tag=$(git rev-parse origin/main)
-release_title="Leaf Shoes - $release_tag"
-previous_tag=$(git describe --tags --abbrev=0 "${release_tag}^" 2>/dev/null || true)
+release_commit=$(git rev-parse origin/main)
+release_hash=${release_commit:0:7}
+release_tag="leafshoes-$release_hash"
+release_title="Leaf Shoes - $release_hash"
+previous_tag=$(git describe --tags --abbrev=0 "${release_commit}^" 2>/dev/null || true)
 checkout_commit=$(git rev-parse HEAD)
 
-if [ "$checkout_commit" != "$release_tag" ]; then
-  echo "Checkout does not match latest main commit: HEAD=$checkout_commit origin/main=$release_tag" >&2
+if [ "$checkout_commit" != "$release_commit" ]; then
+  echo "Checkout does not match latest main commit: HEAD=$checkout_commit origin/main=$release_commit" >&2
   exit 1
 fi
 

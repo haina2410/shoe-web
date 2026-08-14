@@ -78,7 +78,9 @@ afterEach(() => {
 describe("script/release", () => {
   test("creates the first release from the latest main commit", () => {
     const fixture = createRepository();
-    const releaseTag = git(fixture.repository, "rev-parse", "HEAD");
+    const releaseCommit = git(fixture.repository, "rev-parse", "HEAD");
+    const releaseHash = releaseCommit.slice(0, 7);
+    const releaseTag = `leafshoes-${releaseHash}`;
 
     const result = runRelease(fixture.repository, fixture.environment);
 
@@ -96,20 +98,24 @@ describe("script/release", () => {
       "--verify-tag",
       "--generate-notes",
       "--title",
-      `Leaf Shoes - ${releaseTag}`,
+      `Leaf Shoes - ${releaseHash}`,
     ]);
   });
 
   test("generates notes from the preceding release tag", () => {
     const fixture = createRepository();
-    const previousTag = git(fixture.repository, "rev-parse", "HEAD");
-    git(fixture.repository, "tag", "-a", previousTag, "-m", `Leaf Shoes - ${previousTag}`);
+    const previousCommit = git(fixture.repository, "rev-parse", "HEAD");
+    const previousHash = previousCommit.slice(0, 7);
+    const previousTag = `leafshoes-${previousHash}`;
+    git(fixture.repository, "tag", "-a", previousTag, "-m", `Leaf Shoes - ${previousHash}`);
     git(fixture.repository, "push", "origin", previousTag);
     writeFileSync(path.join(fixture.repository, "version.txt"), "second\n");
     git(fixture.repository, "add", "version.txt");
     git(fixture.repository, "commit", "-m", "Second release");
     git(fixture.repository, "push", "origin", "main");
-    const releaseTag = git(fixture.repository, "rev-parse", "HEAD");
+    const releaseCommit = git(fixture.repository, "rev-parse", "HEAD");
+    const releaseHash = releaseCommit.slice(0, 7);
+    const releaseTag = `leafshoes-${releaseHash}`;
 
     const result = runRelease(fixture.repository, fixture.environment);
 
@@ -121,7 +127,7 @@ describe("script/release", () => {
       "--verify-tag",
       "--generate-notes",
       "--title",
-      `Leaf Shoes - ${releaseTag}`,
+      `Leaf Shoes - ${releaseHash}`,
       "--notes-start-tag",
       previousTag,
     ]);
@@ -129,7 +135,8 @@ describe("script/release", () => {
 
   test("refuses to overwrite an existing release tag", () => {
     const fixture = createRepository();
-    const releaseTag = git(fixture.repository, "rev-parse", "HEAD");
+    const releaseCommit = git(fixture.repository, "rev-parse", "HEAD");
+    const releaseTag = `leafshoes-${releaseCommit.slice(0, 7)}`;
     expect(runRelease(fixture.repository, fixture.environment).status).toBe(0);
 
     const result = runRelease(fixture.repository, fixture.environment);
