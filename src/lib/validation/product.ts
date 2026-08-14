@@ -89,7 +89,6 @@ function validateImageSets(
   }
 }
 
-/** Schema tạo sản phẩm mới kèm ít nhất 1 biến thể (+ ảnh, tuỳ chọn). */
 export const createProductInputSchema = z
   .object({
     product: productInputSchema,
@@ -130,7 +129,6 @@ export const variantSyncInputSchema = variantInputSchema.extend({
 
 export type VariantSyncInput = z.infer<typeof variantSyncInputSchema>;
 
-/** Schema cập nhật sản phẩm kèm danh sách biến thể (đồng bộ theo `variantSyncInputSchema`). */
 export const updateProductInputSchema = z
   .object({
     product: productInputSchema,
