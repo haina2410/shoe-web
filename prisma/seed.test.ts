@@ -51,8 +51,15 @@ describe("seed()", () => {
     const products = await testPrisma.product.findMany({
       select: {
         slug: true,
-        images: {
-          select: { url: true },
+        imageSets: {
+          select: {
+            color: true,
+            isDefault: true,
+            images: {
+              select: { url: true },
+              orderBy: [{ position: "asc" }, { id: "asc" }],
+            },
+          },
           orderBy: { position: "asc" },
         },
       },
@@ -65,10 +72,14 @@ describe("seed()", () => {
       const expectedImage =
         SEEDED_PRODUCT_IMAGE_BY_SLUG[
           product.slug as keyof typeof SEEDED_PRODUCT_IMAGE_BY_SLUG
-        ];
+      ];
       expect(expectedImage).toBeDefined();
-      expect(product.images.map((image) => image.url)).toEqual([
-        expectedImage,
+      expect(product.imageSets).toEqual([
+        {
+          color: "Đen",
+          isDefault: true,
+          images: [{ url: expectedImage }],
+        },
       ]);
     }
   });
