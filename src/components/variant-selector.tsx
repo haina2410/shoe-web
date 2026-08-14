@@ -7,13 +7,6 @@ import { Button } from "@/components/ui/button";
 import { useCart } from "@/lib/cart";
 import type { Variant } from "@/generated/prisma/client";
 
-/**
- * `VariantSelector` — chọn size + màu cho trang chi tiết sản phẩm.
- *
- * Client Component: giữ state lựa chọn size/màu, resolve ra variant tương ứng
- * (nếu có) và hiển thị tồn kho. Nút "Thêm vào giỏ" gọi `useCart().addItem`
- * (xem `@/lib/cart`) khi đã chọn được 1 variant còn hàng.
- */
 export function VariantSelector({
   variants,
   basePrice,
@@ -21,6 +14,8 @@ export function VariantSelector({
   slug,
   name,
   imageUrl,
+  selectedColor,
+  onColorChange,
 }: {
   variants: Variant[];
   basePrice: number;
@@ -28,6 +23,8 @@ export function VariantSelector({
   slug: string;
   name: string;
   imageUrl: string | null;
+  selectedColor: string | null;
+  onColorChange: (color: string) => void;
 }) {
   const addItem = useCart((state) => state.addItem);
 
@@ -41,7 +38,6 @@ export function VariantSelector({
   );
 
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
-  const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [justAdded, setJustAdded] = useState(false);
 
   const matchedVariant =
@@ -101,7 +97,7 @@ export function VariantSelector({
               role="radio"
               aria-checked={selectedColor === color}
               onClick={() => {
-                setSelectedColor(color);
+                onColorChange(color);
                 setJustAdded(false);
               }}
               className="rounded-md border px-3 py-1.5 text-sm"

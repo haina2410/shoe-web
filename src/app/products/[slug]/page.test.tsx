@@ -16,8 +16,9 @@ vi.mock("next/image", () => ({
   ),
 }));
 
-vi.mock("@/components/variant-selector", () => ({
-  VariantSelector: () => <div data-testid="variant-selector" />,
+vi.mock("@/lib/cart", () => ({
+  useCart: (selector: (state: { addItem: ReturnType<typeof vi.fn> }) => unknown) =>
+    selector({ addItem: vi.fn() }),
 }));
 
 const { default: ProductDetailPage } = await import("./page");
@@ -28,7 +29,23 @@ const product = {
   name: "Giày chạy bộ nam",
   basePrice: 890000,
   description: "Êm nhẹ cho mỗi ngày.",
-  images: [{ id: "image-1", productId: "product-1", url: "/products/run.png", position: 0 }],
+  imageSets: [
+    {
+      id: "set-1",
+      productId: "product-1",
+      color: "Đen",
+      position: 0,
+      isDefault: true,
+      images: [
+        {
+          id: "image-1",
+          imageSetId: "set-1",
+          url: "/products/run.png",
+          position: 0,
+        },
+      ],
+    },
+  ],
   variants: [],
   category: { id: "category-1", name: "Chạy bộ", slug: "chay-bo" },
 };
@@ -58,6 +75,8 @@ describe("ProductDetailPage", () => {
     );
     expect(screen.getByText("Thanh toán VietQR")).toBeInTheDocument();
     expect(screen.getByText("Hỗ trợ qua Zalo")).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: product.name })).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: `${product.name} - Đen` }),
+    ).toBeInTheDocument();
   });
 });
