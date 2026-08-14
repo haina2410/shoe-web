@@ -30,7 +30,12 @@ Nguyên tắc: nền paper + chữ ink chiếm ~90% diện tích; evergreen làm
 - Nav tối giản dính trên: logo trái, danh mục giữa/phải, giỏ hàng góc phải. Nền paper, kẻ hairline dưới.
 - **Hero product-forward:** mở đầu bằng **ảnh sản phẩm lớn** (không phải "số to + nhãn nhỏ"), tiêu đề ngắn + 1 CTA.
 - Lưới sản phẩm như gallery, nhiều khoảng trắng, card viền hairline (không đổ bóng nặng).
-- Trang chi tiết: ảnh lớn bên trái, chọn size/màu + tồn kho + nút thêm giỏ bên phải.
+- Trang chi tiết: ảnh lớn bên trái, chọn size/màu + tồn kho + nút thêm giỏ bên
+  phải. Mỗi màu có thể có một bộ ảnh riêng. Trước khi chọn màu, gallery dùng
+  bộ mặc định; sau khi chọn, gallery dùng bộ cùng màu và fallback về bộ mặc
+  định, rồi bộ đầu tiên. Đổi bộ luôn trở về ảnh đầu của bộ. Desktop đặt thumbnail
+  theo cột bên trái ảnh chính; mobile đặt thumbnail trong hàng cuộn ngang dưới
+  ảnh. Thumbnail là nút có trạng thái chọn và thao tác được bằng bàn phím.
 
 Trang chủ theo cấu trúc curated storefront: navbar có tìm kiếm, liên kết “Tra
 cứu đơn hàng” và số lượng giỏ, banner tĩnh, ba lối vào danh mục, sản phẩm mới,

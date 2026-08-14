@@ -7,7 +7,7 @@
 ```
 Category 1──* Product 1──* Variant
                   │
-                  1──* ProductImage
+                  1──* ProductImageSet 1──* ProductImage
 Order 1──* OrderItem *──1 Variant (tham chiếu + snapshot)
 Order 1──* Payment
 Order 1──* BankTransaction
@@ -15,7 +15,7 @@ ShippingZone 1──* ProvinceZone (tỉnh → zone)
 AdminUser (Better Auth: user/session/account)
 ```
 
-## Prisma schema (nháp)
+## Prisma schema (rút gọn)
 
 ```prisma
 model Category {
@@ -37,7 +37,7 @@ model Product {
   category    Category       @relation(fields: [categoryId], references: [id])
   basePrice   Int            // VND, lưu số nguyên (đồng)
   status      ProductStatus  @default(DRAFT)
-  images      ProductImage[]
+  imageSets   ProductImageSet[]
   variants    Variant[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
@@ -45,12 +45,23 @@ model Product {
 
 enum ProductStatus { DRAFT ACTIVE ARCHIVED }
 
-model ProductImage {
-  id        String  @id @default(cuid())
+model ProductImageSet {
+  id        String         @id @default(cuid())
   productId String
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  url       String
-  position  Int     @default(0)
+  product   Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  color     String
+  position  Int            @default(0)
+  isDefault Boolean        @default(false)
+  images    ProductImage[]
+  @@unique([productId, color])
+}
+
+model ProductImage {
+  id         String          @id @default(cuid())
+  imageSetId String
+  imageSet   ProductImageSet @relation(fields: [imageSetId], references: [id], onDelete: Cascade)
+  url        String
+  position   Int             @default(0)
 }
 
 model Variant {
@@ -157,6 +168,13 @@ model ProvinceZone {
 - Tổng `OUT` cộng dồn không được vượt tổng `IN`; thao tác hoàn tiền khóa đơn
   trong transaction để hai yêu cầu đồng thời cũng không vượt số thực nhận.
 - **Tồn kho ở cấp `Variant`** (theo size+màu) đúng yêu cầu.
+- **Ảnh nhóm theo màu:** mỗi `ProductImageSet.color` phải khớp một màu đang có
+  trong `Variant` của cùng sản phẩm. Mỗi sản phẩm có tối đa một bộ cho mỗi màu.
+- Sản phẩm có bộ ảnh phải có đúng một bộ `isDefault=true`; unique index có điều
+  kiện ở PostgreSQL chặn nhiều bộ mặc định. Mỗi bộ đã lưu có ít nhất một ảnh.
+  Thứ tự bộ và ảnh được xác định bằng `position`, sau đó `id` để phá hoà.
+- Ảnh đại diện và gallery ưu tiên bộ mặc định; dữ liệu cũ hoặc không đầy đủ
+  thiếu bộ mặc định dùng bộ có thứ tự đầu tiên.
 - **Phí ship theo vùng**: `ProvinceZone` ánh xạ 63 tỉnh → zone; nếu tỉnh chưa map thì dùng zone mặc định.
 
 ## Quản lý tồn kho (demo)
