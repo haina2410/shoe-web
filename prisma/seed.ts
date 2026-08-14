@@ -79,7 +79,18 @@ const PRODUCTS: ProductSeed[] = [
     description: "Đệm êm, trọng lượng nhẹ, phù hợp chạy đường dài.",
     basePrice: 10000,
     categorySlug: "giay-chay-bo",
-    imageSets: [{ color: "Đen", isDefault: true, images: [SEEDED_PRODUCT_IMAGE_BY_SLUG["giay-chay-bo-em-nhe"]] }],
+    imageSets: [
+      {
+        color: "Đen",
+        isDefault: true,
+        images: [SEEDED_PRODUCT_IMAGE_BY_SLUG["giay-chay-bo-em-nhe"]],
+      },
+      {
+        color: "Trắng",
+        isDefault: false,
+        images: ["/products/giay-chay-bo-em-nhe-1.png"],
+      },
+    ],
     variants: makeVariants("RUN-EN"),
   },
   {

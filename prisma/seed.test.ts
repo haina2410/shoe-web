@@ -74,13 +74,48 @@ describe("seed()", () => {
           product.slug as keyof typeof SEEDED_PRODUCT_IMAGE_BY_SLUG
       ];
       expect(expectedImage).toBeDefined();
-      expect(product.imageSets).toEqual([
-        {
-          color: "Đen",
-          isDefault: true,
-          images: [{ url: expectedImage }],
-        },
-      ]);
+      const defaultImageSet = product.imageSets.find(
+        (imageSet) => imageSet.isDefault,
+      );
+      expect(defaultImageSet).toEqual({
+        color: "Đen",
+        isDefault: true,
+        images: [{ url: expectedImage }],
+      });
     }
+  });
+
+  it("seed hai bộ ảnh màu cho mẫu giày chạy bộ êm nhẹ", async () => {
+    await seed(testPrisma);
+
+    const product = await testPrisma.product.findUniqueOrThrow({
+      where: { slug: "giay-chay-bo-em-nhe" },
+      select: {
+        imageSets: {
+          select: {
+            color: true,
+            isDefault: true,
+            images: {
+              select: { url: true },
+              orderBy: [{ position: "asc" }, { id: "asc" }],
+            },
+          },
+          orderBy: { position: "asc" },
+        },
+      },
+    });
+
+    expect(product.imageSets).toEqual([
+      {
+        color: "Đen",
+        isDefault: true,
+        images: [{ url: "/products/giay-chay-bo-em-nhe-den-1.png" }],
+      },
+      {
+        color: "Trắng",
+        isDefault: false,
+        images: [{ url: "/products/giay-chay-bo-em-nhe-1.png" }],
+      },
+    ]);
   });
 });

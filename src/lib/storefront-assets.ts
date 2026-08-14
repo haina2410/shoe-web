@@ -5,7 +5,7 @@ export const SEEDED_PRODUCT_IMAGE_BY_SLUG = {
     "/products/sneaker-la-xanh-co-thap-1.png",
   "sneaker-do-thi-nang-dong":
     "/products/sneaker-do-thi-nang-dong-1.png",
-  "giay-chay-bo-em-nhe": "/products/giay-chay-bo-em-nhe-1.png",
+  "giay-chay-bo-em-nhe": "/products/giay-chay-bo-em-nhe-den-1.png",
   "giay-chay-bo-dia-hinh": "/products/giay-chay-bo-dia-hinh-1.png",
   "sandal-quai-ngang-mua-he":
     "/products/sandal-quai-ngang-mua-he-1.png",
