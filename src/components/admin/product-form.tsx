@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition, type ChangeEvent } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAdminToast } from "@/components/admin/admin-toast-provider";
 import { AdminSpinner } from "@/components/admin/admin-spinner";
@@ -33,6 +34,13 @@ export type ProductFormImage = {
   url: string;
 };
 
+export type ProductFormImageSet = {
+  key: string;
+  color: string;
+  isDefault: boolean;
+  images: ProductFormImage[];
+};
+
 export type ProductFormInitial = {
   product: {
     name: string;
@@ -49,7 +57,12 @@ export type ProductFormInitial = {
     priceOverride: number | null;
     stock: number;
   }>;
-  images: Array<{ url: string; position: number }>;
+  imageSets: Array<{
+    color: string;
+    position: number;
+    isDefault: boolean;
+    images: Array<{ url: string; position: number }>;
+  }>;
 };
 
 let keySeq = 0;
@@ -123,15 +136,32 @@ export function ProductForm({
       : [emptyVariantRow()],
   );
 
-  const [images, setImages] = useState<ProductFormImage[]>(
+  const [imageSets, setImageSets] = useState<ProductFormImageSet[]>(
     initial
-      ? [...initial.images]
+      ? [...initial.imageSets]
           .sort((a, b) => a.position - b.position)
-          .map((img) => ({ key: nextKey(), url: img.url }))
+          .map((imageSet) => ({
+            key: nextKey(),
+            color: imageSet.color,
+            isDefault: imageSet.isDefault,
+            images: [...imageSet.images]
+              .sort((a, b) => a.position - b.position)
+              .map((image) => ({ key: nextKey(), url: image.url })),
+          }))
       : [],
   );
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadingSetKey, setUploadingSetKey] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<{
+    setKey: string;
+    message: string;
+  } | null>(null);
+  const variantColors = [
+    ...new Set(variants.map((variant) => variant.color.trim()).filter(Boolean)),
+  ];
+  const availableColors = variantColors.filter(
+    (color) => !imageSets.some((imageSet) => imageSet.color === color),
+  );
+  const isUploading = uploadingSetKey !== null;
   const isLocked = isPending || isUploading;
 
   function addVariantRow() {
@@ -155,14 +185,54 @@ export function ProductForm({
     );
   }
 
-  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+  function addImageSet() {
+    if (isLocked || availableColors.length === 0) return;
+    setImageSets((sets) => [
+      ...sets,
+      {
+        key: nextKey(),
+        color: availableColors[0],
+        isDefault: false,
+        images: [],
+      },
+    ]);
+  }
+
+  function removeImageSet(key: string) {
+    if (isLocked) return;
+    setImageSets((sets) => sets.filter((imageSet) => imageSet.key !== key));
+  }
+
+  function updateImageSetColor(key: string, color: string) {
+    if (isLocked) return;
+    setImageSets((sets) =>
+      sets.map((imageSet) =>
+        imageSet.key === key ? { ...imageSet, color } : imageSet,
+      ),
+    );
+  }
+
+  function setDefaultImageSet(key: string) {
+    if (isLocked) return;
+    setImageSets((sets) =>
+      sets.map((imageSet) => ({
+        ...imageSet,
+        isDefault: imageSet.key === key,
+      })),
+    );
+  }
+
+  async function handleFileChange(
+    setKey: string,
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
     if (isPending) return;
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
 
     setUploadError(null);
-    setIsUploading(true);
+    setUploadingSetKey(setKey);
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -176,7 +246,7 @@ export function ProductForm({
           typeof data === "object" && data !== null && "error" in data
             ? String((data as { error: unknown }).error)
             : "Tải ảnh lên thất bại.";
-        setUploadError(message);
+        setUploadError({ setKey, message });
         return;
       }
       const url =
@@ -184,31 +254,71 @@ export function ProductForm({
           ? String((data as { url: unknown }).url)
           : null;
       if (!url) {
-        setUploadError("Phản hồi tải ảnh không hợp lệ.");
+        setUploadError({
+          setKey,
+          message: "Phản hồi tải ảnh không hợp lệ.",
+        });
         return;
       }
-      setImages((imgs) => [...imgs, { key: nextKey(), url }]);
+      setImageSets((sets) =>
+        sets.map((imageSet) =>
+          imageSet.key === setKey
+            ? {
+                ...imageSet,
+                images: [...imageSet.images, { key: nextKey(), url }],
+              }
+            : imageSet,
+        ),
+      );
       show({
         title: "Đã tải ảnh lên",
         description: "Ảnh đã được thêm vào sản phẩm.",
         tone: "success",
       });
     } catch {
-      setUploadError("Tải ảnh lên thất bại. Vui lòng thử lại.");
+      setUploadError({
+        setKey,
+        message: "Tải ảnh lên thất bại. Vui lòng thử lại.",
+      });
     } finally {
-      setIsUploading(false);
+      setUploadingSetKey(null);
     }
   }
 
-  function removeImage(key: string) {
+  function removeImage(setKey: string, imageKey: string) {
     if (isLocked) return;
-    setImages((imgs) => imgs.filter((i) => i.key !== key));
+    setImageSets((sets) =>
+      sets.map((imageSet) =>
+        imageSet.key === setKey
+          ? {
+              ...imageSet,
+              images: imageSet.images.filter((image) => image.key !== imageKey),
+            }
+          : imageSet,
+      ),
+    );
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (inFlight.current || isUploading) return;
     setError(null);
+
+    if (imageSets.some((imageSet) => !variantColors.includes(imageSet.color))) {
+      setError("Hãy gán lại hoặc xoá bộ ảnh có màu không còn trong biến thể.");
+      return;
+    }
+    if (imageSets.some((imageSet) => imageSet.images.length === 0)) {
+      setError("Mỗi bộ ảnh phải có ít nhất một ảnh.");
+      return;
+    }
+    if (
+      imageSets.length > 0 &&
+      imageSets.filter((imageSet) => imageSet.isDefault).length !== 1
+    ) {
+      setError("Hãy chọn đúng một bộ ảnh mặc định.");
+      return;
+    }
 
     const parsedBasePrice = Number(basePrice);
     const product = {
@@ -230,9 +340,14 @@ export function ProductForm({
       stock: Math.round(Number(v.stock) || 0),
     }));
 
-    const imagesPayload = images.map((img, index) => ({
-      url: img.url,
-      position: index,
+    const imageSetsPayload = imageSets.map((imageSet, position) => ({
+      color: imageSet.color,
+      position,
+      isDefault: imageSet.isDefault,
+      images: imageSet.images.map((image, imagePosition) => ({
+        url: image.url,
+        position: imagePosition,
+      })),
     }));
 
     inFlight.current = true;
@@ -243,12 +358,12 @@ export function ProductForm({
             ? await createProductAction({
                 product,
                 variants: variantsPayload,
-                images: imagesPayload,
+                imageSets: imageSetsPayload,
               } satisfies CreateProductInput)
             : await updateProductAction(productId as string, {
                 product,
                 variants: variantsPayload,
-                images: imagesPayload,
+                imageSets: imageSetsPayload,
               } satisfies UpdateProductInput);
 
         if (!result.ok) {
@@ -485,59 +600,150 @@ export function ProductForm({
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold" style={{ color: "var(--evergreen)" }}>
-          Ảnh sản phẩm
-        </h2>
-
-        <div className="flex flex-wrap items-center gap-3">
-          {images.map((img) => (
-            <div key={img.key} className="relative">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={img.url}
-                alt=""
-                className="h-20 w-20 rounded-md object-cover"
-                style={{ backgroundColor: "var(--sage)" }}
-              />
-              <button
-                type="button"
-                onClick={() => removeImage(img.key)}
-                disabled={isLocked}
-                className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full text-xs"
-                style={{ backgroundColor: "var(--destructive)", color: "white" }}
-                aria-label="Xoá ảnh"
-              >
-                ×
-              </button>
-            </div>
-          ))}
-
-          <label
-            className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-md border border-dashed text-xs text-center"
-            style={{ borderColor: "var(--line)", color: "var(--muted-foreground)" }}
+        <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+          <div>
+            <h2 className="text-lg font-semibold" style={{ color: "var(--evergreen)" }}>
+              Bộ ảnh theo màu
+            </h2>
+            <p className="mt-1 text-sm text-neutral-600">
+              Chọn màu từ danh sách biến thể và chỉ định một bộ mặc định.
+            </p>
+          </div>
+          <Button
+            className="h-10 min-h-10"
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={addImageSet}
+            disabled={isLocked || availableColors.length === 0}
           >
-            {isUploading ? (
-              <>
-                <AdminSpinner label="Đang tải ảnh…" />
-                <span aria-hidden="true">Đang tải ảnh…</span>
-              </>
-            ) : (
-              "+ Thêm ảnh"
-            )}
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="hidden"
-              onChange={handleFileChange}
-              disabled={isLocked}
-            />
-          </label>
+            Thêm bộ ảnh
+          </Button>
         </div>
-        {uploadError && (
-          <p role="alert" className="text-sm" style={{ color: "var(--destructive)" }}>
-            {uploadError}
-          </p>
-        )}
+
+        <div className="space-y-4">
+          {imageSets.map((imageSet) => {
+            const selectableColors = variantColors.filter(
+              (color) =>
+                color === imageSet.color ||
+                !imageSets.some((candidate) => candidate.color === color),
+            );
+
+            return (
+              <div
+                key={imageSet.key}
+                data-testid="image-set-panel"
+                className="rounded-lg border p-4"
+                style={{ borderColor: "var(--line)" }}
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div className="flex flex-wrap items-end gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">
+                        Màu bộ ảnh
+                        <select
+                          aria-label="Màu bộ ảnh"
+                          value={imageSet.color}
+                          disabled={isLocked}
+                          onChange={(event) =>
+                            updateImageSetColor(imageSet.key, event.target.value)
+                          }
+                          className="mt-1 block rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
+                          style={{
+                            borderColor: "var(--line)",
+                            backgroundColor: "var(--paper)",
+                            color: "var(--ink)",
+                          }}
+                        >
+                          {!variantColors.includes(imageSet.color) && (
+                            <option value={imageSet.color}>{imageSet.color}</option>
+                          )}
+                          {selectableColors.map((color) => (
+                            <option key={color} value={color}>
+                              {color}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                    <label className="flex min-h-10 items-center gap-2 text-sm font-medium">
+                      <input
+                        type="radio"
+                        name="default-image-set"
+                        checked={imageSet.isDefault}
+                        disabled={isLocked}
+                        onChange={() => setDefaultImageSet(imageSet.key)}
+                      />
+                      Bộ mặc định
+                    </label>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="xs"
+                    disabled={isLocked}
+                    onClick={() => removeImageSet(imageSet.key)}
+                  >
+                    Xoá bộ ảnh
+                  </Button>
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  {imageSet.images.map((image) => (
+                    <div key={image.key} className="relative">
+                      <Image
+                        src={image.url}
+                        alt=""
+                        width={80}
+                        height={80}
+                        unoptimized={image.url.startsWith("/api/uploads/") || image.url.startsWith("/uploads/")}
+                        className="h-20 w-20 rounded-md object-cover"
+                        style={{ backgroundColor: "var(--sage)" }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeImage(imageSet.key, image.key)}
+                        disabled={isLocked}
+                        className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full text-xs"
+                        style={{ backgroundColor: "var(--destructive)", color: "white" }}
+                        aria-label="Xoá ảnh"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+
+                  <label
+                    className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-md border border-dashed text-center text-xs"
+                    style={{ borderColor: "var(--line)", color: "var(--muted-foreground)" }}
+                  >
+                    {uploadingSetKey === imageSet.key ? (
+                      <>
+                        <AdminSpinner label="Đang tải ảnh…" />
+                        <span aria-hidden="true">Đang tải ảnh…</span>
+                      </>
+                    ) : (
+                      "+ Thêm ảnh"
+                    )}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      aria-label={`Thêm ảnh cho bộ ${imageSet.color}`}
+                      className="hidden"
+                      onChange={(event) => handleFileChange(imageSet.key, event)}
+                      disabled={isLocked}
+                    />
+                  </label>
+                </div>
+                {uploadError?.setKey === imageSet.key && (
+                  <p role="alert" className="mt-3 text-sm" style={{ color: "var(--destructive)" }}>
+                    {uploadError.message}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </section>
 
       {error && (
