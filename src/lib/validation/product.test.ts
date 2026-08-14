@@ -161,6 +161,12 @@ describe("createProductInputSchema", () => {
     categoryId: "cat-1",
     basePrice: 250000,
   };
+  const validImageSet = {
+    color: "Đen",
+    position: 0,
+    isDefault: true,
+    images: [{ url: "/api/uploads/products/black.webp", position: 0 }],
+  };
 
   it("chấp nhận payload hợp lệ với ít nhất 1 biến thể", () => {
     const result = createProductInputSchema.safeParse({
@@ -184,6 +190,69 @@ describe("createProductInputSchema", () => {
       variants: [validVariant],
     });
     expect(result.success).toBe(false);
+  });
+
+  it("chấp nhận bộ ảnh thuộc màu của biến thể", () => {
+    expect(
+      createProductInputSchema.safeParse({
+        product: validProduct,
+        variants: [validVariant],
+        imageSets: [validImageSet],
+      }).success,
+    ).toBe(true);
+  });
+
+  it("từ chối hai bộ ảnh trùng màu", () => {
+    expect(
+      createProductInputSchema.safeParse({
+        product: validProduct,
+        variants: [validVariant],
+        imageSets: [validImageSet, { ...validImageSet, position: 1 }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("từ chối bộ ảnh không thuộc màu biến thể", () => {
+    expect(
+      createProductInputSchema.safeParse({
+        product: validProduct,
+        variants: [validVariant],
+        imageSets: [{ ...validImageSet, color: "Trắng" }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("từ chối bộ ảnh rỗng", () => {
+    expect(
+      createProductInputSchema.safeParse({
+        product: validProduct,
+        variants: [validVariant],
+        imageSets: [{ ...validImageSet, images: [] }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("từ chối danh sách bộ ảnh không có bộ mặc định", () => {
+    expect(
+      createProductInputSchema.safeParse({
+        product: validProduct,
+        variants: [validVariant],
+        imageSets: [{ ...validImageSet, isDefault: false }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("từ chối nhiều bộ ảnh mặc định", () => {
+    expect(
+      createProductInputSchema.safeParse({
+        product: validProduct,
+        variants: [validVariant, { ...validVariant, color: "Trắng", sku: "SKU-002" }],
+        imageSets: [
+          validImageSet,
+          { ...validImageSet, color: "Trắng", position: 1 },
+        ],
+      }).success,
+    ).toBe(false);
   });
 });
 
@@ -256,7 +325,7 @@ describe("updateProductInputSchema optimistic stock contract", () => {
       updateProductInputSchema.safeParse({
         product,
         variants: [{ ...variant, id: "variant-1" }],
-        images: [],
+        imageSets: [],
       }).success,
     ).toBe(false);
   });
@@ -266,7 +335,7 @@ describe("updateProductInputSchema optimistic stock contract", () => {
       updateProductInputSchema.safeParse({
         product,
         variants: [{ ...variant, id: "variant-1", expectedStock: 10 }],
-        images: [],
+        imageSets: [],
       }).success,
     ).toBe(true);
   });
@@ -276,7 +345,7 @@ describe("updateProductInputSchema optimistic stock contract", () => {
       updateProductInputSchema.safeParse({
         product,
         variants: [variant],
-        images: [],
+        imageSets: [],
       }).success,
     ).toBe(true);
   });
