@@ -208,16 +208,34 @@ Trong GitHub Actions, cấu hình:
 - repository variable `KOMODO_PRODUCTION_STACK_NAME`: tên Stack production.
 
 Workflow dùng `pandeptwidyaop/komodoactions@v1` để gọi Komodo API. Staging chạy
-sau khi toàn bộ image của một push `main` được publish; production chạy khi một
-GitHub Release không phải prerelease được publish. Cả hai bật
+sau khi toàn bộ image của một push `main` được publish. Production chạy khi
+workflow `Release production` tạo release theo yêu cầu hoặc khi một GitHub
+Release không phải prerelease được publish từ bên ngoài workflow. Cả hai bật
 `pull-before-deploy`, chờ PullStack thành công rồi mới gọi DeployStack.
+
+Trước khi release production:
+
+1. Xác nhận workflow `Publish images` đã thành công cho commit mới nhất của
+   `main` và staging của đúng commit đó đã được kiểm tra.
+2. Đặt `RELEASE_TAG` trong Stack production Komodo thành full commit SHA đó.
+3. Mở GitHub Actions, chọn `Release production` trên branch `main`, rồi bấm
+   `Run workflow`.
+
+Manual run checkout lại `main`, chạy `script/release`, tạo annotated Git tag và
+GitHub Release cùng tên full commit SHA. Release có title
+`Leaf Shoes - <full commit SHA>` và generated notes bắt đầu từ release trước.
+Script từ chối checkout không còn là commit mới nhất và không force tag đã tồn
+tại. Sau khi tạo release thành công, cùng workflow run mới deploy production.
+Release tạo bằng `GITHUB_TOKEN` không sinh workflow run thứ hai, nên không deploy
+trùng.
 
 API action không sửa environment của Stack và không truyền GitHub Release tag
 vào Compose. Tag deploy là `RELEASE_TAG` đang cấu hình trong Komodo; bỏ trống thì
 Compose dùng `latest`. Vì vậy GitHub Release chỉ là cổng kích hoạt production.
 Muốn deploy một full commit SHA cụ thể, đặt `RELEASE_TAG` của Stack production
-thành SHA đã được workflow `Publish images` build trước khi publish Release.
-Draft và prerelease không deploy production.
+thành SHA đã được workflow `Publish images` build trước khi chạy
+`Release production` hoặc publish Release. Draft và prerelease không deploy
+production.
 
 Kết quả mong đợi: image `app`, `worker`, `migrate`, `smoke` pull thành công ở
 tag trong `RELEASE_TAG`; PostgreSQL healthy; migration one-shot exit `0`; app và

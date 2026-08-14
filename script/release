@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+git fetch origin main --tags
+
+release_tag=$(git rev-parse origin/main)
+release_title="Leaf Shoes - $release_tag"
+previous_tag=$(git describe --tags --abbrev=0 "${release_tag}^" 2>/dev/null || true)
+checkout_commit=$(git rev-parse HEAD)
+
+if [ "$checkout_commit" != "$release_tag" ]; then
+  echo "Checkout does not match latest main commit: HEAD=$checkout_commit origin/main=$release_tag" >&2
+  exit 1
+fi
+
+if git show-ref --verify --quiet "refs/tags/$release_tag"; then
+  echo "Release tag already exists: $release_tag" >&2
+  exit 1
+fi
+
+git tag -a "$release_tag" -m "$release_title"
+git push origin "$release_tag"
+
+release_arguments=(
+  release create "$release_tag"
+  --verify-tag
+  --generate-notes
+  --title "$release_title"
+)
+
+if [ -n "$previous_tag" ]; then
+  release_arguments+=(--notes-start-tag "$previous_tag")
+fi
+
+gh "${release_arguments[@]}"

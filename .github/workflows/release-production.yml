@@ -1,4 +1,4 @@
-name: Deploy production
+name: Release production
 
 on:
   release:
@@ -10,9 +10,33 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  create_release:
+    name: Create latest main release
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: ./script/release
+
   deploy_production:
     name: Redeploy production with Komodo
-    if: github.event.release.prerelease == false
+    needs: create_release
+    if: >-
+      always() &&
+      ((github.event_name == 'workflow_dispatch' && needs.create_release.result == 'success') ||
+      (github.event_name == 'release' && github.event.release.prerelease == false))
     runs-on: ubuntu-latest
     permissions:
       contents: read
