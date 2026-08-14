@@ -53,7 +53,7 @@ const editInitial = {
       stock: 5,
     },
   ],
-  images: [],
+  imageSets: [],
 };
 
 async function fillRequiredProductFields(user: ReturnType<typeof userEvent.setup>) {
@@ -153,6 +153,95 @@ describe("ProductForm — biến thể inline", () => {
     });
   });
 
+  it("thêm bộ ảnh từ các màu biến thể mà không cho trùng màu", async () => {
+    const user = userEvent.setup();
+    render(
+      <ProductForm
+        mode="edit"
+        productId="product-1"
+        categories={categories}
+        initial={{
+          ...editInitial,
+          variants: [
+            ...editInitial.variants,
+            {
+              id: "variant-2",
+              size: "42",
+              color: "Trắng",
+              sku: "SKU-002",
+              priceOverride: null,
+              stock: 3,
+            },
+          ],
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Thêm bộ ảnh" }));
+    await user.click(screen.getByRole("button", { name: "Thêm bộ ảnh" }));
+
+    expect(screen.getAllByTestId("image-set-panel")).toHaveLength(2);
+    expect(screen.getAllByLabelText("Màu bộ ảnh").map((select) => select)).toEqual([
+      expect.objectContaining({ value: "Đen" }),
+      expect.objectContaining({ value: "Trắng" }),
+    ]);
+    expect(screen.getByRole("button", { name: "Thêm bộ ảnh" })).toBeDisabled();
+  });
+
+  it("chuyển bộ mặc định rõ ràng trước khi lưu", async () => {
+    const user = userEvent.setup();
+    render(
+      <ProductForm
+        mode="edit"
+        productId="product-1"
+        categories={categories}
+        initial={{
+          ...editInitial,
+          variants: [
+            ...editInitial.variants,
+            {
+              id: "variant-2",
+              size: "42",
+              color: "Trắng",
+              sku: "SKU-002",
+              priceOverride: null,
+              stock: 3,
+            },
+          ],
+          imageSets: [
+            {
+              color: "Đen",
+              position: 0,
+              isDefault: true,
+              images: [{ url: "/uploads/black.webp", position: 0 }],
+            },
+            {
+              color: "Trắng",
+              position: 1,
+              isDefault: false,
+              images: [{ url: "/uploads/white.webp", position: 0 }],
+            },
+          ],
+        }}
+      />,
+    );
+
+    await user.click(screen.getAllByRole("radio", { name: "Bộ mặc định" })[1]);
+    await user.click(screen.getByRole("button", { name: "Lưu thay đổi" }));
+
+    await waitFor(() => {
+      expect(updateProductActionMock).toHaveBeenCalledWith(
+        "product-1",
+        expect.objectContaining({
+          imageSets: [
+            expect.objectContaining({ color: "Đen", isDefault: false }),
+            expect.objectContaining({ color: "Trắng", isDefault: true }),
+          ],
+        }),
+      );
+    });
+  });
+
   it("locks submitted fields and competing controls while a save is pending", async () => {
     let resolveAction: ((value: { ok: true }) => void) | undefined;
     createProductActionMock.mockImplementation(
@@ -200,13 +289,20 @@ describe("ProductForm — biến thể inline", () => {
         categories={categories}
         initial={{
           ...editInitial,
-          images: [{ url: "/uploads/existing.webp", position: 0 }],
+          imageSets: [
+            {
+              color: "Đen",
+              position: 0,
+              isDefault: true,
+              images: [{ url: "/uploads/existing.webp", position: 0 }],
+            },
+          ],
         }}
       />,
     );
 
     await user.upload(
-      screen.getByLabelText("+ Thêm ảnh"),
+      screen.getByLabelText("Thêm ảnh cho bộ Đen"),
       new File(["image"], "shoe.webp", { type: "image/webp" }),
     );
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
@@ -235,9 +331,16 @@ describe("ProductForm — biến thể inline", () => {
     await waitFor(() => {
       expect(createProductActionMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          images: [
-            { url: "/uploads/existing.webp", position: 0 },
-            { url: "/uploads/shoe.webp", position: 1 },
+          imageSets: [
+            {
+              color: "Đen",
+              position: 0,
+              isDefault: true,
+              images: [
+                { url: "/uploads/existing.webp", position: 0 },
+                { url: "/uploads/shoe.webp", position: 1 },
+              ],
+            },
           ],
         }),
       );
@@ -253,13 +356,20 @@ describe("ProductForm — biến thể inline", () => {
         categories={categories}
         initial={{
           ...editInitial,
-          images: [{ url: "/uploads/existing.webp", position: 0 }],
+          imageSets: [
+            {
+              color: "Đen",
+              position: 0,
+              isDefault: true,
+              images: [{ url: "/uploads/existing.webp", position: 0 }],
+            },
+          ],
         }}
       />,
     );
 
     await user.upload(
-      screen.getByLabelText("+ Thêm ảnh"),
+      screen.getByLabelText("Thêm ảnh cho bộ Đen"),
       new File(["image"], "shoe.webp", { type: "image/webp" }),
     );
 
@@ -267,7 +377,39 @@ describe("ProductForm — biến thể inline", () => {
       "Tải ảnh lên thất bại. Vui lòng thử lại.",
     );
     expect(document.querySelector("img")).toHaveAttribute("src", "/uploads/existing.webp");
-    expect(screen.getByLabelText("+ Thêm ảnh")).toBeEnabled();
+    expect(screen.getByLabelText("Thêm ảnh cho bộ Đen")).toBeEnabled();
+  });
+
+  it("chặn lưu khi màu bộ ảnh không còn trong biến thể", async () => {
+    const user = userEvent.setup();
+    render(
+      <ProductForm
+        mode="edit"
+        productId="product-1"
+        categories={categories}
+        initial={{
+          ...editInitial,
+          imageSets: [
+            {
+              color: "Đen",
+              position: 0,
+              isDefault: true,
+              images: [{ url: "/uploads/existing.webp", position: 0 }],
+            },
+          ],
+        }}
+      />,
+    );
+
+    const variantColor = screen.getByLabelText("Màu");
+    await user.clear(variantColor);
+    await user.type(variantColor, "Xanh");
+    await user.click(screen.getByRole("button", { name: "Lưu thay đổi" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Hãy gán lại hoặc xoá bộ ảnh có màu không còn trong biến thể.",
+    );
+    expect(updateProductActionMock).not.toHaveBeenCalled();
   });
 
   it("retains entered values and shows a safe error when the save fails", async () => {

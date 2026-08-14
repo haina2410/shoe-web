@@ -89,7 +89,7 @@ const validCreateInput: CreateProductInput = {
   variants: [
     { size: "40", color: "Đen", sku: "SKU-TEST-1", priceOverride: null, stock: 5 },
   ],
-  images: [],
+  imageSets: [],
 };
 
 describe("product actions — authz (role staff bị chặn)", () => {
@@ -114,7 +114,7 @@ describe("product actions — authz (role staff bị chặn)", () => {
       updateProductAction("prod-1", {
         product: validCreateInput.product,
         variants: validCreateInput.variants,
-        images: validCreateInput.images,
+        imageSets: validCreateInput.imageSets,
       }),
     ).rejects.toThrow("REDIRECT:/");
 
@@ -162,7 +162,7 @@ describe("product actions — authz (role staff bị chặn)", () => {
       updateProductAction("prod-1", {
         product: validCreateInput.product,
         variants: validCreateInput.variants,
-        images: validCreateInput.images,
+        imageSets: validCreateInput.imageSets,
       }),
     ).resolves.toEqual({ ok: true });
 
@@ -234,7 +234,7 @@ describe("product actions — authz (role staff bị chặn)", () => {
     const result = await createProductAction({
       product: { ...validCreateInput.product, name: "" },
       variants: validCreateInput.variants,
-      images: validCreateInput.images,
+      imageSets: validCreateInput.imageSets,
     });
 
     expect(result.ok).toBe(false);
@@ -251,7 +251,7 @@ describe("product actions — authz (role staff bị chặn)", () => {
     const result = await updateProductAction("prod-1", {
       product: validCreateInput.product,
       variants: validCreateInput.variants,
-      images: validCreateInput.images,
+      imageSets: validCreateInput.imageSets,
     });
 
     expect(result).toEqual({

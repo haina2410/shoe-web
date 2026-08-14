@@ -95,8 +95,18 @@ export async function createProductCore(
         variants: {
           create: input.variants.map((v) => variantWriteData(v)),
         },
-        images: {
-          create: input.images.map((img) => ({ url: img.url, position: img.position })),
+        imageSets: {
+          create: input.imageSets.map((imageSet) => ({
+            color: imageSet.color,
+            position: imageSet.position,
+            isDefault: imageSet.isDefault,
+            images: {
+              create: imageSet.images.map((image) => ({
+                url: image.url,
+                position: image.position,
+              })),
+            },
+          })),
         },
       },
       include: { variants: true },
@@ -180,19 +190,21 @@ export async function updateProductCore(
       }
     }
 
-    // Ảnh sản phẩm: KHÔNG có khoá tự nhiên riêng để so khớp id như variant
-    // (client không quản lý id ảnh), nên dùng chiến lược đơn giản — xoá hết
-    // rồi tạo lại từ input — giống hệt cách `prisma/seed.ts` đồng bộ ảnh.
-    // Đơn giản, cố ý; nếu cần giữ id ảnh ổn định (vd để không phá cache CDN)
-    // thì nâng cấp sau.
-    await tx.productImage.deleteMany({ where: { productId: id } });
-    if (input.images.length > 0) {
-      await tx.productImage.createMany({
-        data: input.images.map((img) => ({
+    await tx.productImageSet.deleteMany({ where: { productId: id } });
+    for (const imageSet of input.imageSets) {
+      await tx.productImageSet.create({
+        data: {
           productId: id,
-          url: img.url,
-          position: img.position,
-        })),
+          color: imageSet.color,
+          position: imageSet.position,
+          isDefault: imageSet.isDefault,
+          images: {
+            create: imageSet.images.map((image) => ({
+              url: image.url,
+              position: image.position,
+            })),
+          },
+        },
       });
     }
 

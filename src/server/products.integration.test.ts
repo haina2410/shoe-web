@@ -34,7 +34,7 @@ function baseCreateInput(
       { size: "40", color: "Đen", sku: "SKU-A-40-DEN", priceOverride: null, stock: 10 },
       { size: "41", color: "Trắng", sku: "SKU-A-41-TRA", priceOverride: 260000, stock: 5 },
     ],
-    images: [],
+    imageSets: [],
   };
 }
 
@@ -114,25 +114,46 @@ describe("createProductCore", () => {
     expect(persisted?.nameNormalized).toBe(normalizeText(input.product.name));
   });
 
-  it("tạo sản phẩm kèm 2 ảnh → persist đúng url/position theo thứ tự", async () => {
+  it("tạo sản phẩm kèm bộ ảnh màu và giữ đúng thứ tự", async () => {
     const category = await makeCategory();
     const input: CreateProductInput = {
       ...baseCreateInput({}, category.id),
-      images: [
-        { url: "/api/uploads/products/a.jpg", position: 0 },
-        { url: "/api/uploads/products/b.jpg", position: 1 },
+      imageSets: [
+        {
+          color: "Đen",
+          position: 1,
+          isDefault: true,
+          images: [
+            { url: "/api/uploads/products/a.jpg", position: 1 },
+            { url: "/api/uploads/products/b.jpg", position: 0 },
+          ],
+        },
+        {
+          color: "Trắng",
+          position: 0,
+          isDefault: false,
+          images: [{ url: "/api/uploads/products/c.jpg", position: 0 }],
+        },
       ],
     };
 
     const product = await createProductCore(testPrisma, input);
 
-    const images = await testPrisma.productImage.findMany({
+    const imageSets = await testPrisma.productImageSet.findMany({
       where: { productId: product.id },
-      orderBy: { position: "asc" },
+      orderBy: [{ position: "asc" }, { id: "asc" }],
+      include: { images: { orderBy: [{ position: "asc" }, { id: "asc" }] } },
     });
-    expect(images).toHaveLength(2);
-    expect(images[0]).toMatchObject({ url: "/api/uploads/products/a.jpg", position: 0 });
-    expect(images[1]).toMatchObject({ url: "/api/uploads/products/b.jpg", position: 1 });
+    expect(imageSets).toHaveLength(2);
+    expect(imageSets[0]).toMatchObject({ color: "Trắng", isDefault: false });
+    expect(imageSets[0].images.map((image) => image.url)).toEqual([
+      "/api/uploads/products/c.jpg",
+    ]);
+    expect(imageSets[1]).toMatchObject({ color: "Đen", isDefault: true });
+    expect(imageSets[1].images.map((image) => image.url)).toEqual([
+      "/api/uploads/products/b.jpg",
+      "/api/uploads/products/a.jpg",
+    ]);
   });
 
   it("2 sản phẩm trùng tên → slug thứ 2 có hậu tố -2", async () => {
@@ -150,7 +171,7 @@ describe("createProductCore", () => {
       variants: [
         { size: "42", color: "Đen", sku: "SKU-B-42-DEN", priceOverride: null, stock: 3 },
       ],
-      images: [],
+      imageSets: [],
     });
 
     expect(p1.slug).toBe("giay-suc-nu");
@@ -172,7 +193,7 @@ describe("createProductCore", () => {
         { size: "40", color: "Đen", sku: "DUP-SKU", priceOverride: null, stock: 1 },
         { size: "41", color: "Trắng", sku: "DUP-SKU", priceOverride: null, stock: 2 },
       ],
-      images: [],
+      imageSets: [],
     };
 
     await expect(createProductCore(testPrisma, input)).rejects.toThrow();
@@ -203,7 +224,7 @@ describe("createProductCore", () => {
           stock: 1,
         },
       ],
-      images: [],
+      imageSets: [],
     };
 
     await expect(createProductCore(testPrisma, input)).rejects.toThrow();
@@ -218,11 +239,16 @@ describe("deleteProductCore", () => {
     await resetDb();
   });
 
-  it("xoá product → product + images + variants đều mất (đếm = 0)", async () => {
+  it("xoá product → product + image sets + images + variants đều mất", async () => {
     const category = await makeCategory();
     const product = await createProductCore(testPrisma, baseCreateInput({}, category.id));
-    await testPrisma.productImage.create({
-      data: { productId: product.id, url: "/x.jpg", position: 0 },
+    await testPrisma.productImageSet.create({
+      data: {
+        productId: product.id,
+        color: "Đen",
+        isDefault: true,
+        images: { create: { url: "/x.jpg", position: 0 } },
+      },
     });
 
     await deleteProductCore(testPrisma, product.id);
@@ -230,8 +256,9 @@ describe("deleteProductCore", () => {
     expect(await testPrisma.product.count({ where: { id: product.id } })).toBe(0);
     expect(await testPrisma.variant.count({ where: { productId: product.id } })).toBe(0);
     expect(
-      await testPrisma.productImage.count({ where: { productId: product.id } }),
+      await testPrisma.productImageSet.count({ where: { productId: product.id } }),
     ).toBe(0);
+    expect(await testPrisma.productImage.count()).toBe(0);
   });
 
   it("đổi lỗi P2003 khi product có đơn hàng thành ProductBusinessError", async () => {
@@ -340,7 +367,7 @@ describe("updateProductCore", () => {
           stock: 8,
         },
       ],
-      images: [],
+      imageSets: [],
     };
 
     const updated = await updateProductCore(testPrisma, product.id, update);
@@ -412,7 +439,16 @@ describe("updateProductCore", () => {
           stock: 123,
         },
       ],
-      images: [{ url: "/api/uploads/products/not-persisted.jpg", position: 0 }],
+      imageSets: [
+        {
+          color: keepVariant.color,
+          position: 0,
+          isDefault: true,
+          images: [
+            { url: "/api/uploads/products/not-persisted.jpg", position: 0 },
+          ],
+        },
+      ],
     };
 
     await expect(
@@ -425,7 +461,7 @@ describe("updateProductCore", () => {
       where: { id: product.id },
       include: {
         variants: { orderBy: { sku: "asc" } },
-        images: true,
+        imageSets: { include: { images: true } },
       },
     });
     expect(persisted).toMatchObject({
@@ -442,14 +478,21 @@ describe("updateProductCore", () => {
     expect(
       persisted.variants.some((variant) => variant.id === orderedVariant.id),
     ).toBe(true);
-    expect(persisted.images).toHaveLength(0);
+    expect(persisted.imageSets).toHaveLength(0);
   });
 
-  it("cập nhật ảnh → thay thế toàn bộ danh sách ảnh cũ bằng danh sách mới", async () => {
+  it("cập nhật bộ ảnh → thay thế toàn bộ bộ ảnh cũ", async () => {
     const category = await makeCategory();
     const product = await createProductCore(testPrisma, {
       ...baseCreateInput({}, category.id),
-      images: [{ url: "/api/uploads/products/old.jpg", position: 0 }],
+      imageSets: [
+        {
+          color: "Đen",
+          position: 0,
+          isDefault: true,
+          images: [{ url: "/api/uploads/products/old.jpg", position: 0 }],
+        },
+      ],
     });
 
     const update: UpdateProductInput = {
@@ -469,20 +512,28 @@ describe("updateProductCore", () => {
         priceOverride: v.priceOverride,
         stock: v.stock,
       })),
-      images: [
-        { url: "/api/uploads/products/new-1.jpg", position: 0 },
-        { url: "/api/uploads/products/new-2.jpg", position: 1 },
+      imageSets: [
+        {
+          color: "Trắng",
+          position: 0,
+          isDefault: true,
+          images: [
+            { url: "/api/uploads/products/new-1.jpg", position: 0 },
+            { url: "/api/uploads/products/new-2.jpg", position: 1 },
+          ],
+        },
       ],
     };
 
     await updateProductCore(testPrisma, product.id, update);
 
-    const images = await testPrisma.productImage.findMany({
+    const imageSets = await testPrisma.productImageSet.findMany({
       where: { productId: product.id },
-      orderBy: { position: "asc" },
+      include: { images: { orderBy: { position: "asc" } } },
     });
-    expect(images).toHaveLength(2);
-    expect(images.map((i) => i.url)).toEqual([
+    expect(imageSets).toHaveLength(1);
+    expect(imageSets[0]).toMatchObject({ color: "Trắng", isDefault: true });
+    expect(imageSets[0].images.map((image) => image.url)).toEqual([
       "/api/uploads/products/new-1.jpg",
       "/api/uploads/products/new-2.jpg",
     ]);
@@ -534,7 +585,14 @@ describe("updateProductCore", () => {
           stock: 5,
         },
       ],
-      images: [{ url: "/api/uploads/products/stale.jpg", position: 0 }],
+      imageSets: [
+        {
+          color: "Đen",
+          position: 0,
+          isDefault: true,
+          images: [{ url: "/api/uploads/products/stale.jpg", position: 0 }],
+        },
+      ],
     };
 
     await expect(
@@ -546,7 +604,7 @@ describe("updateProductCore", () => {
 
     const persisted = await testPrisma.product.findUniqueOrThrow({
       where: { id: product.id },
-      include: { variants: true, images: true },
+      include: { variants: true, imageSets: { include: { images: true } } },
     });
     expect(persisted).toMatchObject({
       name: product.name,
@@ -565,6 +623,6 @@ describe("updateProductCore", () => {
     expect(
       persisted.variants.some((variant) => variant.sku === "STALE-NEW-VARIANT"),
     ).toBe(false);
-    expect(persisted.images).toHaveLength(0);
+    expect(persisted.imageSets).toHaveLength(0);
   });
 });

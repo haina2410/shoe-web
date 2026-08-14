@@ -40,12 +40,62 @@ export const productImageInputSchema = z.object({
 
 export type ProductImageInput = z.infer<typeof productImageInputSchema>;
 
-/** Schema tạo sản phẩm mới kèm ít nhất 1 biến thể (+ ảnh, tuỳ chọn). */
-export const createProductInputSchema = z.object({
-  product: productInputSchema,
-  variants: z.array(variantInputSchema).min(1),
-  images: z.array(productImageInputSchema).optional().default([]),
+export const productImageSetInputSchema = z.object({
+  color: z.string().min(1),
+  position: z.number().int().min(0),
+  isDefault: z.boolean(),
+  images: z.array(productImageInputSchema).min(1),
 });
+
+export type ProductImageSetInput = z.infer<typeof productImageSetInputSchema>;
+
+function validateImageSets(
+  input: {
+    variants: Array<{ color: string }>;
+    imageSets: ProductImageSetInput[];
+  },
+  ctx: z.RefinementCtx,
+) {
+  const variantColors = new Set(input.variants.map((variant) => variant.color));
+  const imageSetColors = new Set<string>();
+
+  input.imageSets.forEach((imageSet, index) => {
+    if (!variantColors.has(imageSet.color)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["imageSets", index, "color"],
+        message: "Màu bộ ảnh phải thuộc một biến thể sản phẩm",
+      });
+    }
+    if (imageSetColors.has(imageSet.color)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["imageSets", index, "color"],
+        message: "Mỗi màu chỉ được có một bộ ảnh",
+      });
+    }
+    imageSetColors.add(imageSet.color);
+  });
+
+  if (
+    input.imageSets.length > 0 &&
+    input.imageSets.filter((imageSet) => imageSet.isDefault).length !== 1
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["imageSets"],
+      message: "Sản phẩm có bộ ảnh phải có đúng một bộ mặc định",
+    });
+  }
+}
+
+export const createProductInputSchema = z
+  .object({
+    product: productInputSchema,
+    variants: z.array(variantInputSchema).min(1),
+    imageSets: z.array(productImageSetInputSchema).optional().default([]),
+  })
+  .superRefine(validateImageSets);
 
 export type CreateProductInput = z.infer<typeof createProductInputSchema>;
 
@@ -79,11 +129,12 @@ export const variantSyncInputSchema = variantInputSchema.extend({
 
 export type VariantSyncInput = z.infer<typeof variantSyncInputSchema>;
 
-/** Schema cập nhật sản phẩm kèm danh sách biến thể (đồng bộ theo `variantSyncInputSchema`). */
-export const updateProductInputSchema = z.object({
-  product: productInputSchema,
-  variants: z.array(variantSyncInputSchema).min(1),
-  images: z.array(productImageInputSchema).optional().default([]),
-});
+export const updateProductInputSchema = z
+  .object({
+    product: productInputSchema,
+    variants: z.array(variantSyncInputSchema).min(1),
+    imageSets: z.array(productImageSetInputSchema).optional().default([]),
+  })
+  .superRefine(validateImageSets);
 
 export type UpdateProductInput = z.infer<typeof updateProductInputSchema>;

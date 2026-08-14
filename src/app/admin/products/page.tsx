@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { requireAdmin } from "@/lib/auth-guard";
 import { prisma } from "@/lib/prisma";
 import { formatVnd } from "@/lib/money";
@@ -51,7 +52,16 @@ export default async function AdminProductsPage({
     include: {
       category: true,
       variants: true,
-      images: { orderBy: { position: "asc" }, take: 1 },
+      imageSets: {
+        orderBy: [{ isDefault: "desc" }, { position: "asc" }, { id: "asc" }],
+        take: 1,
+        include: {
+          images: {
+            orderBy: [{ position: "asc" }, { id: "asc" }],
+            take: 1,
+          },
+        },
+      },
     },
   });
 
@@ -139,11 +149,13 @@ export default async function AdminProductsPage({
                   <tr key={product.id} className="border-b transition-colors hover:bg-neutral-50 focus-within:bg-neutral-50 last:border-0" style={{ borderColor: "var(--line)" }}>
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-3">
-                        {product.images[0] ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={product.images[0].url}
+                        {product.imageSets[0]?.images[0] ? (
+                          <Image
+                            src={product.imageSets[0].images[0].url}
                             alt=""
+                            width={40}
+                            height={40}
+                            unoptimized={product.imageSets[0].images[0].url.startsWith("/api/uploads/")}
                             className="h-10 w-10 shrink-0 rounded-md object-cover"
                             style={{ backgroundColor: "var(--sage)" }}
                           />

@@ -28,7 +28,12 @@ async function makeProduct(opts: {
   categoryId: string;
   basePrice: number;
   status?: "ACTIVE" | "DRAFT" | "ARCHIVED";
-  images?: { url: string; position: number }[];
+  imageSets?: Array<{
+    color: string;
+    position: number;
+    isDefault: boolean;
+    images: { url: string; position: number }[];
+  }>;
   variants?: { size: string; color: string; sku: string; stock: number; priceOverride?: number | null }[];
 }) {
   return testPrisma.product.create({
@@ -39,10 +44,19 @@ async function makeProduct(opts: {
       basePrice: opts.basePrice,
       status: opts.status ?? "ACTIVE",
       slug: normalizeText(opts.name).replace(/\s+/g, "-") + "-" + Math.random().toString(36).slice(2, 8),
-      images: opts.images ? { create: opts.images } : undefined,
+      imageSets: opts.imageSets
+        ? {
+            create: opts.imageSets.map((imageSet) => ({
+              color: imageSet.color,
+              position: imageSet.position,
+              isDefault: imageSet.isDefault,
+              images: { create: imageSet.images },
+            })),
+          }
+        : undefined,
       variants: opts.variants ? { create: opts.variants } : undefined,
     },
-    include: { images: true, variants: true },
+    include: { imageSets: { include: { images: true } }, variants: true },
   });
 }
 
@@ -63,15 +77,28 @@ describe("listProducts", () => {
     expect(result[0].id).toBe(active.id);
   });
 
-  it("trả đúng shape: imageUrl = ảnh position thấp nhất, totalStock = tổng stock variants", async () => {
+  it("dùng ảnh đầu của bộ mặc định cho card và cộng tồn kho", async () => {
     const cat = await makeCategory("Giày Sneaker", "giay-sneaker");
     const product = await makeProduct({
       name: "Giày Chạy Bộ Alpha",
       categoryId: cat.id,
       basePrice: 300000,
-      images: [
-        { url: "/img/second.jpg", position: 1 },
-        { url: "/img/first.jpg", position: 0 },
+      imageSets: [
+        {
+          color: "Đen",
+          position: 0,
+          isDefault: false,
+          images: [{ url: "/img/black.jpg", position: 0 }],
+        },
+        {
+          color: "Trắng",
+          position: 1,
+          isDefault: true,
+          images: [
+            { url: "/img/default-second.jpg", position: 1 },
+            { url: "/img/default-first.jpg", position: 0 },
+          ],
+        },
       ],
       variants: [
         { size: "40", color: "Đen", sku: "SKU-1", stock: 3 },
@@ -87,9 +114,36 @@ describe("listProducts", () => {
       slug: product.slug,
       name: product.name,
       basePrice: 300000,
-      imageUrl: "/img/first.jpg",
+      imageUrl: "/img/default-first.jpg",
       totalStock: 10,
     });
+  });
+
+  it("dùng ảnh đầu của bộ đầu tiên khi dữ liệu không có bộ mặc định", async () => {
+    const cat = await makeCategory("Giày Sneaker", "giay-sneaker");
+    await makeProduct({
+      name: "Giày Fallback",
+      categoryId: cat.id,
+      basePrice: 300000,
+      imageSets: [
+        {
+          color: "Đen",
+          position: 1,
+          isDefault: false,
+          images: [{ url: "/img/later.jpg", position: 0 }],
+        },
+        {
+          color: "Trắng",
+          position: 0,
+          isDefault: false,
+          images: [{ url: "/img/first-set.jpg", position: 0 }],
+        },
+      ],
+    });
+
+    const result = await listProducts(testPrisma, {});
+
+    expect(result[0].imageUrl).toBe("/img/first-set.jpg");
   });
 
   it("imageUrl = null khi sản phẩm không có ảnh", async () => {
@@ -293,15 +347,28 @@ describe("getProductBySlug", () => {
     await resetDb();
   });
 
-  it("ACTIVE → trả đủ variants + images đã sort theo position + category", async () => {
+  it("ACTIVE → trả bộ ảnh và ảnh con theo position cùng category", async () => {
     const cat = await makeCategory("Giày Sneaker", "giay-sneaker");
     const product = await makeProduct({
       name: "Giày Chi Tiết",
       categoryId: cat.id,
       basePrice: 300000,
-      images: [
-        { url: "/img/b.jpg", position: 1 },
-        { url: "/img/a.jpg", position: 0 },
+      imageSets: [
+        {
+          color: "Đen",
+          position: 1,
+          isDefault: false,
+          images: [{ url: "/img/c.jpg", position: 0 }],
+        },
+        {
+          color: "Trắng",
+          position: 0,
+          isDefault: true,
+          images: [
+            { url: "/img/b.jpg", position: 1 },
+            { url: "/img/a.jpg", position: 0 },
+          ],
+        },
       ],
       variants: [
         { size: "40", color: "Đen", sku: "D-1", stock: 5 },
@@ -313,7 +380,14 @@ describe("getProductBySlug", () => {
 
     expect(result).not.toBeNull();
     expect(result?.id).toBe(product.id);
-    expect(result?.images.map((i) => i.url)).toEqual(["/img/a.jpg", "/img/b.jpg"]);
+    expect(result?.imageSets.map((imageSet) => imageSet.color)).toEqual([
+      "Trắng",
+      "Đen",
+    ]);
+    expect(result?.imageSets[0].images.map((image) => image.url)).toEqual([
+      "/img/a.jpg",
+      "/img/b.jpg",
+    ]);
     expect(result?.variants).toHaveLength(2);
     expect(result?.category.slug).toBe("giay-sneaker");
   });

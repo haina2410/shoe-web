@@ -29,7 +29,12 @@ export default async function EditProductPage({
       where: { id },
       include: {
         variants: true,
-        images: { orderBy: { position: "asc" } },
+        imageSets: {
+          orderBy: [{ position: "asc" }, { id: "asc" }],
+          include: {
+            images: { orderBy: [{ position: "asc" }, { id: "asc" }] },
+          },
+        },
       },
     }),
     prisma.category.findMany({ orderBy: { name: "asc" } }),
@@ -76,7 +81,15 @@ export default async function EditProductPage({
               priceOverride: v.priceOverride,
               stock: v.stock,
             })),
-            images: product.images.map((img) => ({ url: img.url, position: img.position })),
+            imageSets: product.imageSets.map((imageSet) => ({
+              color: imageSet.color,
+              position: imageSet.position,
+              isDefault: imageSet.isDefault,
+              images: imageSet.images.map((image) => ({
+                url: image.url,
+                position: image.position,
+              })),
+            })),
           }}
         />
       </AdminSection>

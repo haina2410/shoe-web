@@ -25,7 +25,9 @@ export type CatalogListItem = {
 /** Chi tiết sản phẩm cho trang detail (Task 4) — ACTIVE only. */
 export type CatalogProductDetail = Prisma.ProductGetPayload<{
   include: {
-    images: true;
+    imageSets: {
+      include: { images: true };
+    };
     variants: true;
     category: true;
   };
@@ -107,7 +109,20 @@ export async function listProducts(
     where: buildWhere(query),
     orderBy: orderByFor(query.sort),
     include: {
-      images: { orderBy: { position: "asc" }, take: 1 },
+      imageSets: {
+        orderBy: [
+          { isDefault: "desc" },
+          { position: "asc" },
+          { id: "asc" },
+        ],
+        take: 1,
+        include: {
+          images: {
+            orderBy: [{ position: "asc" }, { id: "asc" }],
+            take: 1,
+          },
+        },
+      },
       variants: { select: { stock: true } },
     },
   });
@@ -117,7 +132,7 @@ export async function listProducts(
     slug: p.slug,
     name: p.name,
     basePrice: p.basePrice,
-    imageUrl: p.images[0]?.url ?? null,
+    imageUrl: p.imageSets[0]?.images[0]?.url ?? null,
     totalStock: p.variants.reduce((sum, v) => sum + v.stock, 0),
   }));
 }
@@ -133,7 +148,12 @@ export async function getProductBySlug(
   const product = await db.product.findUnique({
     where: { slug },
     include: {
-      images: { orderBy: { position: "asc" } },
+      imageSets: {
+        orderBy: [{ position: "asc" }, { id: "asc" }],
+        include: {
+          images: { orderBy: [{ position: "asc" }, { id: "asc" }] },
+        },
+      },
       variants: true,
       category: true,
     },

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import type { Variant } from "@/generated/prisma/client";
 
 const addItem = vi.fn();
@@ -52,10 +53,25 @@ const variants: Variant[] = [
   }),
 ];
 
+function ControlledVariantSelector({ imageUrl = productContext.imageUrl }) {
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+
+  return (
+    <VariantSelector
+      variants={variants}
+      basePrice={890000}
+      {...productContext}
+      imageUrl={imageUrl}
+      selectedColor={selectedColor}
+      onColorChange={setSelectedColor}
+    />
+  );
+}
+
 describe("VariantSelector", () => {
   it("trước khi chọn đủ size và màu → hướng dẫn chọn thay vì báo tổ hợp không tồn tại", () => {
     render(
-      <VariantSelector variants={variants} basePrice={890000} {...productContext} />,
+      <ControlledVariantSelector />,
     );
 
     expect(
@@ -67,7 +83,7 @@ describe("VariantSelector", () => {
   it("chọn size+màu còn hàng → hiện đúng số lượng tồn kho", async () => {
     const user = userEvent.setup();
     render(
-      <VariantSelector variants={variants} basePrice={890000} {...productContext} />,
+      <ControlledVariantSelector />,
     );
 
     await user.click(screen.getByRole("radio", { name: "39" }));
@@ -79,7 +95,7 @@ describe("VariantSelector", () => {
   it("chọn tổ hợp hết hàng (stock = 0) → hiện 'Hết hàng' và nút thêm giỏ bị disable", async () => {
     const user = userEvent.setup();
     render(
-      <VariantSelector variants={variants} basePrice={890000} {...productContext} />,
+      <ControlledVariantSelector />,
     );
 
     await user.click(screen.getByRole("radio", { name: "39" }));
@@ -92,7 +108,7 @@ describe("VariantSelector", () => {
   it("tổ hợp size+màu không tồn tại variant nào → không crash, báo không có lựa chọn", async () => {
     const user = userEvent.setup();
     render(
-      <VariantSelector variants={variants} basePrice={890000} {...productContext} />,
+      <ControlledVariantSelector />,
     );
 
     // size 40 chỉ tồn tại với màu Trắng, không có 40/Đen.
@@ -106,7 +122,7 @@ describe("VariantSelector", () => {
   it("hiển thị giá theo priceOverride của variant đang chọn khi có", async () => {
     const user = userEvent.setup();
     render(
-      <VariantSelector variants={variants} basePrice={890000} {...productContext} />,
+      <ControlledVariantSelector />,
     );
 
     await user.click(screen.getByRole("radio", { name: "40" }));
@@ -118,7 +134,7 @@ describe("VariantSelector", () => {
   it("nút thêm vào giỏ disabled khi chưa chọn đủ size+màu, hoặc tổ hợp hết hàng", async () => {
     const user = userEvent.setup();
     render(
-      <VariantSelector variants={variants} basePrice={890000} {...productContext} />,
+      <ControlledVariantSelector />,
     );
 
     // Trước khi chọn gì, nút disabled.
@@ -135,7 +151,7 @@ describe("VariantSelector", () => {
   it("chọn variant còn hàng → nút thêm vào giỏ được bật, click gọi addItem với đúng dữ liệu", async () => {
     const user = userEvent.setup();
     render(
-      <VariantSelector variants={variants} basePrice={890000} {...productContext} />,
+      <ControlledVariantSelector />,
     );
 
     await user.click(screen.getByRole("radio", { name: "39" }));
@@ -162,7 +178,7 @@ describe("VariantSelector", () => {
   it("dùng priceOverride của variant làm unitPrice khi thêm vào giỏ", async () => {
     const user = userEvent.setup();
     render(
-      <VariantSelector variants={variants} basePrice={890000} {...productContext} />,
+      <ControlledVariantSelector />,
     );
 
     await user.click(screen.getByRole("radio", { name: "40" }));
@@ -177,7 +193,7 @@ describe("VariantSelector", () => {
   it("sau khi thêm vào giỏ, hiện phản hồi liên kết tới trang giỏ hàng", async () => {
     const user = userEvent.setup();
     render(
-      <VariantSelector variants={variants} basePrice={890000} {...productContext} />,
+      <ControlledVariantSelector />,
     );
 
     await user.click(screen.getByRole("radio", { name: "39" }));
@@ -186,5 +202,23 @@ describe("VariantSelector", () => {
 
     const cartLink = screen.getByRole("link", { name: /xem giỏ hàng/i });
     expect(cartLink).toHaveAttribute("href", "/cart");
+  });
+
+  it("gửi màu được chọn lên component cha", async () => {
+    const user = userEvent.setup();
+    const onColorChange = vi.fn();
+    render(
+      <VariantSelector
+        variants={variants}
+        basePrice={890000}
+        {...productContext}
+        selectedColor={null}
+        onColorChange={onColorChange}
+      />,
+    );
+
+    await user.click(screen.getByRole("radio", { name: "Trắng" }));
+
+    expect(onColorChange).toHaveBeenCalledWith("Trắng");
   });
 });

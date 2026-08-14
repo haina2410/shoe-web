@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { resolve } from "node:path";
 
 const ownerEmail = process.env.SEED_OWNER_EMAIL || "owner@leafshoes.local";
 const ownerPassword = process.env.SEED_OWNER_PASSWORD;
@@ -60,7 +61,7 @@ async function loginAsOwner(page: import("@playwright/test").Page) {
   await expect(page).toHaveURL(/\/admin$/);
 }
 
-test("owner creates, edits, updates stock, and confirms product deletion", async ({
+test("owner creates color galleries, edits stock, and confirms deletion", async ({
   page,
 }) => {
   const runId = `${Date.now()}-${process.pid}`;
@@ -75,18 +76,55 @@ test("owner creates, edits, updates stock, and confirms product deletion", async
 
   await page.getByLabel("Tên sản phẩm").fill(productName);
   await page.getByLabel("Giá (VND)").fill("199000");
+  await page.getByLabel("Trạng thái").selectOption("ACTIVE");
   const category = page.getByLabel("Danh mục");
   await category.selectOption(await category.locator("option").first().getAttribute("value") ?? "");
-  await page.getByLabel("Size").fill("40");
-  await page.getByLabel("Màu").fill("Đen");
-  await page.getByLabel("SKU").fill(sku);
-  await page.getByLabel("Tồn kho").fill("10");
+  await page.getByRole("button", { name: "Thêm biến thể" }).click();
+  const sizes = page.getByLabel("Size");
+  const colors = page.getByLabel("Màu", { exact: true });
+  const skus = page.getByLabel("SKU");
+  const stocks = page.getByLabel("Tồn kho");
+  await sizes.nth(0).fill("40");
+  await colors.nth(0).fill("Đen");
+  await skus.nth(0).fill(sku);
+  await stocks.nth(0).fill("10");
+  await sizes.nth(1).fill("40");
+  await colors.nth(1).fill("Trắng");
+  await skus.nth(1).fill(`${sku}-WHITE`);
+  await stocks.nth(1).fill("6");
+
+  await page.getByRole("button", { name: "Thêm bộ ảnh" }).click();
+  await page.getByRole("button", { name: "Thêm bộ ảnh" }).click();
+  const imageSetPanels = page.getByTestId("image-set-panel");
+  await expect(imageSetPanels).toHaveCount(2);
+  await imageSetPanels.nth(0).getByRole("radio", { name: "Bộ mặc định" }).click();
+  await imageSetPanels.nth(0).getByLabel("Thêm ảnh cho bộ Đen").setInputFiles(
+    resolve("public/products/giay-chay-bo-em-nhe-den-1.png"),
+  );
+  await expect(imageSetPanels.nth(0).locator("img")).toHaveCount(1);
+  await imageSetPanels.nth(1).getByLabel("Thêm ảnh cho bộ Trắng").setInputFiles(
+    resolve("public/products/giay-chay-bo-em-nhe-1.png"),
+  );
+  await expect(imageSetPanels.nth(1).locator("img")).toHaveCount(1);
   await page.getByRole("button", { name: "Tạo sản phẩm" }).click();
 
   await expect(page).toHaveURL(/\/admin\/products$/, { timeout: 15_000 });
   await expectToast(page, "Đã tạo sản phẩm");
   let productRow = page.getByRole("row").filter({ hasText: productName });
-  await expect(productRow).toContainText("10 đôi");
+  await expect(productRow).toContainText("16 đôi");
+
+  await page.goto(`/products?q=${encodeURIComponent(productName)}`);
+  await page.getByRole("link", { name: new RegExp(productName) }).click();
+  const blackImage = page.getByRole("img", { name: `${productName} - Đen` });
+  await expect(blackImage).toBeVisible();
+  const blackImageUrl = await blackImage.getAttribute("src");
+  await page.getByRole("radio", { name: "Trắng" }).click();
+  const whiteImage = page.getByRole("img", { name: `${productName} - Trắng` });
+  await expect(whiteImage).toBeVisible();
+  await expect(whiteImage).not.toHaveAttribute("src", blackImageUrl ?? "");
+
+  await page.goto("/admin/products");
+  productRow = page.getByRole("row").filter({ hasText: productName });
 
   await productRow.getByRole("link", { name: "Sửa" }).click();
   await expect(page.getByRole("heading", { name: "Sửa sản phẩm" })).toBeVisible();
@@ -102,7 +140,7 @@ test("owner creates, edits, updates stock, and confirms product deletion", async
   const stockSection = page
     .locator("section")
     .filter({ has: page.getByRole("heading", { name: "Chỉnh nhanh tồn kho" }) });
-  const stockRow = stockSection.getByRole("row").filter({ hasText: sku });
+  const stockRow = stockSection.getByRole("row").filter({ hasText: sku }).first();
   const stockInput = stockRow.getByLabel("Tồn kho");
   await stockInput.fill("14");
   const pendingStockUpdate = await pauseServerAction(page);
@@ -116,7 +154,7 @@ test("owner creates, edits, updates stock, and confirms product deletion", async
 
   await page.goto("/admin/products");
   productRow = page.getByRole("row").filter({ hasText: updatedProductName });
-  await expect(productRow).toContainText("14 đôi");
+  await expect(productRow).toContainText("20 đôi");
   await productRow.getByRole("button", { name: "Xoá" }).click();
   const deletionDialog = page.getByRole("alertdialog", { name: "Xoá sản phẩm" });
   await expect(deletionDialog).toContainText(updatedProductName);

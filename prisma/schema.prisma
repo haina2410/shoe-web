@@ -89,6 +89,7 @@ model Category {
   parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
   children Category[] @relation("CategoryTree")
   products Product[]
+
   @@map("category")
 }
 
@@ -99,35 +100,51 @@ enum ProductStatus {
 }
 
 model Product {
-  id              String         @id @default(cuid())
-  name            String
-  slug            String         @unique
+  id             String            @id @default(cuid())
+  name           String
+  slug           String            @unique
   // Bản không dấu của `name` (qua `normalizeText`), phục vụ tìm kiếm
   // "contains" không phân biệt dấu tiếng Việt. Cố ý KHÔNG có btree index:
   // `LIKE %x%` không tận dụng được btree; nếu cần tăng tốc sẽ dùng pg_trgm
   // (xem plan Ngày 9).
-  nameNormalized  String         @default("")
-  description     String?
-  categoryId      String
-  category        Category       @relation(fields: [categoryId], references: [id])
-  basePrice       Int            // VND, số nguyên
-  status          ProductStatus  @default(DRAFT)
-  images          ProductImage[]
-  variants        Variant[]
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  nameNormalized String            @default("")
+  description    String?
+  categoryId     String
+  category       Category          @relation(fields: [categoryId], references: [id])
+  basePrice      Int // VND, số nguyên
+  status         ProductStatus     @default(DRAFT)
+  imageSets      ProductImageSet[]
+  variants       Variant[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
   @@index([categoryId])
   @@index([status])
   @@map("product")
 }
 
-model ProductImage {
-  id        String  @id @default(cuid())
+model ProductImageSet {
+  id        String         @id @default(cuid())
   productId String
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  url       String
-  position  Int     @default(0)
-  @@index([productId])
+  product   Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  color     String
+  position  Int            @default(0)
+  isDefault Boolean        @default(false)
+  images    ProductImage[]
+
+  @@unique([productId, color])
+  @@index([productId, position])
+  @@map("product_image_set")
+}
+
+model ProductImage {
+  id         String          @id @default(cuid())
+  imageSetId String
+  imageSet   ProductImageSet @relation(fields: [imageSetId], references: [id], onDelete: Cascade)
+  url        String
+  position   Int             @default(0)
+
+  @@index([imageSetId, position])
   @@map("product_image")
 }
 
@@ -141,6 +158,7 @@ model Variant {
   priceOverride Int?
   stock         Int         @default(0)
   orderItems    OrderItem[]
+
   @@unique([productId, size, color])
   @@index([productId])
   @@map("variant")
@@ -187,6 +205,7 @@ model Order {
   bankTransactions BankTransaction[]
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
+
   @@index([email])
   @@index([status])
   @@map("order")
@@ -203,6 +222,7 @@ model OrderItem {
   color       String
   unitPrice   Int
   quantity    Int
+
   @@index([orderId])
   @@map("order_item")
 }
@@ -211,7 +231,7 @@ model Payment {
   id                String           @id @default(cuid())
   orderId           String
   order             Order            @relation(fields: [orderId], references: [id])
-  provider          String           // "sepay" | "manual"
+  provider          String // "sepay" | "manual"
   transactionId     String           @unique
   amount            Int
   rawPayload        Json?
@@ -221,6 +241,7 @@ model Payment {
   note              String?
   recordedByUserId  String?
   recordedBy        User?            @relation("RecordedPayments", fields: [recordedByUserId], references: [id], onDelete: SetNull)
+
   @@index([orderId])
   @@index([orderId, direction])
   @@index([recordedByUserId])
@@ -255,10 +276,11 @@ model BankTransaction {
 
 model ShippingZone {
   id        String         @id @default(cuid())
-  name      String         @unique   // unique để upsert seed idempotent
+  name      String         @unique // unique để upsert seed idempotent
   fee       Int
   isDefault Boolean        @default(false) // zone fallback khi tỉnh không map
   provinces ProvinceZone[]
+
   @@map("shipping_zone")
 }
 
@@ -267,6 +289,7 @@ model ProvinceZone {
   province String       @unique
   zoneId   String
   zone     ShippingZone @relation(fields: [zoneId], references: [id])
+
   @@index([zoneId])
   @@map("province_zone")
 }

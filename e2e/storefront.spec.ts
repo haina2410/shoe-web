@@ -57,4 +57,12 @@ test("trang chủ → sản phẩm nổi bật → search không dấu → chi t
   await sizeGroup.getByRole("radio", { name: "40" }).click();
   await colorGroup.getByRole("radio", { name: "Đen" }).click();
   await expect(page.getByText(/Còn \d+ sản phẩm|Hết hàng/)).toBeVisible();
+
+  await expect(
+    page.getByRole("img", { name: "Giày Chạy Bộ Êm Nhẹ - Đen" }),
+  ).toBeVisible();
+  await colorGroup.getByRole("radio", { name: "Trắng" }).click();
+  await expect(
+    page.getByRole("img", { name: "Giày Chạy Bộ Êm Nhẹ - Trắng" }),
+  ).toBeVisible();
 });
