@@ -461,12 +461,27 @@ báo lỗi, không riêng lệnh này. Cố ý như vậy: bỏ trống cặp đ
 vào production.
 
 Nó chỉ bind `127.0.0.1:${DASHBOARD_HOST_PORT:-3010}` (không phải 3000 — `app`
-đang giữ port đó) và **không** đi qua Cloudflare Tunnel. Mở từ máy mình bằng SSH
-port-forward, đừng thêm public hostname:
+đang giữ port đó). Image được build cố định cho base path `/admin_jobs`; không
+đặt `PGBOSS_DASHBOARD_BASE_PATH` trong environment Komodo hoặc Compose.
 
-```bash
-ssh -N -L 3010:127.0.0.1:3010 <user>@<vps>
+Trong Cloudflare Tunnel, thêm route có path `/admin_jobs/*` tới origin sau và
+đặt nó trước route catch-all của `leafshoesvietnam.com`:
+
+```text
+http://localhost:3010
 ```
+
+Cloudflare phải forward nguyên path `/admin_jobs/...`, không strip prefix. Truy
+cập dashboard tại:
+
+```text
+https://leafshoesvietnam.com/admin_jobs/
+```
+
+Basic Auth của dashboard vẫn là lớp bắt buộc dù route đi qua Cloudflare. Có thể
+đặt thêm Cloudflare Access trước `/admin_jobs/*`, nhưng không dùng Access để thay
+thế hai biến Basic Auth. Nếu `DASHBOARD_HOST_PORT` khác `3010`, đổi origin Tunnel
+cho khớp trong cùng cửa sổ vận hành.
 
 Xong việc thì bỏ hẳn container, đừng để nó chạy thường trực:
 

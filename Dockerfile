@@ -50,16 +50,31 @@ CMD ["./node_modules/.bin/tsx", "src/worker/index.ts"]
 FROM worker AS migrate
 CMD ["./scripts/migrate-and-seed.sh"]
 
-# Ghim đúng version thay vì `npm install -g` lúc container chạy: khởi động
-# không cần npm registry, và mỗi release luôn ra cùng một bản dashboard.
+FROM base AS dashboard-builder
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates git \
+  && rm -rf /var/lib/apt/lists/*
+WORKDIR /opt/pg-boss
+RUN git init \
+  && git remote add origin https://github.com/timgit/pg-boss.git \
+  && git fetch --depth 1 origin f869cc90c3324c72807072523e89c776dd5f71cd \
+  && git checkout --detach FETCH_HEAD
+RUN npm ci --ignore-scripts
+WORKDIR /opt/pg-boss/packages/dashboard
+RUN npm ci
+RUN PGBOSS_DASHBOARD_BASE_PATH=/admin_jobs npm run build \
+  && npm prune --omit=dev
+
 FROM base AS dashboard
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=3000
-RUN npm install -g @pg-boss/dashboard@1.6.4
+COPY --from=dashboard-builder --chown=nextjs:nodejs /opt/pg-boss/packages/dashboard/build ./build
+COPY --from=dashboard-builder --chown=nextjs:nodejs /opt/pg-boss/packages/dashboard/node_modules ./node_modules
+COPY --from=dashboard-builder --chown=nextjs:nodejs /opt/pg-boss/LICENSE ./licenses/pg-boss-LICENSE
 USER nextjs
 EXPOSE 3000
-CMD ["pg-boss-dashboard"]
+CMD ["node", "build/server.js"]
 
 FROM deps AS smoke
 ENV NODE_ENV=test

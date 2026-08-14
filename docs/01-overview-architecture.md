@@ -20,7 +20,7 @@ trì và không có glue code giữa nhiều ứng dụng khi quy mô hiện t�
 │                                    └─ transaction) ────┘                          │
 │                                                                                  │
 │  [Origin: 127.0.0.1 qua Cloudflare Tunnel]            [Resend] ◄─ gửi email TT   │
-│                                                        [Zalo Bot API] ◄─ báo đơn  │
+│  [/admin_jobs → pg-boss dashboard tạm thời]           [Zalo Bot API] ◄─ báo đơn  │
 └──────────────────────────────────────────────────────────────────────────────────┘
         ▲                                    ▲
    Khách (guest, chỉ email)            SePay/Casso webhook (khớp CK ngân hàng)
@@ -31,6 +31,11 @@ Production dùng `cloudflared` system service đã có trên VPS để kết th�
 Caddy/Nginx và không mở origin web hoặc PostgreSQL ra Internet. PostgreSQL chỉ
 publish trên loopback VPS tại `127.0.0.1:${POSTGRES_HOST_PORT:-5432}` để operator
 truy cập qua SSH port forwarding.
+
+Dashboard pg-boss là surface vận hành bật theo profile `ops`, bind riêng trên
+loopback và được build cố định cho `/admin_jobs`. Khi cần dùng, Cloudflare Tunnel
+chuyển nguyên prefix này tới dashboard; route phải đứng trước catch-all của app.
+Dashboard vẫn yêu cầu HTTP Basic Auth vì có quyền retry và xoá job.
 
 ## Các thành phần
 
