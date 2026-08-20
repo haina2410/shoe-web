@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CategoryPaths } from "@/components/home/category-paths";
+import { CompanyGallery } from "@/components/home/company-gallery";
 import { HeroBanner } from "@/components/home/hero-banner";
 import { TrustStrip } from "@/components/home/trust-strip";
 import { EmptyState } from "@/components/empty-state";
@@ -66,6 +67,7 @@ export default async function HomePage() {
           </div>
         )}
       </section>
+      <CompanyGallery />
       <TrustStrip />
     </>
   );

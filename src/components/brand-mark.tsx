@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { BRAND_MARK_PATH } from "@/lib/storefront-assets";
 import { STORE_INFO } from "@/lib/storefront-content";
 
 type BrandMarkProps = {
@@ -10,11 +11,10 @@ export function BrandMark({ compact = false, className }: BrandMarkProps): React
   return (
     <span className={["inline-flex items-center gap-2", className].filter(Boolean).join(" ")}>
       <Image
-        src="/brand/leafshoes-mark.svg"
+        src={BRAND_MARK_PATH}
         alt=""
         aria-hidden="true"
         data-testid="leaf-mark"
-        unoptimized
         width={compact ? 24 : 32}
         height={compact ? 24 : 32}
       />

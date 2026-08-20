@@ -10,3 +10,20 @@ test("trang chủ hiển thị brand và điều hướng", async ({ page }) => 
     page.getByRole("banner").getByRole("link", { name: "Giỏ hàng", exact: true }),
   ).toBeVisible();
 });
+
+test("thư viện công ty chuyển ảnh thủ công và quay vòng", async ({ page }) => {
+  await page.goto("/");
+
+  const gallery = page.locator('[data-section="company"]');
+  await expect(
+    gallery.getByRole("heading", { name: "Khoảnh khắc tại leafshoes" }),
+  ).toBeVisible();
+  await expect(gallery.getByText("1 / 3", { exact: true })).toBeVisible();
+
+  await gallery.getByRole("button", { name: "Ảnh tiếp theo" }).click();
+  await expect(gallery.getByText("2 / 3", { exact: true })).toBeVisible();
+
+  await gallery.getByRole("button", { name: "Ảnh trước đó" }).click();
+  await gallery.getByRole("button", { name: "Ảnh trước đó" }).click();
+  await expect(gallery.getByText("3 / 3", { exact: true })).toBeVisible();
+});

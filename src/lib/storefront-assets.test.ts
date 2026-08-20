@@ -2,6 +2,9 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  ABOUT_COMPANY_IMAGES,
+  BRAND_MARK_PATH,
+  COMPANY_GALLERY_IMAGES,
   HERO_IMAGE_PATH,
   SEEDED_PRODUCT_IMAGE_BY_SLUG,
 } from "./storefront-assets";
@@ -19,6 +22,50 @@ const toPublicFile = (publicUrl: string) =>
   path.join(process.cwd(), "public", publicUrl.replace(/^\//, ""));
 
 describe("storefront assets", () => {
+  it("cung cấp bộ nhận diện và ảnh công ty có nội dung thay thế cùng kích thước", () => {
+    expect(BRAND_MARK_PATH).toBe("/brand/leafshoes-mark.png");
+    expect(COMPANY_GALLERY_IMAGES).toHaveLength(3);
+
+    for (const image of COMPANY_GALLERY_IMAGES) {
+      expect(image.alt).not.toBe("");
+      expect(image.width).toBeGreaterThan(0);
+      expect(image.height).toBeGreaterThan(0);
+    }
+
+    expect(ABOUT_COMPANY_IMAGES).toEqual({
+      hero: {
+        src: "/company/company-team.jpg",
+        alt: "Đại diện leafshoes tại không gian làm việc của công ty",
+        caption: "leafshoes Việt Nam tại xưởng ở Đồng Nai",
+        width: 1120,
+        height: 840,
+      },
+      production: COMPANY_GALLERY_IMAGES[1],
+      showroom: COMPANY_GALLERY_IMAGES[0],
+    });
+    expect(COMPANY_GALLERY_IMAGES[2]).toMatchObject({
+      width: 1120,
+      height: 840,
+    });
+  });
+
+  it("giữ mọi ảnh thương hiệu và công ty tại đường dẫn đã công bố", () => {
+    const publicImages = [
+      BRAND_MARK_PATH,
+      ...COMPANY_GALLERY_IMAGES.map((image) => image.src),
+      ...Object.values(ABOUT_COMPANY_IMAGES).map((image) => image.src),
+    ];
+
+    for (const imageUrl of publicImages) {
+      expect(existsSync(toPublicFile(imageUrl))).toBe(true);
+    }
+
+    expect(existsSync(path.join(process.cwd(), "src/app/icon.png"))).toBe(true);
+    expect(existsSync(path.join(process.cwd(), "src/app/apple-icon.png"))).toBe(
+      true,
+    );
+  });
+
   it("maps every seeded product slug to an image", () => {
     expect(Object.keys(SEEDED_PRODUCT_IMAGE_BY_SLUG)).toEqual(
       SEEDED_PRODUCT_SLUGS,
