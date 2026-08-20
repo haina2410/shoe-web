@@ -57,6 +57,8 @@ trực tiếp: `pull_policy: missing` có thể giữ image cũ ở local.
 Sao chép **tên biến** từ [`.env.production.example`](../.env.production.example)
 vào environment của Komodo rồi điền giá trị thật tại đó. Không copy file ví dụ
 thành credential production và không paste secret vào Compose source.
+`APP_ENV` là biến bắt buộc: đặt `production` cho Stack production và `staging`
+cho Stack staging. Validator production từ chối mọi giá trị khác `production`.
 
 Komodo phải cấp **cùng một environment** cho cả Stack và Action/Procedure
 deploy: Stack cần nó để nội suy service/volume/port, còn Action/Procedure gọi
@@ -105,6 +107,7 @@ COMPOSE_PROJECT_NAME=leafshoes-staging
 RELEASE_TAG=latest
 APP_HOST_PORT=3300
 POSTGRES_HOST_PORT=5433
+APP_ENV=staging
 CRAWL_POLICY=disallow
 ```
 
@@ -499,6 +502,10 @@ hưởng.
 báo đơn mới; collector `zalo-bot` chỉ dùng cùng token, không nhận database,
 mail, VietQR hay app secret.
 
+App chọn người nhận khi enqueue theo `APP_ENV`: `development` và `staging` chỉ
+gửi Nam; `production` gửi cả Nam và Sung. Thiếu hoặc sai `APP_ENV` không được
+phép âm thầm gửi theo danh sách mặc định.
+
 Khi thêm nhân viên, bật collector tạm thời:
 
 ```bash
@@ -533,6 +540,7 @@ incident ticket.
 - [ ] Production uses `CRAWL_POLICY=allow`; staging uses
   `CRAWL_POLICY=disallow`, and `/robots.txt` is purged when a policy change must
   take effect before its cache TTL expires.
+- [ ] Production uses `APP_ENV=production`; staging uses `APP_ENV=staging`.
 - [ ] Komodo alone holds real secrets; Git, images, build args, logs and test
   reports do not contain them.
 - [ ] Release images carry no secrets: build arguments are placeholders only and

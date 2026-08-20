@@ -2,7 +2,7 @@ import { PgBoss, fromPrisma } from "pg-boss";
 import type { PrismaTransactionLike } from "pg-boss";
 import { z } from "zod";
 import {
-  ZALO_NOTIFICATION_RECIPIENTS,
+  zaloNotificationRecipientsForEnv,
   type ZaloNotificationRecipient,
 } from "@/lib/zalo-bot";
 
@@ -256,7 +256,9 @@ export async function enqueueZaloOrderCreatedNotifications(
   tx: PrismaTransactionLike,
   payload: { orderCode: string },
   boss?: PgBoss,
-  recipients: readonly ZaloNotificationRecipient[] = ZALO_NOTIFICATION_RECIPIENTS,
+  recipients: readonly ZaloNotificationRecipient[] = zaloNotificationRecipientsForEnv(
+    process.env.APP_ENV,
+  ),
 ): Promise<void> {
   const bossInstance = boss ?? (await getBoss());
 
