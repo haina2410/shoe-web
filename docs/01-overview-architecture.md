@@ -41,6 +41,7 @@ Dashboard vẫn yêu cầu HTTP Basic Auth vì có quyền retry và xoá job.
 
 ### 1. Storefront (khách hàng)
 - Dùng **React Server Components** cho danh sách/chi tiết sản phẩm (SEO + tải nhanh).
+- `/sitemap.xml` được tạo động từ các trang storefront công khai và sản phẩm `ACTIVE`; URL tuyệt đối dùng `APP_BASE_URL`.
 - **Giỏ hàng giữ ở client** (localStorage, state qua Zustand) — không cần đăng nhập. Chỉ khi checkout mới gửi giỏ lên server để tạo đơn.
 - Checkout: form thông tin nhận hàng + email (guest).
 
