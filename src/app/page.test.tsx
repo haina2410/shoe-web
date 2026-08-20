@@ -27,7 +27,7 @@ describe("HomePage", () => {
       .getAllByTestId("home-section")
       .map((node) => node.dataset.section);
 
-    expect(labels).toEqual(["hero", "categories", "featured", "trust"]);
+    expect(labels).toEqual(["hero", "categories", "featured", "company", "trust"]);
     expect(
       screen.getByRole("heading", { name: "Sản phẩm nổi bật" }),
     ).toBeInTheDocument();
