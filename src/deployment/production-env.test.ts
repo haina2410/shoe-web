@@ -13,6 +13,7 @@ describe("production environment validation", () => {
         REQUIRED_PRODUCTION_ENV.map((name) => [name, `${name}-value`]),
       ),
       CRAWL_POLICY: "allow",
+      APP_ENV: "production",
     };
     delete env.POSTGRES_PASSWORD;
     delete env.BOT_TOKEN;
@@ -30,8 +31,21 @@ describe("production environment validation", () => {
       REQUIRED_PRODUCTION_ENV.map((name) => [name, `${name}-value`]),
     );
     env.CRAWL_POLICY = "disallow";
+    env.APP_ENV = "production";
 
     expect(validateProductionEnv(env)).toEqual(["CRAWL_POLICY"]);
+  });
+
+  it("rejects an app environment other than production", () => {
+    const env: NodeJS.ProcessEnv = {
+      ...Object.fromEntries(
+        REQUIRED_PRODUCTION_ENV.map((name) => [name, `${name}-value`]),
+      ),
+      CRAWL_POLICY: "allow",
+      APP_ENV: "staging",
+    };
+
+    expect(validateProductionEnv(env)).toEqual(["APP_ENV"]);
   });
 
   it("CLI never echoes present secret values when validation fails", () => {

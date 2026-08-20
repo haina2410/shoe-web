@@ -10,6 +10,23 @@ export const ZALO_NOTIFICATION_RECIPIENTS: readonly ZaloNotificationRecipient[] 
   { key: "sung", chatId: "5fe4a715e25c0b02524d" }
 ];
 
+const appEnvSchema = z.enum(["development", "staging", "production"]);
+
+export function zaloNotificationRecipientsForEnv(
+  appEnv: string | undefined,
+): readonly ZaloNotificationRecipient[] {
+  const parsed = appEnvSchema.safeParse(appEnv);
+  if (!parsed.success) {
+    throw new Error(
+      "APP_ENV must be one of: development, staging, production",
+    );
+  }
+
+  return parsed.data === "production"
+    ? ZALO_NOTIFICATION_RECIPIENTS
+    : ZALO_NOTIFICATION_RECIPIENTS.filter(({ key }) => key === "nam");
+}
+
 export type ZaloUpdate = {
   eventName: string;
   from?: {

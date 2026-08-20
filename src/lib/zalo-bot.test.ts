@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createZaloBotClient,
+  zaloNotificationRecipientsForEnv,
   zaloBotClientFromEnv,
 } from "@/lib/zalo-bot";
 
@@ -104,6 +105,31 @@ describe("zaloBotClientFromEnv", () => {
         "BOT_TOKEN",
       );
       expect(() => zaloBotClientFromEnv(env)).not.toThrow(botToken ?? "not-present");
+    },
+  );
+});
+
+describe("zaloNotificationRecipientsForEnv", () => {
+  it.each(["development", "staging"])(
+    "routes %s notifications only to Nam",
+    (appEnv) => {
+      expect(zaloNotificationRecipientsForEnv(appEnv)).toEqual([
+        { key: "nam", chatId: "6586dcd80b91e2cfbb80" },
+      ]);
+    },
+  );
+
+  it("routes production notifications to Nam and Sung", () => {
+    expect(zaloNotificationRecipientsForEnv("production")).toEqual([
+      { key: "nam", chatId: "6586dcd80b91e2cfbb80" },
+      { key: "sung", chatId: "5fe4a715e25c0b02524d" },
+    ]);
+  });
+
+  it.each([undefined, "", "preview"])(
+    "rejects a missing or unsupported APP_ENV: %s",
+    (appEnv) => {
+      expect(() => zaloNotificationRecipientsForEnv(appEnv)).toThrow("APP_ENV");
     },
   );
 });

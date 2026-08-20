@@ -8,6 +8,7 @@ name: ${COMPOSE_PROJECT_NAME:-leafshoes}
 x-runtime-environment: &runtime-environment
   DATABASE_URL: postgresql://${POSTGRES_USER:?required}:${POSTGRES_PASSWORD:?required}@postgres:5432/${POSTGRES_DB:?required}?schema=public
   APP_BASE_URL: ${APP_BASE_URL:?required}
+  APP_ENV: ${APP_ENV:?required}
   VIETQR_BANK_CODE: ${VIETQR_BANK_CODE:?required}
   VIETQR_ACCOUNT_NO: ${VIETQR_ACCOUNT_NO:?required}
   VIETQR_ACCOUNT_NAME: ${VIETQR_ACCOUNT_NAME:?required}

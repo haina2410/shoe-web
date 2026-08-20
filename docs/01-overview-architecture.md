@@ -63,6 +63,7 @@ Dashboard vẫn yêu cầu HTTP Basic Auth vì có quyền retry và xoá job.
 
 - Zalo là dịch vụ ngoài dùng Bot API trực tiếp cho thông báo đơn mới nội bộ.
 - Danh sách người nhận là cấu hình mã nguồn có khoá ổn định và chat ID; hàng đợi chỉ lưu khoá, không lưu chat ID hay PII khách hàng.
+- App chọn người nhận lúc enqueue theo `APP_ENV`: development/staging gửi Nam, production gửi Nam và Sung.
 
 ## Ranh giới module (để dễ hiểu & test độc lập)
 
@@ -80,4 +81,4 @@ Dashboard vẫn yêu cầu HTTP Basic Auth vì có quyền retry và xoá job.
 
 ## Môi trường & cấu hình
 
-Biến môi trường chính: `DATABASE_URL`, `POSTGRES_HOST_PORT`, `BETTER_AUTH_SECRET`, `RESEND_API_KEY`, `BOT_TOKEN`, `SEPAY_WEBHOOK_SECRET`, thông tin tài khoản ngân hàng nhận tiền (số TK, ngân hàng, tên) để sinh VietQR, `APP_BASE_URL`.
+Biến môi trường chính: `APP_ENV`, `DATABASE_URL`, `POSTGRES_HOST_PORT`, `BETTER_AUTH_SECRET`, `RESEND_API_KEY`, `BOT_TOKEN`, `SEPAY_WEBHOOK_SECRET`, thông tin tài khoản ngân hàng nhận tiền (số TK, ngân hàng, tên) để sinh VietQR, `APP_BASE_URL`.

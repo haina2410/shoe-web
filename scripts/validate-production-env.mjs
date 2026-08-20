@@ -7,6 +7,7 @@ export const REQUIRED_PRODUCTION_ENV = [
   "BETTER_AUTH_SECRET",
   "BETTER_AUTH_URL",
   "APP_BASE_URL",
+  "APP_ENV",
   "CRAWL_POLICY",
   "BOT_TOKEN",
   "VIETQR_BANK_CODE",
@@ -28,7 +29,11 @@ export const REQUIRED_PRODUCTION_ENV = [
 export function validateProductionEnv(env = process.env) {
   return REQUIRED_PRODUCTION_ENV.filter((name) => {
     const value = env[name]?.trim();
-    return !value || (name === "CRAWL_POLICY" && value !== "allow");
+    return (
+      !value ||
+      (name === "APP_ENV" && value !== "production") ||
+      (name === "CRAWL_POLICY" && value !== "allow")
+    );
   });
 }
 

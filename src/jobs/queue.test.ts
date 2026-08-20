@@ -112,6 +112,10 @@ describe("paymentConfirmedJobSchema", () => {
 });
 
 describe("Zalo order-created queue", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("creates and updates the send-zalo-order-created queue", async () => {
     const createQueue = vi.fn().mockResolvedValue(undefined);
     const updateQueue = vi.fn().mockResolvedValue(undefined);
@@ -170,6 +174,26 @@ describe("Zalo order-created queue", () => {
       2,
       QUEUE_SEND_ZALO_ORDER_CREATED,
       { orderCode: "LEAFABC123", recipientKey: "staff-saigon" },
+      expect.objectContaining({ db: expect.anything() }),
+    );
+  });
+
+  it("uses APP_ENV to choose recipients when none are injected", async () => {
+    vi.stubEnv("APP_ENV", "staging");
+    const send = vi.fn().mockResolvedValue("job-id");
+    const boss = { send } as unknown as PgBoss;
+    const tx = { $queryRawUnsafe: vi.fn() };
+
+    await enqueueZaloOrderCreatedNotifications(
+      tx,
+      { orderCode: "LEAFABC123" },
+      boss,
+    );
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith(
+      QUEUE_SEND_ZALO_ORDER_CREATED,
+      { orderCode: "LEAFABC123", recipientKey: "nam" },
       expect.objectContaining({ db: expect.anything() }),
     );
   });
