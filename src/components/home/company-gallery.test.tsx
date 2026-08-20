@@ -119,4 +119,28 @@ describe("CompanyGallery", () => {
     expect(screen.getByRole("button", { name: "Ảnh trước đó" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Ảnh tiếp theo" })).toBeInTheDocument();
   });
+
+  it("giữ gallery hiển thị khi danh sách ảnh ngắn lại", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<CompanyGallery images={images} />);
+    const next = screen.getByRole("button", { name: "Ảnh tiếp theo" });
+
+    await user.click(next);
+    await user.click(next);
+    rerender(<CompanyGallery images={images.slice(0, 1)} />);
+
+    expect(screen.getByRole("img", { name: "Không gian trưng bày" })).toBeInTheDocument();
+    expect(screen.getByText("1 / 1")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Ảnh tiếp theo" }));
+    expect(screen.getByText("1 / 1")).toBeInTheDocument();
+  });
+
+  it("khai báo chiều rộng ảnh khớp với phần nội dung 1120 px", () => {
+    renderGallery();
+
+    expect(screen.getByRole("img", { name: "Không gian trưng bày" })).toHaveAttribute(
+      "sizes",
+      "(max-width: 1151px) calc(100vw - 2rem), 1120px",
+    );
+  });
 });

@@ -29,8 +29,8 @@ export const COMPANY_GALLERY_IMAGES = [
     src: "/company/company-opening.jpg",
     alt: "Đại diện leafshoes trong ngày khai trương công ty",
     caption: "Một dấu mốc trong hành trình của leafshoes",
-    width: 1920,
-    height: 1440,
+    width: 1120,
+    height: 840,
   },
 ] as const satisfies readonly CompanyImage[];
 
@@ -39,8 +39,8 @@ export const ABOUT_COMPANY_IMAGES = {
     src: "/company/company-team.jpg",
     alt: "Đại diện leafshoes tại không gian làm việc của công ty",
     caption: "leafshoes Việt Nam tại xưởng ở Đồng Nai",
-    width: 1920,
-    height: 1440,
+    width: 1120,
+    height: 840,
   },
   production: COMPANY_GALLERY_IMAGES[1],
   showroom: COMPANY_GALLERY_IMAGES[0],

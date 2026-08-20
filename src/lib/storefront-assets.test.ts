@@ -37,11 +37,15 @@ describe("storefront assets", () => {
         src: "/company/company-team.jpg",
         alt: "Đại diện leafshoes tại không gian làm việc của công ty",
         caption: "leafshoes Việt Nam tại xưởng ở Đồng Nai",
-        width: 1920,
-        height: 1440,
+        width: 1120,
+        height: 840,
       },
       production: COMPANY_GALLERY_IMAGES[1],
       showroom: COMPANY_GALLERY_IMAGES[0],
+    });
+    expect(COMPANY_GALLERY_IMAGES[2]).toMatchObject({
+      width: 1120,
+      height: 840,
     });
   });
 

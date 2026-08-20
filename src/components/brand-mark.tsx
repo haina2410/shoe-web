@@ -15,7 +15,6 @@ export function BrandMark({ compact = false, className }: BrandMarkProps): React
         alt=""
         aria-hidden="true"
         data-testid="leaf-mark"
-        unoptimized
         width={compact ? 24 : 32}
         height={compact ? 24 : 32}
       />

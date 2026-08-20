@@ -15,7 +15,8 @@ export function CompanyGallery({
 }): React.JSX.Element {
   const [index, setIndex] = useState(0);
   const touchStartX = useRef<number | null>(null);
-  const image = images[index];
+  const safeIndex = images.length === 0 ? 0 : index % images.length;
+  const image = images[safeIndex];
 
   if (!image) {
     return <></>;
@@ -89,7 +90,7 @@ export function CompanyGallery({
               alt={image.alt}
               width={image.width}
               height={image.height}
-              sizes="(max-width: 1215px) calc(100vw - 2rem), 1152px"
+              sizes="(max-width: 1151px) calc(100vw - 2rem), 1120px"
               className="h-auto w-full object-cover transition-opacity motion-reduce:transition-none"
             />
           </div>
@@ -107,7 +108,7 @@ export function CompanyGallery({
             <div className="min-w-0 flex-1 text-center">
               <p className="font-semibold text-[var(--evergreen)]">{image.caption}</p>
               <p aria-live="polite" aria-atomic="true" className="mt-1 text-sm text-neutral-600">
-                {index + 1} / {images.length}
+                {safeIndex + 1} / {images.length}
               </p>
             </div>
             <button
