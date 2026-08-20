@@ -24,6 +24,14 @@ for (const viewport of VIEWPORTS) {
     for (const route of CONTENT_ROUTES) {
       await page.goto(route.path);
       await expect(page.getByRole("heading", { level: 1, name: route.heading })).toBeVisible();
+
+      if (route.path === "/gioi-thieu") {
+        const companyImages = page.getByTestId("about-company-images");
+
+        await expect(companyImages).toBeVisible();
+        await expect(companyImages.getByRole("img")).toHaveCount(3);
+      }
+
       expect(
         await page.evaluate(
           () =>
