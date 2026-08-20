@@ -7,6 +7,13 @@ describe("BrandMark", () => {
     render(<BrandMark />);
 
     expect(screen.getByText("leafshoes")).toBeInTheDocument();
-    expect(screen.getByTestId("leaf-mark")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByTestId("leaf-mark")).toHaveAttribute(
+      "src",
+      "/brand/leafshoes-mark.png",
+    );
+    expect(screen.getByTestId("leaf-mark")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
   });
 });
