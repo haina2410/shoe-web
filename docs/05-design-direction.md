@@ -40,9 +40,12 @@ Nguyên tắc: nền paper + chữ ink chiếm ~90% diện tích; evergreen làm
 Trang chủ theo cấu trúc curated storefront: navbar có tìm kiếm, liên kết “Tra
 cứu đơn hàng” và số lượng giỏ, banner tĩnh, ba lối vào danh mục, sản phẩm mới,
 trust strip và footer doanh nghiệp. Footer cũng có liên kết “Tra cứu đơn hàng”.
-Không dùng carousel, giá giảm giả, countdown hoặc số liệu bán hàng không có nguồn
-dữ liệu thật. Search dùng GET tới `/products?q=<query>`; cart count là client
-island nhỏ, không biến toàn bộ header thành Client Component.
+Nội dung sản phẩm và hero không tự động chuyển. Một gallery thủ công về câu
+chuyện doanh nghiệp có thể xuất hiện bên dưới sản phẩm; gallery chỉ quay vòng khi
+người dùng chủ động thao tác bằng bàn phím, con trỏ hoặc cảm ứng và không tự nhận
+focus. Không dùng giá giảm giả, countdown hoặc số liệu bán hàng không có nguồn dữ
+liệu thật. Search dùng GET tới `/products?q=<query>`; cart count là client island
+nhỏ, không biến toàn bộ header thành Client Component.
 
 Trang tra cứu công khai tại `/orders` nhận mã đơn từ biểu mẫu hoặc URL. Mã được
 cắt khoảng trắng, chuyển sang chữ hoa và, nếu tồn tại, chuyển hướng đến
