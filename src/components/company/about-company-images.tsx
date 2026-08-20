@@ -22,7 +22,7 @@ export function AboutCompanyImages(): React.JSX.Element {
               alt={ABOUT_COMPANY_IMAGES.hero.alt}
               width={ABOUT_COMPANY_IMAGES.hero.width}
               height={ABOUT_COMPANY_IMAGES.hero.height}
-              sizes="(max-width: 832px) calc(100vw - 2rem), 736px"
+              sizes="(max-width: 768px) calc(100vw - 2rem), 736px"
               className="h-auto w-full object-cover"
             />
           </div>
@@ -43,7 +43,7 @@ export function AboutCompanyImages(): React.JSX.Element {
                   alt={image.alt}
                   width={image.width}
                   height={image.height}
-                  sizes="(max-width: 640px) calc(100vw - 2rem), 356px"
+                  sizes="(max-width: 639px) calc(100vw - 2rem), (max-width: 768px) calc((100vw - 3.5rem) / 2), 356px"
                   className="h-auto w-full object-cover"
                 />
               </div>

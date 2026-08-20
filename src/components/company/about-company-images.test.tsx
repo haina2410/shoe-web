@@ -23,4 +23,19 @@ describe("AboutCompanyImages", () => {
       expect(screen.getByText(image.caption)).toBeInTheDocument();
     }
   });
+
+  it("reports responsive widths that match the content column and supporting grid", () => {
+    render(<AboutCompanyImages />);
+
+    expect(
+      screen.getByRole("img", { name: ABOUT_COMPANY_IMAGES.hero.alt }),
+    ).toHaveAttribute("sizes", "(max-width: 768px) calc(100vw - 2rem), 736px");
+
+    for (const image of [ABOUT_COMPANY_IMAGES.production, ABOUT_COMPANY_IMAGES.showroom]) {
+      expect(screen.getByRole("img", { name: image.alt })).toHaveAttribute(
+        "sizes",
+        "(max-width: 639px) calc(100vw - 2rem), (max-width: 768px) calc((100vw - 3.5rem) / 2), 356px",
+      );
+    }
+  });
 });

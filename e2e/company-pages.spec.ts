@@ -9,10 +9,10 @@ const CONTENT_ROUTES = [
   { path: "/gioi-thieu", heading: "Giới thiệu công ty" },
   { path: "/nha-may", heading: "Nhà máy & hoạt động kinh doanh" },
   { path: "/chi-nhanh", heading: "Chi nhánh" },
-  { path: "/chinh-sach/thanh-toan", heading: "Hướng dẫn thanh toán" },
+  { path: "/chinh-sach/thanh-toan", heading: "Hình thức thanh toán" },
   { path: "/chinh-sach/giao-hang", heading: "Chính sách giao hàng" },
-  { path: "/chinh-sach/doi-tra", heading: "Chính sách đổi trả" },
-  { path: "/chinh-sach/bao-mat", heading: "Chính sách bảo mật" },
+  { path: "/chinh-sach/doi-tra", heading: "Chính sách bảo hành và đổi trả" },
+  { path: "/chinh-sach/bao-mat", heading: "Chính sách bảo mật thông tin" },
 ] as const;
 
 for (const viewport of VIEWPORTS) {
@@ -84,7 +84,7 @@ test("chân trang dẫn tới chính sách đổi trả", async ({ page }) => {
 
   const link = page
     .getByRole("navigation", { name: "Chính sách" })
-    .getByRole("link", { name: "Chính sách đổi trả" });
+    .getByRole("link", { name: "Chính sách bảo hành và đổi trả" });
 
   // Cú click ngay sau `goto` có thể rơi vào lúc router chưa hydrate xong (chỉ
   // xảy ra khi cả bộ E2E chạy song song), khiến điều hướng bị bỏ. `toPass` cho
@@ -94,7 +94,9 @@ test("chân trang dẫn tới chính sách đổi trả", async ({ page }) => {
     await expect(page).toHaveURL(/\/chinh-sach\/doi-tra$/, { timeout: 2_000 });
   }).toPass({ timeout: 15_000 });
 
-  await expect(page.getByRole("heading", { level: 1, name: "Chính sách đổi trả" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Chính sách bảo hành và đổi trả" }),
+  ).toBeVisible();
 });
 
 test("thanh liên hệ trên cùng cho gọi và gửi thư ngay", async ({ page }) => {
