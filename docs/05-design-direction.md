@@ -30,6 +30,8 @@ Nguyên tắc: nền paper + chữ ink chiếm ~90% diện tích; evergreen làm
 - Nav tối giản dính trên: logo trái, danh mục giữa/phải, giỏ hàng góc phải. Nền paper, kẻ hairline dưới.
 - **Hero product-forward:** mở đầu bằng **ảnh sản phẩm lớn** (không phải "số to + nhãn nhỏ"), tiêu đề ngắn + 1 CTA.
 - Lưới sản phẩm như gallery, nhiều khoảng trắng, card viền hairline (không đổ bóng nặng).
+- Card sản phẩm tự ôm nội dung thay vì kéo cao theo hàng, hiển thị tối đa bốn ảnh
+  đại diện màu bên dưới giá cùng số màu và danh sách size để khách quét nhanh.
 - Trang chi tiết: ảnh lớn bên trái, chọn size/màu + tồn kho + nút thêm giỏ bên
   phải. Mỗi màu có thể có một bộ ảnh riêng. Trước khi chọn màu, gallery dùng
   bộ mặc định; sau khi chọn, gallery dùng bộ cùng màu và fallback về bộ mặc

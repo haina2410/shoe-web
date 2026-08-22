@@ -16,6 +16,12 @@ const baseItem: CatalogListItem = {
   name: "Giày chạy bộ nam",
   basePrice: 890000,
   imageUrl: "/uploads/giay-chay-bo-nam.jpg",
+  imagePreviews: [
+    { color: "Đen", url: "/uploads/giay-den.jpg" },
+    { color: "Trắng", url: "/uploads/giay-trang.jpg" },
+  ],
+  colors: ["Đen", "Trắng"],
+  sizes: ["40", "41"],
   totalStock: 12,
 };
 
@@ -63,5 +69,14 @@ describe("ProductCard", () => {
   it("không hiển thị nội dung giảm giá khi dữ liệu không có khuyến mãi", () => {
     render(<ProductCard product={baseItem} />);
     expect(screen.queryByText(/giảm|%/i)).not.toBeInTheDocument();
+  });
+
+  it("hiển thị ảnh đại diện màu và thông tin biến thể", () => {
+    render(<ProductCard product={baseItem} />);
+
+    expect(screen.getByLabelText("2 màu")).toBeInTheDocument();
+    expect(screen.getByText("Size 40, 41")).toBeInTheDocument();
+    expect(screen.getAllByRole("img")).toHaveLength(1);
+    expect(document.querySelectorAll('img[alt=""]')).toHaveLength(2);
   });
 });

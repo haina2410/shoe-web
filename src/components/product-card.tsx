@@ -3,20 +3,13 @@ import Link from "next/link";
 import { formatVnd } from "@/lib/money";
 import type { CatalogListItem } from "@/server/queries/catalog";
 
-/**
- * `ProductCard` — thẻ sản phẩm dùng trong lưới `/products`.
- *
- * Server-safe (không có `"use client"`): chỉ render, không có state/handler.
- * Dùng `next/image` để tối ưu ảnh storefront. Ảnh admin được phục vụ qua
- * route handler cần giữ nguyên request nội bộ, nên chỉ chúng được unoptimized.
- * Thiếu ảnh (`imageUrl === null`) → fallback khối nền `--sage` + glyph lá,
- * không bao giờ render `<img>` với `src` rỗng/hỏng.
- */
 export function ProductCard({ product }: { product: CatalogListItem }) {
+  const visiblePreviews = product.imagePreviews.slice(0, 4);
+
   return (
     <Link
       href={`/products/${product.slug}`}
-      className="group block overflow-hidden rounded-xl border bg-[var(--paper)] transition-shadow motion-safe:hover:-translate-y-0.5 motion-safe:hover:shadow-lg focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[var(--accent)]"
+      className="group block self-start overflow-hidden rounded-xl border bg-[var(--paper)] transition-shadow motion-safe:hover:-translate-y-0.5 motion-safe:hover:shadow-lg focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[var(--accent)]"
       style={{ borderColor: "var(--line)" }}
     >
       <div
@@ -48,10 +41,39 @@ export function ProductCard({ product }: { product: CatalogListItem }) {
         ) : null}
       </div>
       <div className="p-4">
-        <p className="truncate font-semibold tracking-tight">{product.name}</p>
+        <p className="line-clamp-2 min-h-12 font-semibold leading-6 tracking-tight">{product.name}</p>
         <p className="mt-1 text-base font-bold" style={{ color: "var(--evergreen)" }}>
           {formatVnd(product.basePrice)}
         </p>
+        {visiblePreviews.length > 0 ? (
+          <div className="mt-3 flex items-center gap-2" aria-label={`${product.colors.length} màu`}>
+            {visiblePreviews.map((preview) => (
+              <span
+                key={`${preview.color}-${preview.url}`}
+                className="relative size-10 overflow-hidden rounded-md border bg-[var(--sage)]"
+                title={preview.color}
+              >
+                <Image
+                  src={preview.url}
+                  alt=""
+                  fill
+                  sizes="40px"
+                  unoptimized={preview.url.startsWith("/api/uploads/")}
+                  className="object-cover"
+                />
+              </span>
+            ))}
+            {product.imagePreviews.length > visiblePreviews.length ? (
+              <span className="text-xs font-medium text-neutral-600">
+                +{product.imagePreviews.length - visiblePreviews.length}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+        <div className="mt-3 flex items-center justify-between gap-2 text-xs text-neutral-600">
+          <span>{product.colors.length} màu</span>
+          <span>{product.sizes.length > 0 ? `Size ${product.sizes.join(", ")}` : "Chưa có size"}</span>
+        </div>
       </div>
     </Link>
   );
