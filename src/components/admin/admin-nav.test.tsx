@@ -17,6 +17,10 @@ describe("AdminNav", () => {
       "href",
       "/admin/products",
     );
+    expect(screen.getByRole("link", { name: "Danh mục" })).toHaveAttribute(
+      "href",
+      "/admin/categories",
+    );
     expect(screen.getByRole("link", { name: "Đơn hàng" })).toHaveAttribute(
       "href",
       "/admin/orders",

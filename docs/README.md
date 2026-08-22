@@ -6,7 +6,7 @@ tài liệu tham chiếu bền vững về kiến trúc, nghiệp vụ, giao di�
 ## Phạm vi tính năng (MVP demo)
 
 - **Browse:** danh mục + lọc (giá/size/màu), tìm kiếm theo tên, trang chi tiết sản phẩm, giỏ hàng nhiều sản phẩm.
-- **Quản lý sản phẩm (admin):** CRUD sản phẩm/biến thể/tồn kho, upload ảnh; nhiều admin có phân quyền (RBAC).
+- **Quản lý catalog (admin):** CRUD sản phẩm/biến thể/tồn kho, upload ảnh, CRUD danh mục phẳng và xem sản phẩm theo danh mục; nhiều admin có phân quyền (RBAC).
 - **Thanh toán:** chuyển khoản QR VietQR, đối soát tự động qua SePay/Casso + admin xác nhận tay khi cần; checkout tạo đơn; gửi email xác nhận.
 - **Mua không cần đăng nhập:** guest checkout chỉ bằng email.
 

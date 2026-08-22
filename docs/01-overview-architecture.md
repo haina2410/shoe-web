@@ -47,7 +47,7 @@ Dashboard vẫn yêu cầu HTTP Basic Auth vì có quyền retry và xoá job.
 
 ### 2. Admin (quản trị)
 - Route nhóm `(admin)` được bảo vệ bằng **Better Auth** (email/mật khẩu) + **RBAC** (role OWNER/STAFF).
-- Quản lý sản phẩm/biến thể/tồn kho, quản lý đơn hàng, xác nhận thanh toán thủ công.
+- Quản lý sản phẩm/biến thể/tồn kho, danh mục phẳng, đơn hàng và xác nhận thanh toán thủ công.
 - UI bảng dữ liệu bằng **TanStack Table** trên nền shadcn/ui.
 
 ### 3. API routes

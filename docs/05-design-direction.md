@@ -80,7 +80,7 @@ hover/focus rõ ràng và cuộn ngang khi cần.
 
 Màu hành động diễn đạt hậu quả: xanh cho lưu và chuyển tiếp an toàn, amber cho
 xác nhận thanh toán, hoàn tiền và ghép giao dịch, đỏ cho huỷ đơn và xoá sản
-phẩm; nút viền trung tính dành cho lọc, đóng và điều hướng. Badge luôn có nhãn
+phẩm/danh mục; nút viền trung tính dành cho lọc, đóng và điều hướng. Badge luôn có nhãn
 chữ: chờ thanh toán/review và hoàn một phần là amber; đã thanh toán/đã ghép là
 xanh dương; đang giao là tím; hoàn tất/đã hoàn toàn bộ là xanh; huỷ, hết hàng là
 đỏ; trạng thái trung tính là xám. Không truyền đạt trạng thái chỉ bằng màu.
@@ -98,6 +98,11 @@ chính cao tối thiểu 40px. Trên mobile, summary và action xếp dọc theo
 đọc, không thu nhỏ mục tiêu chạm; bảng tiếp tục cuộn ngang. Dialog giữ focus
 bên trong, trả focus về trigger khi đóng, cho Escape/hủy khi không pending.
 Toast không cướp focus; keyboard focus và pending state luôn nhìn thấy được.
+
+Trang danh mục dùng bảng phẳng có tên, slug ổn định và danh sách sản phẩm liên
+kết tới màn hình sửa sản phẩm. Danh mục có sản phẩm hiển thị lý do và vô hiệu
+hoá nút xoá; server vẫn kiểm tra lại điều kiện này khi mutation chạy. Staff xem
+được danh mục và sản phẩm bên trong nhưng chỉ owner thấy thao tác tạo, sửa, xoá.
 
 ## Signature (điểm nhấn duy nhất)
 

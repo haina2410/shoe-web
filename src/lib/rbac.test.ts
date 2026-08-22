@@ -11,6 +11,13 @@ describe("can()", () => {
     expect(can("staff", "product", "create")).toBe(false);
     expect(can("staff", "product", "delete")).toBe(false);
   });
+  it("owner quản lý category còn staff chỉ đọc", () => {
+    expect(can("owner", "category", "create")).toBe(true);
+    expect(can("owner", "category", "update")).toBe(true);
+    expect(can("owner", "category", "delete")).toBe(true);
+    expect(can("staff", "category", "read")).toBe(true);
+    expect(can("staff", "category", "create")).toBe(false);
+  });
   it("staff đọc + cập nhật order", () => {
     expect(can("staff", "order", "read")).toBe(true);
     expect(can("staff", "order", "update")).toBe(true);

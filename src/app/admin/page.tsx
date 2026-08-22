@@ -7,7 +7,7 @@ export default function AdminDashboardPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Vận hành cửa hàng"
-        description="Truy cập nhanh các công việc hiện có: quản lý sản phẩm, đơn hàng và đối soát giao dịch ngân hàng."
+        description="Truy cập nhanh các công việc hiện có: quản lý sản phẩm, danh mục, đơn hàng và đối soát giao dịch ngân hàng."
       />
 
       <AdminSection>
@@ -22,6 +22,18 @@ export default function AdminDashboardPage() {
           </h2>
           <p className="mt-1 text-sm text-neutral-600">
             Xem, thêm, sửa, xoá sản phẩm và cập nhật tồn kho.
+          </p>
+        </Link>
+        <Link
+          href="/admin/categories"
+          className="block rounded-lg border p-4 transition-colors hover:bg-[var(--sage)]/40 focus-visible:bg-[var(--sage)]/40"
+          style={{ borderColor: "var(--line)" }}
+        >
+          <h2 className="font-semibold" style={{ color: "var(--evergreen)" }}>
+            Quản lý danh mục
+          </h2>
+          <p className="mt-1 text-sm text-neutral-600">
+            Xem sản phẩm theo danh mục và quản lý danh mục phẳng.
           </p>
         </Link>
         <Link
