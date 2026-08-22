@@ -48,13 +48,13 @@ describe("ProductsPage", () => {
     );
   });
 
-  it("keeps the public product grid independent of the admin alignment change", async () => {
+  it("keeps product cards aligned to their own content height", async () => {
     listProductsMock.mockResolvedValue([{ id: "product-1" }]);
 
     render(await ProductsPage({ searchParams: Promise.resolve({}) }));
 
-    expect(screen.getByRole("article", { name: "Sản phẩm thử" }).parentElement).not.toHaveClass(
-      "self-start",
+    expect(screen.getByRole("article", { name: "Sản phẩm thử" }).parentElement).toHaveClass(
+      "items-start",
     );
   });
 });

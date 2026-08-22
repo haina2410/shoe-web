@@ -19,6 +19,9 @@ export type CatalogListItem = {
   name: string;
   basePrice: number;
   imageUrl: string | null;
+  imagePreviews: { color: string; url: string }[];
+  colors: string[];
+  sizes: string[];
   totalStock: number;
 };
 
@@ -115,7 +118,6 @@ export async function listProducts(
           { position: "asc" },
           { id: "asc" },
         ],
-        take: 1,
         include: {
           images: {
             orderBy: [{ position: "asc" }, { id: "asc" }],
@@ -123,7 +125,7 @@ export async function listProducts(
           },
         },
       },
-      variants: { select: { stock: true } },
+      variants: { select: { stock: true, color: true, size: true } },
     },
   });
 
@@ -133,6 +135,13 @@ export async function listProducts(
     name: p.name,
     basePrice: p.basePrice,
     imageUrl: p.imageSets[0]?.images[0]?.url ?? null,
+    imagePreviews: p.imageSets.flatMap((imageSet) =>
+      imageSet.images[0]
+        ? [{ color: imageSet.color, url: imageSet.images[0].url }]
+        : [],
+    ),
+    colors: [...new Set(p.variants.map((variant) => variant.color))],
+    sizes: [...new Set(p.variants.map((variant) => variant.size))].sort(),
     totalStock: p.variants.reduce((sum, v) => sum + v.stock, 0),
   }));
 }
