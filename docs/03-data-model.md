@@ -168,6 +168,11 @@ model ProvinceZone {
 - Tổng `OUT` cộng dồn không được vượt tổng `IN`; thao tác hoàn tiền khóa đơn
   trong transaction để hai yêu cầu đồng thời cũng không vượt số thực nhận.
 - **Tồn kho ở cấp `Variant`** (theo size+màu) đúng yêu cầu.
+- **Danh mục trong admin là danh sách phẳng:** danh mục được tạo từ admin luôn
+  có `parentId=null`; giao diện không cho đặt quan hệ cha/con. Slug được sinh
+  duy nhất khi tạo và giữ ổn định khi đổi tên để URL lọc storefront không đổi.
+  Danh mục chỉ được xoá khi không còn sản phẩm tham chiếu; trang admin liệt kê
+  và liên kết toàn bộ sản phẩm đang thuộc từng danh mục.
 - **Ảnh nhóm theo màu:** mỗi `ProductImageSet.color` phải khớp một màu đang có
   trong `Variant` của cùng sản phẩm. Mỗi sản phẩm có tối đa một bộ cho mỗi màu.
 - Sản phẩm có bộ ảnh phải có đúng một bộ `isDefault=true`; unique index có điều

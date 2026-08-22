@@ -4,7 +4,7 @@ import { roles } from "@/lib/permissions";
 export type AppRole = keyof typeof roles; // "owner" | "staff"
 
 /** Tài nguyên hỗ trợ kiểm tra quyền. */
-export type Resource = "product" | "order";
+export type Resource = "product" | "category" | "order";
 
 /**
  * Kiểu request mà `Role.authorize()` của better-auth chấp nhận.

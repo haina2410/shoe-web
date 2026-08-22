@@ -14,10 +14,14 @@ describe("AdminDashboardPage", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Truy cập nhanh các công việc hiện có: quản lý sản phẩm, đơn hàng và đối soát giao dịch ngân hàng.",
+        "Truy cập nhanh các công việc hiện có: quản lý sản phẩm, danh mục, đơn hàng và đối soát giao dịch ngân hàng.",
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Quản lý sản phẩm/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Quản lý danh mục/i })).toHaveAttribute(
+      "href",
+      "/admin/categories",
+    );
     expect(screen.getByRole("link", { name: /Quản lý đơn hàng/i })).toBeInTheDocument();
   });
 
