@@ -14,12 +14,16 @@ const { default: ChinhSachPage, generateMetadata, generateStaticParams } = await
 );
 
 describe("ChinhSachPage", () => {
-  it("render sẵn đúng năm trang chính sách lúc build", () => {
+  it("render sẵn đủ trang chính sách bắt buộc lúc build", () => {
     expect(generateStaticParams()).toEqual([
       { slug: "huong-dan-mua-hang" },
-      { slug: "giao-hang" },
+      { slug: "gia" },
       { slug: "thanh-toan" },
+      { slug: "giao-hang" },
       { slug: "doi-tra" },
+      { slug: "bao-hanh" },
+      { slug: "dieu-kien-cung-cap" },
+      { slug: "khieu-nai" },
       { slug: "bao-mat" },
     ]);
   });
@@ -30,26 +34,45 @@ describe("ChinhSachPage", () => {
     );
 
     expect(
-      screen.getByRole("heading", { level: 1, name: "Hướng dẫn mua hàng" }),
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Hướng dẫn mua hàng và hỗ trợ trực tuyến",
+      }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { level: 2, name: "Các bước mua hàng" }),
     ).toBeInTheDocument();
   });
 
-  it("công bố bảo hành 30 ngày cùng điều kiện đổi trả", async () => {
+  it("công bố điều kiện đổi trả cùng cách hoàn tiền", async () => {
     render(await ChinhSachPage({ params: Promise.resolve({ slug: "doi-tra" }) }));
 
     expect(
-      screen.getByRole("heading", { level: 1, name: "Chính sách bảo hành và đổi trả" }),
+      screen.getByRole("heading", { level: 1, name: "Chính sách đổi trả và hoàn tiền" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", {
-        level: 2,
-        name: "Bảo hành lỗi sản xuất trong 30 ngày",
-      }),
+      screen.getByRole("heading", { level: 2, name: "Điều kiện đổi trả" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 2, name: "Hoàn tiền" })).toBeInTheDocument();
+  });
+
+  it("tách bảo hành thành trang riêng và giữ mốc 30 ngày", async () => {
+    render(await ChinhSachPage({ params: Promise.resolve({ slug: "bao-hanh" }) }));
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Chính sách bảo hành" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Phạm vi bảo hành" }),
+    ).toBeInTheDocument();
+  });
+
+  it("có trang khiếu nại nêu thời hạn xử lý", async () => {
+    render(await ChinhSachPage({ params: Promise.resolve({ slug: "khieu-nai" }) }));
+
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Thời hạn xử lý" }),
+    ).toBeInTheDocument();
   });
 
   it("đặt title và description theo từng trang", async () => {

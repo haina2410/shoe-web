@@ -7,6 +7,7 @@ export const STORE_INFO = {
   email: "leafshoesvn@gmail.com",
   address: "Số 14, Đường Phú Sơn 3, Xã Bình Minh, TP. Đồng Nai",
   zaloUrl: "https://zalo.me/0395069089",
+  workingHours: "8:00 – 17:30, thứ Hai đến thứ Bảy",
 } as const;
 
 export const CATEGORY_PATHS = [

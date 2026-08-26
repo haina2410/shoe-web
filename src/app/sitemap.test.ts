@@ -45,9 +45,13 @@ describe("sitemap", () => {
       {
         url: "https://leafshoesvietnam.com/chinh-sach/huong-dan-mua-hang",
       },
-      { url: "https://leafshoesvietnam.com/chinh-sach/giao-hang" },
+      { url: "https://leafshoesvietnam.com/chinh-sach/gia" },
       { url: "https://leafshoesvietnam.com/chinh-sach/thanh-toan" },
+      { url: "https://leafshoesvietnam.com/chinh-sach/giao-hang" },
       { url: "https://leafshoesvietnam.com/chinh-sach/doi-tra" },
+      { url: "https://leafshoesvietnam.com/chinh-sach/bao-hanh" },
+      { url: "https://leafshoesvietnam.com/chinh-sach/dieu-kien-cung-cap" },
+      { url: "https://leafshoesvietnam.com/chinh-sach/khieu-nai" },
       { url: "https://leafshoesvietnam.com/chinh-sach/bao-mat" },
       {
         url: "https://leafshoesvietnam.com/products/giay-chay-bo",

@@ -14,7 +14,7 @@ const ALL_PAGES: readonly ContentPage[] = [...COMPANY_PAGES, ...POLICY_PAGE_LIST
  * Các trang nội dung là dữ liệu tĩnh, nên lỗi hay gặp nhất không phải lỗi
  * render mà là lỗi nội dung: quên viết một section, để lại chỗ trống, hoặc đặt
  * href lệch với route thật (link chết trong navbar). Test này chốt các bất biến
- * đó một lần cho cả tám trang.
+ * đó một lần cho mọi trang.
  */
 describe("nội dung trang tĩnh", () => {
   it("có đủ tiêu đề, mô tả và đoạn mở đầu cho mọi trang", () => {
@@ -86,6 +86,22 @@ describe("nội dung trang tĩnh", () => {
     );
   });
 
+  it("phủ đủ danh mục tài liệu bắt buộc của Bộ Công Thương", () => {
+    // Thiếu một slug ở đây là thiếu một tệp phải nộp trên cổng đăng ký website
+    // thương mại điện tử, nên khoá lại bằng test thay vì bằng trí nhớ.
+    for (const slug of [
+      "bao-mat",
+      "khieu-nai",
+      "gia",
+      "thanh-toan",
+      "dieu-kien-cung-cap",
+      "giao-hang",
+      "doi-tra",
+    ] as const) {
+      expect(POLICY_SLUGS).toContain(slug);
+    }
+  });
+
   it("nói đúng những cam kết mà hệ thống thật sự thực hiện", () => {
     // Ba con số này là hành vi thật của code (một zone phí phẳng, job
     // expire-unpaid maxAgeHours=24, danh sách 34 tỉnh trong seed). Nếu ai đổi
@@ -98,5 +114,10 @@ describe("nội dung trang tĩnh", () => {
     expect(
       POLICY_PAGES["giao-hang"].sections.flatMap((s) => s.bullets ?? []).join(" "),
     ).toContain("34 tỉnh thành");
+    expect(POLICY_PAGES["doi-tra"].lead).toContain("3 ngày");
+    expect(POLICY_PAGES["bao-hanh"].lead).toContain("30 ngày");
+    expect(
+      POLICY_PAGES["gia"].sections.flatMap((s) => s.bullets ?? []).join(" "),
+    ).toContain("30.000 ₫");
   });
 });
