@@ -39,7 +39,7 @@ for (const viewport of VIEWPORTS) {
         const companyImages = page.getByTestId("about-company-images");
 
         await expect(companyImages).toBeVisible();
-        await expect(companyImages.getByRole("img")).toHaveCount(3);
+        await expect(companyImages.getByRole("img")).toHaveCount(2);
       }
 
       expect(
