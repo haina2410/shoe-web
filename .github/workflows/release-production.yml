@@ -119,6 +119,11 @@ jobs:
   deploy_production:
     name: Redeploy production with Komodo
     needs: verify_images
+    # `create_release` bị skip trên event `release`, và skip lan xuống toàn bộ
+    # chuỗi phụ thuộc chứ không dừng ở một bậc: thiếu status function ở đây thì
+    # job này skip theo, dù `verify_images` xanh. `!cancelled()` thay vì
+    # `always()` để một run bị huỷ không deploy tiếp.
+    if: ${{ !cancelled() && needs.verify_images.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
