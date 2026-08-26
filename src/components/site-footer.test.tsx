@@ -28,10 +28,14 @@ describe("SiteFooter", () => {
       ["Nhà máy & hoạt động kinh doanh", "/nha-may"],
       ["Chi nhánh", "/chi-nhanh"],
       ["Tra cứu đơn hàng", "/orders"],
-      ["Hướng dẫn mua hàng", "/chinh-sach/huong-dan-mua-hang"],
+      ["Hướng dẫn mua hàng và hỗ trợ", "/chinh-sach/huong-dan-mua-hang"],
+      ["Chính sách giá", "/chinh-sach/gia"],
+      ["Chính sách thanh toán", "/chinh-sach/thanh-toan"],
       ["Chính sách giao hàng", "/chinh-sach/giao-hang"],
-      ["Hình thức thanh toán", "/chinh-sach/thanh-toan"],
-      ["Chính sách bảo hành và đổi trả", "/chinh-sach/doi-tra"],
+      ["Chính sách đổi trả và hoàn tiền", "/chinh-sach/doi-tra"],
+      ["Chính sách bảo hành", "/chinh-sach/bao-hanh"],
+      ["Điều kiện cung cấp hàng hoá", "/chinh-sach/dieu-kien-cung-cap"],
+      ["Tiếp nhận và giải quyết khiếu nại", "/chinh-sach/khieu-nai"],
       ["Chính sách bảo mật thông tin", "/chinh-sach/bao-mat"],
     ] as const) {
       expect(screen.getByRole("link", { name }), name).toHaveAttribute("href", href);

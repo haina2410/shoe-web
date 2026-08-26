@@ -56,20 +56,31 @@ banner “Không tìm thấy đơn hàng”, để không tiết lộ mã nào �
 
 ## Trang nội dung công khai
 
-Footer công khai đủ năm trang thông tin bán hàng: “Hướng dẫn mua hàng” tại
-`/chinh-sach/huong-dan-mua-hang`, “Chính sách giao hàng” tại
-`/chinh-sach/giao-hang`, “Hình thức thanh toán” tại
-`/chinh-sach/thanh-toan`, “Chính sách bảo hành và đổi trả” tại
-`/chinh-sach/doi-tra` và “Chính sách bảo mật thông tin” tại
-`/chinh-sach/bao-mat`. Nội dung dùng chung khung `ContentPageView` và được giữ
-tập trung trong `src/lib/policy-content.ts` để metadata, route render sẵn và
-điều hướng luôn cùng một nguồn.
+Footer công khai chín trang chính sách dưới `/chinh-sach/[slug]`, phủ đủ danh
+mục tài liệu bắt buộc của Bộ Công Thương cho website thương mại điện tử:
+
+| Tài liệu Bộ Công Thương | Slug |
+| --- | --- |
+| Chính sách bảo mật | `bao-mat` |
+| Tiếp nhận và giải quyết phản ánh, yêu cầu, khiếu nại | `khieu-nai` |
+| Chính sách giá | `gia` |
+| Chính sách về thanh toán | `thanh-toan` |
+| Điều kiện, hạn chế trong việc cung cấp hàng hoá | `dieu-kien-cung-cap` |
+| Chính sách giao hàng, đổi trả và hoàn tiền | `giao-hang`, `doi-tra` |
+| Hình thức hỗ trợ trực tuyến | `huong-dan-mua-hang` |
+| Tài liệu khác | `bao-hanh` |
+
+Nội dung dùng chung khung `ContentPageView` và được giữ tập trung trong
+`src/lib/policy-content.ts` để metadata, route render sẵn và điều hướng luôn
+cùng một nguồn.
 
 Nội dung công bố phải khớp hành vi thật của checkout và vận hành: khách đặt
 hàng không cần tài khoản, thanh toán duy nhất bằng chuyển khoản VietQR, phí giao
 hàng phẳng 30.000 ₫, đơn chưa thanh toán hết hạn sau 24 giờ, đổi trả đủ điều
-kiện trong 7 ngày và bảo hành lỗi sản xuất trong 30 ngày. Khi thay đổi một hành
-vi này, cập nhật trang chính sách tương ứng trong cùng thay đổi.
+kiện trong 3 ngày và bảo hành lỗi sản xuất trong 30 ngày. Đổi trả chỉ áp dụng
+cho lỗi sản xuất, hư hỏng do vận chuyển và giao sai; không nhận đổi vì chọn sai
+size hay đổi ý. Khi thay đổi một hành vi này, cập nhật trang chính sách tương
+ứng trong cùng thay đổi.
 
 ## Bề mặt quản trị
 
