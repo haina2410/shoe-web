@@ -230,7 +230,7 @@ export const POLICY_PAGES: Readonly<Record<PolicySlug, ContentPage>> = {
     title: "Chính sách đổi trả và hoàn tiền",
     metaDescription:
       "Đổi trả trong 3 ngày cho sản phẩm lỗi sản xuất hoặc hư hỏng do vận chuyển, điều kiện đổi trả và cách leafshoes hoàn tiền.",
-    lead: "Bạn có thể yêu cầu đổi hoặc trả hàng trong 3 ngày kể từ khi nhận, áp dụng cho sản phẩm lỗi sản xuất hoặc hư hỏng trong quá trình vận chuyển. Lỗi sản xuất phát hiện muộn hơn vẫn được tiếp nhận theo chính sách bảo hành 30 ngày.",
+    lead: "Bạn có thể yêu cầu đổi hoặc trả hàng trong 3 ngày kể từ khi nhận, áp dụng cho sản phẩm lỗi sản xuất hoặc hư hỏng trong quá trình vận chuyển. Chúng tôi không nhận đổi trả vì lý do cá nhân. Lỗi sản xuất phát hiện muộn hơn vẫn được tiếp nhận theo chính sách bảo hành 30 ngày.",
     sections: [
       {
         heading: "Trường hợp được đổi trả",
@@ -254,7 +254,7 @@ export const POLICY_PAGES: Readonly<Record<PolicySlug, ContentPage>> = {
       {
         heading: "Trường hợp không đổi trả",
         bullets: [
-          "Đổi vì chọn sai size hoặc thay đổi nhu cầu cá nhân. Hãy xem kỹ bảng size trước khi đặt, hoặc hỏi trước qua Zalo.",
+          "Mọi lý do cá nhân: chọn sai size, đổi ý, không thích kiểu dáng hay màu thực tế, mua nhầm. Hãy xem kỹ bảng size và ảnh sản phẩm trước khi đặt, hoặc hỏi trước qua Zalo — chúng tôi tư vấn size miễn phí.",
           "Hàng đã sử dụng, đã giặt, hoặc hư hỏng phát sinh trong quá trình sử dụng.",
           "Thiếu hộp, nhãn, tem hoặc phụ kiện; tem bị rách rời hoặc không còn đọc được.",
           "Trầy xước, ố màu, bể vỡ phát hiện sau khi bạn đã ký nhận hàng mà không ghi nhận tại thời điểm nhận.",
@@ -295,12 +295,21 @@ export const POLICY_PAGES: Readonly<Record<PolicySlug, ContentPage>> = {
     title: "Chính sách bảo hành",
     metaDescription:
       "Bảo hành lỗi sản xuất trong 30 ngày kể từ ngày nhận hàng, phạm vi áp dụng, trường hợp loại trừ và cách gửi yêu cầu bảo hành.",
-    lead: "Sản phẩm được bảo hành lỗi sản xuất trong 30 ngày kể từ ngày bạn nhận hàng. Bảo hành áp dụng cho lỗi phát sinh từ quá trình sản xuất khi sản phẩm được sử dụng đúng cách.",
+    lead: "Sản phẩm được bảo hành lỗi sản xuất trong 30 ngày kể từ ngày bạn nhận hàng, căn cứ phiếu bảo hành kèm theo sản phẩm và tem niêm phong còn nguyên vẹn. Bảo hành áp dụng cho lỗi phát sinh từ quá trình sản xuất khi sản phẩm được sử dụng đúng cách.",
     sections: [
+      {
+        heading: "Điều kiện được bảo hành",
+        bullets: [
+          "Sản phẩm có phiếu bảo hành do leafshoes cấp, đặt sẵn trong hộp khi giao hàng. Hãy giữ phiếu này cho tới hết thời hạn bảo hành.",
+          "Tem niêm phong của công ty trên sản phẩm còn nguyên vẹn, còn đọc được và không có dấu hiệu bị bóc, dán lại hay thay thế.",
+          "Phiếu bảo hành còn trong thời hạn ghi trên phiếu.",
+          "Sản phẩm được sử dụng và bảo quản đúng theo hướng dẫn đi kèm.",
+        ],
+      },
       {
         heading: "Phạm vi bảo hành",
         bullets: [
-          "Thời hạn 30 ngày được tính từ ngày bạn nhận hàng, xác định theo đơn hàng trong hệ thống.",
+          "Thời hạn 30 ngày được tính từ ngày bạn nhận hàng, ghi trên phiếu bảo hành và đối chiếu được với đơn hàng trong hệ thống.",
           "Bong keo bất thường ở đế hoặc thân giày khi sử dụng bình thường.",
           "Bung, đứt hoặc tuột đường may không do va đập hay kéo rách.",
           "Hỏng phụ kiện và chi tiết sản phẩm như khoá, quai, dây, ô dê khi sử dụng đúng cách.",
@@ -311,6 +320,8 @@ export const POLICY_PAGES: Readonly<Record<PolicySlug, ContentPage>> = {
         heading: "Trường hợp không bảo hành",
         bullets: [
           "Hết thời hạn 30 ngày kể từ ngày nhận hàng.",
+          "Không xuất trình được phiếu bảo hành, hoặc phiếu bị tẩy xoá, sửa chữa, không còn đọc được.",
+          "Tem niêm phong bị mất, rách rời, mờ không đọc được, hoặc có dấu hiệu bị bóc và dán lại.",
           "Hao mòn tự nhiên, trầy xước, bạc màu hoặc biến dạng phát sinh trong quá trình sử dụng.",
           "Hư hỏng do dùng sai mục đích, va đập, cắt rách, kéo giãn quá mức hoặc bảo quản không đúng cách.",
           "Hư hỏng do tiếp xúc với nước, nhiệt độ cao hoặc hoá chất không phù hợp với hướng dẫn sử dụng thông thường của sản phẩm.",
@@ -323,7 +334,8 @@ export const POLICY_PAGES: Readonly<Record<PolicySlug, ContentPage>> = {
         heading: "Cách gửi yêu cầu bảo hành",
         bullets: [
           `Nhắn Zalo hoặc gọi ${STORE_INFO.phoneDisplay}, hoặc gửi email tới ${STORE_INFO.email}.`,
-          "Cung cấp mã đơn hàng, mô tả tình trạng và ảnh chụp rõ phần bị lỗi. Không cần phiếu bảo hành giấy — mã đơn là căn cứ duy nhất.",
+          "Cung cấp mã đơn hàng, ảnh phiếu bảo hành, ảnh tem niêm phong, mô tả tình trạng và ảnh chụp rõ phần bị lỗi.",
+          "Gửi kèm phiếu bảo hành bản gốc khi gửi sản phẩm về. Thiếu phiếu thì chúng tôi không tiếp nhận bảo hành.",
           "Chúng tôi trả lời trong vòng 2 ngày làm việc và hướng dẫn địa chỉ gửi sản phẩm về.",
           "Sau khi nhận sản phẩm, chúng tôi kiểm tra trong vòng 3 ngày làm việc và thông báo kết luận cho bạn.",
         ],
@@ -465,7 +477,7 @@ export const POLICY_PAGES: Readonly<Record<PolicySlug, ContentPage>> = {
       {
         heading: "Phạm vi thu thập",
         paragraphs: [
-          "Chúng tôi chỉ thu thập thông tin do chính bạn cung cấp: qua form đặt hàng trên website, hoặc khi bạn chủ động liên hệ qua Zalo, điện thoại và email. Website không đặt mã theo dõi quảng cáo và không thu thập dữ liệu hành vi duyệt web của bạn.",
+          "Chúng tôi chỉ thu thập thông tin do chính bạn cung cấp, qua các nguồn: form đặt hàng trên website; trao đổi trực tiếp tại cửa hàng và trụ sở công ty; hotline chăm sóc khách hàng; Zalo; và email. Website không đặt mã theo dõi quảng cáo và không thu thập dữ liệu hành vi duyệt web của bạn.",
         ],
       },
       {
@@ -474,6 +486,7 @@ export const POLICY_PAGES: Readonly<Record<PolicySlug, ContentPage>> = {
           "Giao hàng và liên hệ khi cần xác nhận địa chỉ.",
           "Gửi email xác nhận đơn và xác nhận thanh toán.",
           "Đối soát thanh toán và xử lý yêu cầu bảo hành, đổi trả, hoàn tiền, khiếu nại.",
+          "Gửi thông báo về chính sách mới, sản phẩm mới và chương trình khuyến mãi của cửa hàng. Mỗi email loại này đều có đường dẫn từ chối nhận, hoặc bạn nhắn một câu tới Zalo của cửa hàng là chúng tôi dừng gửi.",
           "Đáp ứng nghĩa vụ kế toán và nghĩa vụ pháp lý liên quan tới đơn hàng.",
         ],
       },
@@ -481,7 +494,6 @@ export const POLICY_PAGES: Readonly<Record<PolicySlug, ContentPage>> = {
         heading: "Những gì chúng tôi không làm",
         bullets: [
           "Không bán hoặc cho thuê dữ liệu của bạn cho bên thứ ba.",
-          "Không gửi email quảng cáo; chúng tôi chỉ gửi email liên quan trực tiếp tới đơn của bạn.",
           "Không yêu cầu bạn tạo tài khoản, không đặt mã theo dõi quảng cáo trên website.",
           "Không bao giờ hỏi mật khẩu ngân hàng, mã OTP hay số thẻ của bạn — dù qua điện thoại, Zalo hay email.",
         ],
@@ -504,12 +516,6 @@ export const POLICY_PAGES: Readonly<Record<PolicySlug, ContentPage>> = {
         heading: "Thời gian lưu trữ",
         paragraphs: [
           "Chúng tôi lưu thông tin đơn hàng trong 24 tháng kể từ ngày đặt, đủ để phục vụ bảo hành, đối soát và nghĩa vụ kế toán. Hết thời hạn này, dữ liệu được xoá hoặc ẩn danh, trừ phần chứng từ mà pháp luật yêu cầu lưu lâu hơn.",
-        ],
-      },
-      {
-        heading: "Quyền của bạn",
-        paragraphs: [
-          `Bạn có thể yêu cầu xem, sửa hoặc xoá thông tin của mình bằng cách liên hệ ${STORE_INFO.email} hoặc ${STORE_INFO.phoneDisplay}, kèm mã đơn để chúng tôi xác định đúng đơn. Chúng tôi trả lời trong vòng 3 ngày làm việc và giữ lại dữ liệu đơn hàng ở mức cần thiết cho nghĩa vụ kế toán và bảo hành.`,
         ],
       },
       {
