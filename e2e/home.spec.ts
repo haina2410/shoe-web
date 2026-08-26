@@ -18,12 +18,14 @@ test("thư viện công ty chuyển ảnh thủ công và quay vòng", async ({ 
   await expect(
     gallery.getByRole("heading", { name: "Khoảnh khắc tại leafshoes" }),
   ).toBeVisible();
-  await expect(gallery.getByText("1 / 3", { exact: true })).toBeVisible();
+  await expect(gallery.getByText("1 / 2", { exact: true })).toBeVisible();
 
   await gallery.getByRole("button", { name: "Ảnh tiếp theo" }).click();
-  await expect(gallery.getByText("2 / 3", { exact: true })).toBeVisible();
+  await expect(gallery.getByText("2 / 2", { exact: true })).toBeVisible();
+
+  await gallery.getByRole("button", { name: "Ảnh tiếp theo" }).click();
+  await expect(gallery.getByText("1 / 2", { exact: true })).toBeVisible();
 
   await gallery.getByRole("button", { name: "Ảnh trước đó" }).click();
-  await gallery.getByRole("button", { name: "Ảnh trước đó" }).click();
-  await expect(gallery.getByText("3 / 3", { exact: true })).toBeVisible();
+  await expect(gallery.getByText("2 / 2", { exact: true })).toBeVisible();
 });

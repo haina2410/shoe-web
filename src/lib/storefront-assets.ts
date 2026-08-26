@@ -25,13 +25,6 @@ export const COMPANY_GALLERY_IMAGES = [
     width: 1920,
     height: 1440,
   },
-  {
-    src: "/company/company-opening.jpg",
-    alt: "Đại diện leafshoes trong ngày khai trương công ty",
-    caption: "Một dấu mốc trong hành trình của leafshoes",
-    width: 1120,
-    height: 840,
-  },
 ] as const satisfies readonly CompanyImage[];
 
 export const ABOUT_COMPANY_IMAGES = {

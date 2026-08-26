@@ -24,7 +24,7 @@ const toPublicFile = (publicUrl: string) =>
 describe("storefront assets", () => {
   it("cung cấp bộ nhận diện và ảnh công ty có nội dung thay thế cùng kích thước", () => {
     expect(BRAND_MARK_PATH).toBe("/brand/leafshoes-mark.png");
-    expect(COMPANY_GALLERY_IMAGES).toHaveLength(3);
+    expect(COMPANY_GALLERY_IMAGES).toHaveLength(2);
 
     for (const image of COMPANY_GALLERY_IMAGES) {
       expect(image.alt).not.toBe("");
@@ -42,10 +42,6 @@ describe("storefront assets", () => {
       },
       production: COMPANY_GALLERY_IMAGES[1],
       showroom: COMPANY_GALLERY_IMAGES[0],
-    });
-    expect(COMPANY_GALLERY_IMAGES[2]).toMatchObject({
-      width: 1120,
-      height: 840,
     });
   });
 
