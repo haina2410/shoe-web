@@ -78,9 +78,18 @@ Nội dung công bố phải khớp hành vi thật của checkout và vận hà
 hàng không cần tài khoản, thanh toán duy nhất bằng chuyển khoản VietQR, phí giao
 hàng phẳng 30.000 ₫, đơn chưa thanh toán hết hạn sau 24 giờ, đổi trả đủ điều
 kiện trong 3 ngày và bảo hành lỗi sản xuất trong 30 ngày. Đổi trả chỉ áp dụng
-cho lỗi sản xuất, hư hỏng do vận chuyển và giao sai; không nhận đổi vì chọn sai
-size hay đổi ý. Khi thay đổi một hành vi này, cập nhật trang chính sách tương
-ứng trong cùng thay đổi.
+cho lỗi sản xuất, hư hỏng do vận chuyển và giao sai; mọi lý do cá nhân đều không
+được nhận. Khi thay đổi một hành vi này, cập nhật trang chính sách tương ứng
+trong cùng thay đổi.
+
+Hai cam kết dưới đây đi trước hệ thống, nên vận hành phải theo kịp thì nội dung
+công bố mới đúng:
+
+- Trang bảo hành lấy phiếu bảo hành và tem niêm phong làm căn cứ tiếp nhận. Mỗi
+  hộp giao đi phải thực sự có phiếu và tem, nếu không thì đúng theo chữ trong
+  chính sách, mọi yêu cầu bảo hành đều bị từ chối.
+- Trang bảo mật cho phép gửi email chính sách và khuyến mãi, kèm cam kết có
+  đường dẫn từ chối nhận. Luồng gửi và cơ chế từ chối này chưa có trong code.
 
 ## Bề mặt quản trị
 
