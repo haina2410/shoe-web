@@ -9,6 +9,12 @@ concurrency:
   group: production-deploy
   cancel-in-progress: false
 
+env:
+  REGISTRY: ghcr.io
+  # Phải khớp danh sách target của publish-images.yml và các service dùng
+  # RELEASE_TAG trong docker-compose.prod.yml.
+  IMAGE_TARGETS: app worker migrate smoke dashboard
+
 jobs:
   create_release:
     name: Create latest main release
@@ -16,6 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      sha: ${{ steps.released.outputs.sha }}
     steps:
       - name: Checkout latest main
         uses: actions/checkout@v7
@@ -30,13 +38,87 @@ jobs:
           GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
         run: ./script/release
 
-  deploy_production:
-    name: Redeploy production with Komodo
+      - name: Ghi lại commit vừa phát hành
+        id: released
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  verify_images:
+    name: Verify latest images match the released commit
     needs: create_release
     if: >-
       always() &&
       ((github.event_name == 'workflow_dispatch' && needs.create_release.result == 'success') ||
       (github.event_name == 'release' && github.event.release.prerelease == false))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Xác định commit của bản phát hành
+        id: released
+        env:
+          DISPATCH_SHA: ${{ needs.create_release.outputs.sha }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if [ -n "$DISPATCH_SHA" ]; then
+            sha=$DISPATCH_SHA
+          else
+            git fetch --tags --force origin
+            # rev-list bóc được cả tag chú thích, thứ mà script/release tạo ra.
+            sha=$(git rev-list -n 1 "$RELEASE_TAG")
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "Bản phát hành trỏ tới commit $sha"
+
+      - name: Đăng nhập ghcr.io
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Đối chiếu tag latest với commit vừa phát hành
+        env:
+          SHA: ${{ steps.released.outputs.sha }}
+        run: |
+          # Production pull tag `latest`, còn publish-images lại chạy theo push
+          # main một cách độc lập. Nếu build đó chưa xong hoặc đã đỏ, `latest`
+          # vẫn trỏ commit cũ và deploy sẽ âm thầm đẩy đúng bản cũ đó lên.
+          repository=${GITHUB_REPOSITORY,,}
+          failed=0
+
+          for target in $IMAGE_TARGETS; do
+            image="${REGISTRY}/${repository}/${target}"
+            latest_digest=$(docker buildx imagetools inspect "${image}:latest" --format '{{.Manifest.Digest}}' 2>/dev/null || true)
+            commit_digest=$(docker buildx imagetools inspect "${image}:${SHA}" --format '{{.Manifest.Digest}}' 2>/dev/null || true)
+
+            if [ -z "$commit_digest" ]; then
+              echo "::error::${target}: chưa có image cho commit ${SHA}. Publish images chưa chạy xong hoặc đã thất bại."
+              failed=1
+            elif [ -z "$latest_digest" ]; then
+              echo "::error::${target}: không đọc được tag latest."
+              failed=1
+            elif [ "$latest_digest" != "$commit_digest" ]; then
+              echo "::error::${target}: tag latest đang là ${latest_digest}, không phải ${commit_digest} của commit ${SHA}."
+              failed=1
+            else
+              echo "${target}: latest khớp commit (${latest_digest})"
+            fi
+          done
+
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::Huỷ deploy: tag latest không phải bản build của commit vừa phát hành."
+            exit 1
+          fi
+
+  deploy_production:
+    name: Redeploy production with Komodo
+    needs: verify_images
     runs-on: ubuntu-latest
     permissions:
       contents: read

@@ -216,10 +216,20 @@ workflow `Release production` tạo release theo yêu cầu hoặc khi một Git
 Release không phải prerelease được publish từ bên ngoài workflow. Cả hai bật
 `pull-before-deploy`, chờ PullStack thành công rồi mới gọi DeployStack.
 
+Giữa bước tạo release và bước deploy, job `verify_images` đối chiếu digest của
+tag `latest` với digest của tag commit vừa phát hành, cho cả năm image `app`,
+`worker`, `migrate`, `smoke` và `dashboard`. Job này tồn tại vì `Publish images`
+chạy độc lập theo push `main`: nếu build đó chưa xong hoặc đã thất bại thì
+`latest` vẫn trỏ commit cũ, và một deploy dùng `RELEASE_TAG=latest` sẽ âm thầm
+đẩy lại đúng bản cũ đó. Lệch digest, hoặc chưa có image cho commit vừa phát
+hành, đều làm job đỏ và `deploy_production` bị bỏ qua. Rollback không đi qua
+workflow này nên không bị chặn.
+
 Trước khi release production:
 
-1. Xác nhận workflow `Publish images` đã thành công cho commit mới nhất của
-   `main` và staging của đúng commit đó đã được kiểm tra.
+1. Xác nhận staging của commit mới nhất `main` đã được kiểm tra. Việc
+   `Publish images` đã xong cho commit đó thì `verify_images` tự chặn, không cần
+   kiểm tra tay.
 2. Đặt `RELEASE_TAG` trong Stack production Komodo thành full commit SHA đó.
 3. Mở GitHub Actions, chọn `Release production` trên branch `main`, rồi bấm
    `Run workflow`.
