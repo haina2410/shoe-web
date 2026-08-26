@@ -11,26 +11,7 @@ export function AboutCompanyImages(): React.JSX.Element {
         Từ xưởng đến từng đôi giày
       </h2>
 
-      <div className="mt-4 space-y-6">
-        <figure>
-          <div
-            className="overflow-hidden rounded-2xl border bg-neutral-100"
-            style={{ borderColor: "var(--line)" }}
-          >
-            <Image
-              src={ABOUT_COMPANY_IMAGES.hero.src}
-              alt={ABOUT_COMPANY_IMAGES.hero.alt}
-              width={ABOUT_COMPANY_IMAGES.hero.width}
-              height={ABOUT_COMPANY_IMAGES.hero.height}
-              sizes="(max-width: 768px) calc(100vw - 2rem), 736px"
-              className="h-auto w-full object-cover"
-            />
-          </div>
-          <figcaption className="mt-2 text-sm text-neutral-600">
-            {ABOUT_COMPANY_IMAGES.hero.caption}
-          </figcaption>
-        </figure>
-
+      <div className="mt-4">
         <div className="grid gap-6 sm:grid-cols-2">
           {[ABOUT_COMPANY_IMAGES.production, ABOUT_COMPANY_IMAGES.showroom].map((image) => (
             <figure key={image.src}>

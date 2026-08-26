@@ -28,19 +28,9 @@ export const COMPANY_GALLERY_IMAGES = [
 ] as const satisfies readonly CompanyImage[];
 
 export const ABOUT_COMPANY_IMAGES = {
-  hero: {
-    src: "/company/company-team.jpg",
-    alt: "Đại diện leafshoes tại không gian làm việc của công ty",
-    caption: "leafshoes Việt Nam tại xưởng ở Đồng Nai",
-    width: 1120,
-    height: 840,
-  },
   production: COMPANY_GALLERY_IMAGES[1],
   showroom: COMPANY_GALLERY_IMAGES[0],
-} as const satisfies Record<
-  "hero" | "production" | "showroom",
-  CompanyImage
->;
+} as const satisfies Record<"production" | "showroom", CompanyImage>;
 
 export const SEEDED_PRODUCT_IMAGE_BY_SLUG = {
   "sneaker-la-xanh-co-thap":
