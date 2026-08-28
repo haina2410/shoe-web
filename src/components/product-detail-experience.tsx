@@ -7,7 +7,10 @@ import {
   selectImageSet,
   type ProductImageSetView,
 } from "@/components/product-gallery";
-import { VariantSelector } from "@/components/variant-selector";
+import {
+  pickDefaultVariant,
+  VariantSelector,
+} from "@/components/variant-selector";
 
 type ProductDetailView = {
   id: string;
@@ -25,7 +28,10 @@ export function ProductDetailExperience({
 }: {
   product: ProductDetailView;
 }) {
-  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const defaultVariant = pickDefaultVariant(product.variants);
+  const [selectedColor, setSelectedColor] = useState<string | null>(
+    defaultVariant?.color ?? null,
+  );
   const selectedImageSet = selectImageSet(product.imageSets, selectedColor);
   const cartImageUrl = selectedImageSet?.images[0]?.url ?? null;
 
@@ -69,6 +75,7 @@ export function ProductDetailExperience({
           imageUrl={cartImageUrl}
           selectedColor={selectedColor}
           onColorChange={setSelectedColor}
+          defaultSize={defaultVariant?.size ?? null}
         />
 
         <ul

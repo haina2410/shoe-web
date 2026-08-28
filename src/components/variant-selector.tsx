@@ -7,6 +7,10 @@ import { Button } from "@/components/ui/button";
 import { useCart } from "@/lib/cart";
 import type { Variant } from "@/generated/prisma/client";
 
+export function pickDefaultVariant(variants: Variant[]): Variant | null {
+  return variants.find((variant) => variant.stock > 0) ?? variants[0] ?? null;
+}
+
 export function VariantSelector({
   variants,
   basePrice,
@@ -16,6 +20,7 @@ export function VariantSelector({
   imageUrl,
   selectedColor,
   onColorChange,
+  defaultSize = null,
 }: {
   variants: Variant[];
   basePrice: number;
@@ -25,6 +30,7 @@ export function VariantSelector({
   imageUrl: string | null;
   selectedColor: string | null;
   onColorChange: (color: string) => void;
+  defaultSize?: string | null;
 }) {
   const addItem = useCart((state) => state.addItem);
 
@@ -37,7 +43,7 @@ export function VariantSelector({
     [variants],
   );
 
-  const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [selectedSize, setSelectedSize] = useState<string | null>(defaultSize);
   const [justAdded, setJustAdded] = useState(false);
 
   const matchedVariant =
