@@ -82,6 +82,53 @@ beforeEach(() => {
 });
 
 describe("ProductDetailExperience", () => {
+  it("mở trang chi tiết → chọn sẵn variant còn hàng đầu tiên, nút thêm giỏ bật sẵn", async () => {
+    const user = userEvent.setup();
+    render(<ProductDetailExperience product={product} />);
+
+    expect(screen.getByRole("radio", { name: "39" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.getByRole("radio", { name: "Đen" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+
+    const addButton = screen.getByRole("button", { name: "Thêm vào giỏ" });
+    expect(addButton).toBeEnabled();
+    await user.click(addButton);
+
+    expect(addItem).toHaveBeenCalledWith(
+      expect.objectContaining({ variantId: "black-variant" }),
+    );
+  });
+
+  it("bỏ qua variant hết hàng khi chọn sẵn", () => {
+    render(
+      <ProductDetailExperience
+        product={{
+          ...product,
+          variants: [
+            { ...product.variants[0], stock: 0 },
+            { ...product.variants[1], stock: 0 },
+            { ...product.variants[2], size: "40" },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("radio", { name: "40" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.getByRole("radio", { name: "Xanh" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Thêm vào giỏ" })).toBeEnabled();
+  });
+
   it("đổi gallery theo màu và dùng ảnh đầu của bộ đó trong giỏ", async () => {
     const user = userEvent.setup();
     render(<ProductDetailExperience product={product} />);
