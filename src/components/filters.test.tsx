@@ -66,8 +66,8 @@ describe("Filters", () => {
 
   it("render checkbox khoảng giá từ PRICE_RANGES", () => {
     render(<Filters categories={categories} facets={facets} query={{}} />);
-    expect(screen.getByRole("checkbox", { name: "Dưới 500k" })).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "Trên 1,5 triệu" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Dưới 300k" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Trên 800k" })).toBeInTheDocument();
   });
 
   it("render select sort với 3 lựa chọn", () => {
