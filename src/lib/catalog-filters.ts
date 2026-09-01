@@ -6,7 +6,7 @@
  * UI (bộ lọc giá) và lớp query (`src/server/queries/catalog.ts`) đều import
  * từ đây để không bao giờ lệch nhau.
  */
-export type PriceRangeKey = "duoi-500k" | "500k-1tr" | "1tr-1r5" | "tren-1r5";
+export type PriceRangeKey = "duoi-300k" | "300k-500k" | "500k-800k" | "tren-800k";
 
 export type PriceRange = {
   key: PriceRangeKey;
@@ -16,10 +16,10 @@ export type PriceRange = {
 };
 
 export const PRICE_RANGES: PriceRange[] = [
-  { key: "duoi-500k", label: "Dưới 500k", min: 0, max: 500000 },
-  { key: "500k-1tr", label: "500k – 1 triệu", min: 500000, max: 1000000 },
-  { key: "1tr-1r5", label: "1 – 1,5 triệu", min: 1000000, max: 1500000 },
-  { key: "tren-1r5", label: "Trên 1,5 triệu", min: 1500000, max: null },
+  { key: "duoi-300k", label: "Dưới 300k", min: 0, max: 300000 },
+  { key: "300k-500k", label: "300k – 500k", min: 300000, max: 500000 },
+  { key: "500k-800k", label: "500k – 800k", min: 500000, max: 800000 },
+  { key: "tren-800k", label: "Trên 800k", min: 800000, max: null },
 ];
 
 /** Các kiểu sắp xếp hợp lệ cho danh sách sản phẩm. `moi-nhat` là mặc định. */

@@ -240,7 +240,7 @@ describe("listProducts", () => {
     const cheap = await makeProduct({ name: "Rẻ", categoryId: cat.id, basePrice: 100000 });
     await makeProduct({ name: "Đắt", categoryId: cat.id, basePrice: 2000000 });
 
-    const result = await listProducts(testPrisma, { priceKeys: ["duoi-500k"] });
+    const result = await listProducts(testPrisma, { priceKeys: ["duoi-300k"] });
 
     expect(result.map((r) => r.id)).toEqual([cheap.id]);
   });
@@ -248,44 +248,44 @@ describe("listProducts", () => {
   it("lọc price: nhiều bucket (OR)", async () => {
     const cat = await makeCategory("Giày Sneaker", "giay-sneaker");
     const cheap = await makeProduct({ name: "Rẻ", categoryId: cat.id, basePrice: 100000 });
-    const mid = await makeProduct({ name: "Vừa", categoryId: cat.id, basePrice: 700000 });
+    const mid = await makeProduct({ name: "Vừa", categoryId: cat.id, basePrice: 400000 });
     await makeProduct({ name: "Đắt", categoryId: cat.id, basePrice: 2000000 });
 
-    const result = await listProducts(testPrisma, { priceKeys: ["duoi-500k", "500k-1tr"] });
+    const result = await listProducts(testPrisma, { priceKeys: ["duoi-300k", "300k-500k"] });
 
     expect(new Set(result.map((r) => r.id))).toEqual(new Set([cheap.id, mid.id]));
   });
 
-  it("price bucket không trần (tren-1r5) bao gồm giá rất cao", async () => {
+  it("price bucket không trần (tren-800k) bao gồm giá rất cao", async () => {
     const cat = await makeCategory("Giày Sneaker", "giay-sneaker");
     const expensive = await makeProduct({ name: "Siêu Đắt", categoryId: cat.id, basePrice: 50_000_000 });
     await makeProduct({ name: "Rẻ", categoryId: cat.id, basePrice: 100000 });
 
-    const result = await listProducts(testPrisma, { priceKeys: ["tren-1r5"] });
+    const result = await listProducts(testPrisma, { priceKeys: ["tren-800k"] });
 
     expect(result.map((r) => r.id)).toEqual([expensive.id]);
   });
 
-  it("price bucket biên: min inclusive, max exclusive tại đúng mốc 500000 và 1000000", async () => {
+  it("price bucket biên: min inclusive, max exclusive tại đúng mốc 300000 và 500000", async () => {
     const cat = await makeCategory("Giày Sneaker", "giay-sneaker");
+    const at300k = await makeProduct({ name: "Đúng 300k", categoryId: cat.id, basePrice: 300000 });
     const at500k = await makeProduct({ name: "Đúng 500k", categoryId: cat.id, basePrice: 500000 });
-    const at1tr = await makeProduct({ name: "Đúng 1 triệu", categoryId: cat.id, basePrice: 1000000 });
 
-    // basePrice === 500000 → thuộc "500k-1tr" (gte 500000), KHÔNG thuộc "duoi-500k" (lt 500000)
+    // basePrice === 300000 → thuộc "300k-500k" (gte 300000), KHÔNG thuộc "duoi-300k" (lt 300000)
     expect(
-      (await listProducts(testPrisma, { priceKeys: ["500k-1tr"] })).map((r) => r.id),
+      (await listProducts(testPrisma, { priceKeys: ["300k-500k"] })).map((r) => r.id),
+    ).toContain(at300k.id);
+    expect(
+      (await listProducts(testPrisma, { priceKeys: ["duoi-300k"] })).map((r) => r.id),
+    ).not.toContain(at300k.id);
+
+    // basePrice === 500000 → thuộc "500k-800k" (gte 500000), KHÔNG thuộc "300k-500k" (lt 500000)
+    expect(
+      (await listProducts(testPrisma, { priceKeys: ["500k-800k"] })).map((r) => r.id),
     ).toContain(at500k.id);
     expect(
-      (await listProducts(testPrisma, { priceKeys: ["duoi-500k"] })).map((r) => r.id),
+      (await listProducts(testPrisma, { priceKeys: ["300k-500k"] })).map((r) => r.id),
     ).not.toContain(at500k.id);
-
-    // basePrice === 1000000 → thuộc "1tr-1r5" (gte 1000000), KHÔNG thuộc "500k-1tr" (lt 1000000)
-    expect(
-      (await listProducts(testPrisma, { priceKeys: ["1tr-1r5"] })).map((r) => r.id),
-    ).toContain(at1tr.id);
-    expect(
-      (await listProducts(testPrisma, { priceKeys: ["500k-1tr"] })).map((r) => r.id),
-    ).not.toContain(at1tr.id);
   });
 
   it("search không dấu: q khớp bất kể dấu/hoa-thường", async () => {
