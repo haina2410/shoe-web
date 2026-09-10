@@ -42,6 +42,9 @@ Nguyên tắc: nền paper + chữ ink chiếm ~90% diện tích; evergreen làm
 Trang chủ theo cấu trúc curated storefront: navbar có tìm kiếm, liên kết “Tra
 cứu đơn hàng” và số lượng giỏ, hero sản phẩm tĩnh, ba lối vào danh mục, sản phẩm
 mới, trust strip và footer doanh nghiệp. Footer cũng có liên kết “Tra cứu đơn hàng”.
+Logo Bộ Công Thương nằm dưới thông tin doanh nghiệp trong footer, dùng ảnh từ
+`fileserver.online.gov.vn`, cao 44px và giữ nguyên tỷ lệ. Logo dẫn đến trang xác
+nhận trên `online.gov.vn` trong tab mới, có nhãn thay thế và viền focus bàn phím.
 Nội dung sản phẩm và hero không tự động chuyển. Một gallery thủ công về câu
 chuyện doanh nghiệp có thể xuất hiện bên dưới sản phẩm; gallery chỉ quay vòng khi
 người dùng chủ động thao tác bằng bàn phím, con trỏ hoặc cảm ứng và không tự nhận

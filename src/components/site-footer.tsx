@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { BrandMark } from "@/components/brand-mark";
 import { COMPANY_NAV, COMPANY_NAV_LABEL } from "@/lib/company-content";
@@ -38,6 +39,22 @@ export function SiteFooter() {
             <BrandMark />
             <p className="mt-4 font-semibold text-neutral-900">{STORE_INFO.legalName}</p>
             <p className="mt-1">{STORE_INFO.businessLine}</p>
+            <a
+              className="mt-4 inline-block rounded focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--evergreen)]"
+              href="https://online.gov.vn/nen-tang/fdd07a64-22ec-48d9-abde-28db43ccb38a"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Đã xác nhận với Bộ Công Thương"
+            >
+              <Image
+                src="https://fileserver.online.gov.vn/uploads/Resources/iconxacnhan/DaThongBao.png"
+                alt="Đã xác nhận với Bộ Công Thương"
+                width={230}
+                height={86}
+                className="h-11 w-auto"
+                unoptimized
+              />
+            </a>
           </section>
 
           <section aria-labelledby="footer-contact">
