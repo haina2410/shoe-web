@@ -69,4 +69,3 @@ ALTER TABLE "catalog_api_asset" ADD CONSTRAINT "catalog_api_asset_tokenId_fkey" 
 ALTER TABLE "catalog_api_request" ADD CONSTRAINT "catalog_api_request_tokenId_fkey" FOREIGN KEY ("tokenId") REFERENCES "catalog_api_token"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE "catalog_api_audit" ADD CONSTRAINT "catalog_api_audit_tokenId_fkey" FOREIGN KEY ("tokenId") REFERENCES "catalog_api_token"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
