@@ -13,6 +13,9 @@ Order 1──* Payment
 Order 1──* BankTransaction
 ShippingZone 1──* ProvinceZone (tỉnh → zone)
 AdminUser (Better Auth: user/session/account)
+User 1──* CatalogApiToken 1──* CatalogApiAsset
+                        1──* CatalogApiRequest
+                        1──* CatalogApiAudit
 ```
 
 ## Prisma schema (rút gọn)
@@ -189,3 +192,41 @@ model ProvinceZone {
 - Job cron `expire-unpaid` huỷ đơn `PENDING_PAYMENT` quá hạn (VD 24h) — vì chưa trừ kho lúc tạo đơn nên không cần hoàn kho. (Nếu sau này muốn "giữ chỗ" tồn kho lúc tạo đơn thì bổ sung reservation + hoàn kho khi hết hạn.)
 - Ghi nhận `Payment(direction=OUT)` không đổi `Order.status` và **không tự
   hoàn tồn kho**. Việc hoàn hàng/nhập kho lại nằm ngoài phạm vi demo.
+
+## Catalog API
+
+| Entity | Dữ liệu và invariant |
+|---|---|
+| `CatalogApiToken` (`catalog_api_token`) | Owner, tên, SHA-256 token unique, scopes, expiry/revocation, thời điểm dùng cuối và bộ đếm theo phút. Không lưu bearer secret. |
+| `CatalogApiAsset` (`catalog_api_asset`) | Token sở hữu, URL WebP unique, số byte đã mã hóa, expiry và `attachedAt`. Token có asset được bảo vệ bằng FK `Restrict`. |
+| `CatalogApiRequest` (`catalog_api_request`) | Unique `(tokenId, operation, key)`, hash payload và JSON response thành công. Không tự hết hạn; replay không ghi thêm resource/audit. |
+| `CatalogApiAudit` (`catalog_api_audit`) | Token, operation, resource ID và timestamp cho mỗi mutation thành công lần đầu. Là nguồn đếm quota tạo sản phẩm. |
+
+User phải còn role `owner` và chưa bị ban khi sử dụng token; hết hạn/thu hồi
+không xóa sản phẩm, asset hoặc lịch sử. Scopes là `catalog:read`,
+`products:create`, `images:write`. Token mới có hạn tối đa 90 ngày. User xóa
+cascade token; token cascade request/audit nhưng asset FK chặn xóa token còn
+asset. Vận hành dùng thu hồi thay vì xóa token.
+
+Rate limit lưu trong DB là 60 request/phút/token, quota tạo sản phẩm là 10.000
+lần thành công/token trong toàn bộ vòng đời. Quota ảnh là 250 MiB/token, tính
+trên tổng byte asset record còn tồn tại, gồm cả ảnh đã gắn sản phẩm. Asset chưa
+gắn hết hạn sau 24 giờ; cleanup xóa file và record, còn asset đã gắn được giữ
+lại. `attachedAt` đánh dấu đã từng gắn, không phải phép đếm tham chiếu hiện tại;
+API không tự thu hồi dung lượng khi admin bỏ ảnh hoặc xóa sản phẩm.
+
+Product API chỉ tạo `DRAFT`, dùng chung thao tác transaction của catalog admin.
+Asset phải thuộc đúng token và còn hạn hoặc đã gắn; server ánh xạ `assetId`
+thành URL trong `ProductImage`. Các product/image record giữ URL, không tạo FK
+trực tiếp tới asset. Slug do server sinh; SKU unique toàn catalog, cặp size/màu
+unique trong sản phẩm và các invariant bộ ảnh vẫn áp dụng.
+
+Mutation serialize bằng khóa dòng token. Kiểm tra quyền, quota, dữ liệu catalog,
+đánh dấu asset đã gắn, response idempotency và audit commit cùng transaction.
+Hash product tính sau khi normalize/default payload; hash ảnh gồm MIME và byte
+gốc. Cùng key với hash khác trả conflict. Response đã lưu là snapshot lúc tạo;
+GET product trả trạng thái hiện tại. File upload không có transaction chung với
+DB; cleanup dọn crash-orphan có tên `catalog-<uuid>.webp` sau 24 giờ khi không
+có asset hoặc product image tham chiếu. File không có prefix này được giữ lại.
+
+Xem [catalog API](09-catalog-api.md) cho field constraints và quy tắc retry.
