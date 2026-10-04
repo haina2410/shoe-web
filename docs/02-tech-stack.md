@@ -8,6 +8,8 @@
 | Email | **Resend + React Email** | Template email viết bằng React (đồng bộ với frontend); free tier đủ; cần domain riêng để SPF/DKIM |
 | Thông báo nội bộ | **Zalo Bot API trực tiếp** | Gửi thông báo đơn mới cho danh sách nhân viên có khoá ổn định; không cần dịch vụ trung gian hay lưu chat ID trong pg-boss |
 | Auth | **Better Auth** (v1.6.x) | Email/mật khẩu first-class + RBAC qua plugin; hợp shadcn (better-auth-ui) |
+| Catalog API auth | **Bearer token ngẫu nhiên + SHA-256 trong PostgreSQL** | Scope tách khỏi session admin; hết hạn, thu hồi, quota và idempotency lưu bền vững |
+| Xử lý ảnh catalog API | **sharp** (dependency trực tiếp) | Kiểm tra định dạng/kích thước, xoay theo orientation và mã hóa WebP bỏ metadata trong Node runtime |
 | UI component | **shadcn/ui + Tailwind** | Sở hữu code, không khóa vendor, dựng được bản sắc riêng (không "templated") |
 | Bảng dữ liệu admin | **TanStack Table** | Bảng/sort/filter mạnh cho trang quản trị |
 | Thanh toán | **VietQR + SePay/Casso** webhook | Đối soát chuyển khoản tự động + fallback admin xác nhận tay |
@@ -34,3 +36,12 @@ Chọn **shadcn/ui + Tailwind**: sở hữu code component, không bị áp đ�
 - **Font phải hỗ trợ đầy đủ dấu tiếng Việt** (xem [05](05-design-direction.md)).
 - **Domain riêng** để cấu hình SPF/DKIM cho Resend (email vào inbox). Trước khi có domain: dùng SMTP tạm/log email, không chặn tiến độ.
 - Tài khoản **SePay** (hoặc Casso) trỏ về tài khoản ngân hàng nhận tiền; dùng môi trường sandbox trước.
+
+### Catalog API runtime
+
+Catalog route handlers dùng Node.js runtime vì cần `sharp`, filesystem và
+Prisma. File WebP nằm trong uploads volume, không phải database hoặc filesystem
+tạm của container. CLI `npm run catalog:api -- ...` chạy bằng `tsx`, dùng cùng
+Prisma schema; Compose service `catalog-maintenance` sử dụng image migrate để
+có source và dependency cần thiết. Xem [hợp đồng API](09-catalog-api.md) và
+[runbook](08-production-runbook.md) cho giới hạn request và vận hành.

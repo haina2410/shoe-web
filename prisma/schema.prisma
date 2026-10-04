@@ -13,20 +13,21 @@ datasource db {
 }
 
 model User {
-  id               String    @id
+  id               String            @id
   name             String
   email            String
-  emailVerified    Boolean   @default(false)
+  emailVerified    Boolean           @default(false)
   image            String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
   role             String?
-  banned           Boolean?  @default(false)
+  banned           Boolean?          @default(false)
   banReason        String?
   banExpires       DateTime?
+  catalogApiTokens CatalogApiToken[]
   sessions         Session[]
   accounts         Account[]
-  recordedPayments Payment[] @relation("RecordedPayments")
+  recordedPayments Payment[]         @relation("RecordedPayments")
 
   @@unique([email])
   @@map("user")
@@ -292,4 +293,66 @@ model ProvinceZone {
 
   @@index([zoneId])
   @@map("province_zone")
+}
+
+model CatalogApiToken {
+  id           String              @id @default(cuid())
+  ownerId      String
+  owner        User                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name         String
+  tokenHash    String              @unique
+  scopes       String[]
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime            @default(now())
+  lastUsedAt   DateTime?
+  rateWindow   DateTime            @default(now())
+  requestCount Int                 @default(0)
+  assets       CatalogApiAsset[]
+  requests     CatalogApiRequest[]
+  audits       CatalogApiAudit[]
+
+  @@index([ownerId])
+  @@map("catalog_api_token")
+}
+
+model CatalogApiAsset {
+  id         String          @id @default(cuid())
+  tokenId    String
+  token      CatalogApiToken @relation(fields: [tokenId], references: [id], onDelete: Restrict)
+  url        String          @unique
+  bytes      Int
+  createdAt  DateTime        @default(now())
+  expiresAt  DateTime
+  attachedAt DateTime?
+
+  @@index([tokenId])
+  @@index([attachedAt, expiresAt])
+  @@map("catalog_api_asset")
+}
+
+model CatalogApiRequest {
+  id          String          @id @default(cuid())
+  tokenId     String
+  token       CatalogApiToken @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+  operation   String
+  key         String
+  payloadHash String
+  response    Json
+  createdAt   DateTime        @default(now())
+
+  @@unique([tokenId, operation, key])
+  @@map("catalog_api_request")
+}
+
+model CatalogApiAudit {
+  id         String          @id @default(cuid())
+  tokenId    String
+  token      CatalogApiToken @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+  operation  String
+  resourceId String
+  createdAt  DateTime        @default(now())
+
+  @@index([tokenId, createdAt])
+  @@map("catalog_api_audit")
 }

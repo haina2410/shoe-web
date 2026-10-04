@@ -14,8 +14,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 type HarnessOptions = {
-  dockerFailure?: "dump" | "archive";
-  mvFailure?: "uploads";
+  dockerFailure?: "" | "dump" | "archive";
+  mvFailure?: "" | "uploads";
 };
 
 function createBackupHarness({
@@ -86,7 +86,8 @@ fi
   );
   chmodSync(fakeDocker, 0o755);
 
-  const env = {
+  const env: NodeJS.ProcessEnv = {
+    NODE_ENV: "test",
     PATH: `${fakeBin}:${process.env.PATH}`,
     BACKUP_DIR: backupDir,
     POSTGRES_DB: "leafshoes",

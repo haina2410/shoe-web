@@ -56,6 +56,24 @@ services:
         condition: service_healthy
     restart: "no"
 
+  catalog-maintenance:
+    image: ghcr.io/haina2410/shoe-web/migrate:${RELEASE_TAG:-latest}
+    pull_policy: missing
+    profiles: [maintenance]
+    environment:
+      <<: *runtime-environment
+      UPLOAD_DIR: ${UPLOAD_DIR:-/data/uploads}
+    volumes:
+      - uploads_data:${UPLOAD_DIR:-/data/uploads}
+    entrypoint: ["./node_modules/.bin/tsx", "scripts/catalog-api.ts"]
+    command: ["--help"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
   app:
     image: ghcr.io/haina2410/shoe-web/app:${RELEASE_TAG:-latest}
     pull_policy: missing

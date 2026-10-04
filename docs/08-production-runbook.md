@@ -565,3 +565,97 @@ incident ticket.
   runs payment, upload, user or order creation; seed runs only when `SEED=1` is
   set deliberately, and even then only into an empty catalog. Smoke remains
   request-only.
+
+## 14. Vận hành catalog API
+
+Hợp đồng endpoint, payload, scope, quota và ví dụ import bằng `curl` nằm trong
+[catalog API](09-catalog-api.md). Các lệnh dưới đây chạy từ đúng checkout,
+Compose project và environment Komodo; không phải acceptance tự động. Bearer
+catalog được lưu trong file riêng, không phải biến `.env` hoặc secret build.
+
+### Migration và origin
+
+Release phải có migration `20261004090000_catalog_api` trước khi cấp token hoặc
+phục vụ catalog API. Quy trình deploy thường chạy migrate trước app; khi vận
+hành thủ công, pull đúng `RELEASE_TAG` và kiểm tra migration bằng image đó:
+
+```bash
+docker compose -f docker-compose.prod.yml --profile maintenance pull migrate catalog-maintenance
+docker compose -f docker-compose.prod.yml run --rm migrate
+docker compose -f docker-compose.prod.yml run --rm migrate \
+  ./node_modules/.bin/prisma migrate status
+```
+
+Backup trước migration theo mục backup. Không đặt `SEED` cho các lệnh này.
+Service `catalog-maintenance` dùng image migrate, Node/tsx và cùng uploads
+volume với app; thuộc profile `maintenance`, không chạy thường trực. Lệnh
+`compose run` có thể khởi động dependency `migrate` trước khi chạy CLI.
+
+Catalog API trong production từ chối request không có protocol HTTPS. Nó tin
+`X-Forwarded-Proto` từ Cloudflare/proxy; giữ app trên `127.0.0.1`, không mở cổng
+origin public và không cho proxy chuyển nguyên header protocol giả của client.
+Giữ `/api/*` ngoài cache Cloudflare.
+
+### Cấp và thu hồi token
+
+Tạo thư mục host chuyên dụng ngoài repository, chỉ UID/GID `1001` của container
+được đọc/ghi. Đường dẫn bind mount phải là thư mục host thực, không nằm trong
+filesystem tạm của container. Ví dụ trên Linux VPS:
+
+```bash
+sudo install -d -m 0700 -o 1001 -g 1001 /srv/leafshoes-catalog-credentials
+docker compose -f docker-compose.prod.yml --profile maintenance run --rm \
+  --volume /srv/leafshoes-catalog-credentials:/credentials \
+  catalog-maintenance issue \
+  --owner-email owner@example.com --name supplier-import --days 30 \
+  --scopes catalog:read,products:create,images:write \
+  --out /credentials/supplier-import.json
+sudo stat -c '%U %G %a %n' /srv/leafshoes-catalog-credentials \
+  /srv/leafshoes-catalog-credentials/supplier-import.json
+```
+
+Thay email bằng owner thực đang hoạt động. File mới mode `0600`, thư mục mode
+`0700`; CLI từ chối ghi đè và chỉ in ID/expiry/trạng thái lưu, không in bearer.
+Nếu ghi file thất bại, token vừa tạo bị thu hồi. Chọn tên file mới khi cấp lại.
+Chuyển credential tới máy import qua kênh private, giữ quyền owner-only và
+không dán nội dung file vào terminal/log. `--days` nhận 1–90, mặc định 30;
+`--scopes` bỏ qua sẽ cấp cả ba scope, nên chỉ định tường minh quyền cần dùng.
+
+```bash
+docker compose -f docker-compose.prod.yml --profile maintenance run --rm \
+  catalog-maintenance list
+docker compose -f docker-compose.prod.yml --profile maintenance run --rm \
+  catalog-maintenance revoke --id REPLACE_WITH_TOKEN_ID
+```
+
+`list` chỉ trả metadata, không thể khôi phục bearer. Thu hồi khi xong batch hoặc
+nghi lộ credential; xóa các bản sao file secret sau khi thu hồi. Đổi role/ban
+owner cũng làm token mất quyền. Thu hồi/hết hạn không xóa sản phẩm, ảnh hoặc
+idempotency record. Không dùng xóa token để dọn dữ liệu.
+
+### Dọn ảnh và đối soát
+
+Chạy định kỳ bằng scheduler của operator hoặc sau batch import bỏ dở:
+
+```bash
+docker compose -f docker-compose.prod.yml --profile maintenance run --rm \
+  catalog-maintenance cleanup-images
+```
+
+Lệnh trả `removed` (asset đã xóa) và `orphansRemoved` (file orphan đã xóa), khóa theo token và kiểm tra lại trạng thái trước khi
+xóa. Chỉ asset **chưa từng gắn** đã hết hạn 24 giờ mới bị xóa file và record;
+ảnh đã gắn sản phẩm được giữ, kể cả token đã thu hồi. Phải dùng cùng
+`UPLOAD_DIR` và uploads volume của app; service maintenance đã cấu hình cả hai.
+Không có cron cleanup tích hợp. Cleanup cũng quét file `catalog-<uuid>.webp`
+cũ hơn 24 giờ, xóa khi không còn asset hoặc product image nào tham chiếu. Prefix
+riêng giúp dọn orphan do crash mà giữ nguyên ảnh admin/session. File mới hơn
+24 giờ và file legacy không có prefix `catalog-` không nằm trong orphan sweep;
+đối chiếu tham chiếu catalog và backup trước khi xử lý file legacy thủ công.
+
+Khi request bị timeout/`500`, đối soát bằng request ID và retry cùng token/key/
+payload theo API reference. Log `event=catalog_api` có operation/resource ID/status/code,
+không chứa bearer/body. Không tạo key mới chỉ để vượt một kết quả không rõ.
+`410 ASSET_EXPIRED` yêu cầu upload bằng key mới. Quota storage chỉ giảm sau khi
+record được cleanup; ảnh đã gắn vẫn tính quota ngay cả khi admin bỏ ảnh khỏi
+sản phẩm. Theo dõi dung lượng uploads và database/idempotency history trong
+backup định kỳ.

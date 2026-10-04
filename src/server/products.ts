@@ -1,4 +1,4 @@
-import type { PrismaClient, Product, Variant } from "@/generated/prisma/client";
+import type { PrismaClient, Prisma, Product, Variant } from "@/generated/prisma/client";
 import { slugify, uniqueSlug } from "@/lib/slug";
 import { normalizeText } from "@/lib/normalize";
 import type {
@@ -66,15 +66,15 @@ function variantWriteData(v: {
   };
 }
 
-/**
- * Tạo sản phẩm mới kèm các biến thể.
- * - Slug sinh từ `name` qua `slugify` + `uniqueSlug` (đụng slug đã tồn tại → thêm hậu tố `-2`, `-3`…).
- * - Product + variants được tạo trong 1 `db.$transaction`: nếu bất kỳ variant nào
- *   vi phạm ràng buộc (vd SKU trùng — unique) thì toàn bộ rollback, không để lại
- *   product/variant mồ côi.
- */
 export async function createProductCore(
   db: PrismaClient,
+  input: CreateProductInput,
+): Promise<ProductWithVariants> {
+  return db.$transaction((tx) => createProductInTransaction(tx, input));
+}
+
+export async function createProductInTransaction(
+  db: Prisma.TransactionClient,
   input: CreateProductInput,
 ): Promise<ProductWithVariants> {
   const slug = await uniqueSlug(slugify(input.product.name), async (candidate) => {
@@ -82,35 +82,33 @@ export async function createProductCore(
     return existing !== null;
   });
 
-  return db.$transaction(async (tx) => {
-    return tx.product.create({
-      data: {
-        name: input.product.name,
-        nameNormalized: normalizeText(input.product.name),
-        description: input.product.description,
-        categoryId: input.product.categoryId,
-        basePrice: input.product.basePrice,
-        status: input.product.status,
-        slug,
-        variants: {
-          create: input.variants.map((v) => variantWriteData(v)),
-        },
-        imageSets: {
-          create: input.imageSets.map((imageSet) => ({
-            color: imageSet.color,
-            position: imageSet.position,
-            isDefault: imageSet.isDefault,
-            images: {
-              create: imageSet.images.map((image) => ({
-                url: image.url,
-                position: image.position,
-              })),
-            },
-          })),
-        },
+  return db.product.create({
+    data: {
+      name: input.product.name,
+      nameNormalized: normalizeText(input.product.name),
+      description: input.product.description,
+      categoryId: input.product.categoryId,
+      basePrice: input.product.basePrice,
+      status: input.product.status,
+      slug,
+      variants: {
+        create: input.variants.map((v) => variantWriteData(v)),
       },
-      include: { variants: true },
-    });
+      imageSets: {
+        create: input.imageSets.map((imageSet) => ({
+          color: imageSet.color,
+          position: imageSet.position,
+          isDefault: imageSet.isDefault,
+          images: {
+            create: imageSet.images.map((image) => ({
+              url: image.url,
+              position: image.position,
+            })),
+          },
+        })),
+      },
+    },
+    include: { variants: true },
   });
 }
 

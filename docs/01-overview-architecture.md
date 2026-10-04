@@ -52,6 +52,7 @@ Dashboard vẫn yêu cầu HTTP Basic Auth vì có quyền retry và xoá job.
 
 ### 3. API routes
 - `/api/webhooks/sepay` — nhận webhook đối soát ngân hàng từ SePay/Casso.
+- `/api/admin/categories`, `/api/admin/images`, `/api/admin/products`, `/api/admin/products/validate` và `/api/admin/products/:id` — [catalog API](09-catalog-api.md) dùng bearer token riêng, không nhận cookie Better Auth. API chỉ đọc catalog, upload ảnh và tạo sản phẩm `DRAFT`; chỉnh sửa/publish vẫn qua admin.
 - Server Actions cho mutation (tạo đơn, cập nhật tồn kho...) thay cho nhiều REST endpoint.
 
 ### 4. Worker (pg-boss)
@@ -71,6 +72,7 @@ Dashboard vẫn yêu cầu HTTP Basic Auth vì có quyền retry và xoá job.
 | Module | Chức năng | Phụ thuộc |
 |---|---|---|
 | `catalog` | Sản phẩm, biến thể, danh mục, tồn kho | DB |
+| `catalog-api` | Bearer scope, rate/quota, validation, idempotency, audit và ảnh import | catalog, DB, sharp, uploads volume |
 | `cart` | Giỏ hàng phía client + tính tạm tính | — (client) |
 | `checkout` | Tạo đơn, tính phí ship, sinh VietQR | catalog, shipping, orders |
 | `orders` | Vòng đời đơn hàng, trạng thái | DB, jobs |
@@ -83,3 +85,23 @@ Dashboard vẫn yêu cầu HTTP Basic Auth vì có quyền retry và xoá job.
 ## Môi trường & cấu hình
 
 Biến môi trường chính: `APP_ENV`, `DATABASE_URL`, `POSTGRES_HOST_PORT`, `BETTER_AUTH_SECRET`, `RESEND_API_KEY`, `BOT_TOKEN`, `SEPAY_WEBHOOK_SECRET`, thông tin tài khoản ngân hàng nhận tiền (số TK, ngân hàng, tên) để sinh VietQR, `APP_BASE_URL`.
+
+## Ranh giới catalog API
+
+`src/server/catalog-api` xác thực token gắn với một user còn role `owner`,
+chưa bị ban. Token không tạo tenant: scope `catalog:read` đọc được mọi sản phẩm
+bằng ID, kể cả sản phẩm không do token đó tạo. Asset upload thuộc riêng token;
+API chỉ nhận `assetId` và tự ánh xạ sang URL đã lưu.
+
+Mutation khóa dòng token trong PostgreSQL, kiểm tra lại quyền rồi commit dữ
+liệu, response idempotency và audit trong cùng transaction. Việc ghi file nằm
+ngoài tính nguyên tử của PostgreSQL; lỗi thông thường dọn file chưa commit,
+nhưng crash có thể để lại file không có asset record. File API có prefix
+`catalog-`; cleanup chỉ dọn orphan thuộc prefix này sau 24 giờ và khi không còn
+asset/product image tham chiếu. `catalog-maintenance` trong profile
+`maintenance` dùng image migrate và cùng uploads volume để cấp, thu hồi token
+hoặc dọn ảnh theo [runbook](08-production-runbook.md).
+
+API production bắt buộc HTTPS và tin `X-Forwarded-Proto` từ reverse proxy.
+Cloudflare Tunnel phải chuyển đúng protocol; app chỉ bind loopback để client
+không thể bypass proxy bằng header tự gửi.
