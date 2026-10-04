@@ -27,9 +27,10 @@ describe("production environment validation", () => {
   });
 
   it("rejects a crawler policy that would block production", () => {
-    const env: NodeJS.ProcessEnv = Object.fromEntries(
-      REQUIRED_PRODUCTION_ENV.map((name) => [name, `${name}-value`]),
-    );
+    const env: NodeJS.ProcessEnv = {
+      NODE_ENV: "test",
+      ...Object.fromEntries(REQUIRED_PRODUCTION_ENV.map((name) => [name, `${name}-value`])),
+    };
     env.CRAWL_POLICY = "disallow";
     env.APP_ENV = "production";
 
@@ -38,6 +39,7 @@ describe("production environment validation", () => {
 
   it("rejects an app environment other than production", () => {
     const env: NodeJS.ProcessEnv = {
+      NODE_ENV: "test",
       ...Object.fromEntries(
         REQUIRED_PRODUCTION_ENV.map((name) => [name, `${name}-value`]),
       ),

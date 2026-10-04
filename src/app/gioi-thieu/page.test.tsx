@@ -10,6 +10,7 @@ describe("GioiThieuPage", () => {
     expect(screen.getByRole("heading", { level: 2, name: "Từ xưởng đến từng đôi giày" })).toBeInTheDocument();
     expect(screen.getByText("Chúng tôi làm gì")).toBeInTheDocument();
     expect(screen.getByText(/sản xuất giày dép và phụ liệu dép/)).toBeInTheDocument();
-    expect(screen.getAllByRole("img")).toHaveLength(3);
+    expect(screen.getByRole("img", { name: "Những đôi dép đang được hoàn thiện tại xưởng leafshoes" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Khu trưng bày giày dép tại leafshoes Việt Nam" })).toBeInTheDocument();
   });
 });
