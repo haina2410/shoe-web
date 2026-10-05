@@ -60,7 +60,15 @@ Danh mục sắp theo ID tăng dần. Lặp GET với `cursor=nextCursor` cho đ
 `nextCursor=null`; cursor chọn các ID lớn hơn giá trị gửi lên. Validate không
 tạo product, asset, audit mutation hay idempotency record, nhưng vẫn tính rate
 limit và cập nhật thời điểm dùng token. Kết quả validate là kiểm tra tại thời
-điểm gọi, không đặt chỗ SKU/asset; create kiểm tra lại trong transaction.
+điểm gọi, không đặt chỗ SKU/asset; create kiểm tra lại trong transaction và
+trả `422 INVALID_ASSET` nếu file biến mất trước lúc tham chiếu được ghi.
+
+Admin có thể bỏ ảnh trong form và Hủy an toàn vì ProductImage đã lưu chỉ đổi
+khi bấm Lưu. Lưu enqueue cleanup cho URL đã bị gỡ trong cùng transaction với
+thay đổi product; worker khóa URL rồi kiểm tra lại mọi ProductImage trước khi
+xóa. Cleanup job xóa `CatalogApiAsset` sau khi file bị xóa hoặc đã vắng mặt,
+nhưng giữ `CatalogApiRequest` để lần replay upload cũ trả `410 ASSET_EXPIRED`.
+Xóa toàn bộ sản phẩm hiện không enqueue cleanup ảnh.
 
 ## Giới hạn request và ảnh
 
@@ -77,13 +85,15 @@ limit và cập nhật thời điểm dùng token. Kết quả validate là ki�
 - Server xoay theo orientation, mã hóa lại WebP và bỏ metadata. `bytes` trong
   response là dung lượng WebP, `id` là `assetId` dùng trong payload product.
 - Tổng asset record của một token tối đa 250 MiB, gồm cả ảnh đã gắn và ảnh hết
-  hạn chưa cleanup. Asset chưa gắn hết hạn sau 24 giờ. Ảnh đã gắn được giữ lại;
-  việc xóa ảnh khỏi product không tự giảm quota.
+  hạn chưa cleanup. Asset chưa gắn hết hạn sau 24 giờ. Sau khi admin lưu bỏ
+  ảnh, worker xóa asset và thu hồi quota nếu không còn product image nào tham
+  chiếu. Asset đang được sản phẩm khác dùng vẫn được giữ.
 
 URL upload là đường dẫn public để hiển thị ảnh; việc product còn `DRAFT` không
 làm file ảnh trở thành nội dung riêng tư. Chỉ upload ảnh sản phẩm được phép
-công khai. Cleanup là lệnh vận hành riêng, không phải job tự chạy; xem runbook. Lệnh cũng
-dọn file `catalog-<uuid>.webp` cũ hơn 24 giờ không còn asset/product image tham
+công khai. Cleanup asset hết hạn/crash-orphan là lệnh vận hành riêng; gợi ý
+dọn ảnh admin chạy qua worker. Xem runbook. Lệnh maintenance cũng dọn file
+`catalog-<uuid>.webp` cũ hơn 24 giờ không còn asset/product image tham
 chiếu, giữ nguyên file recent và file legacy/admin không mang prefix này.
 
 ## Payload product

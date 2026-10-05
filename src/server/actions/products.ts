@@ -21,12 +21,19 @@ import {
   ProductBusinessError,
 } from "@/server/products";
 import { z } from "zod";
+import { enqueueDeleteProductImage, getBoss } from "@/jobs/queue";
+import { isManagedProductImageUrl } from "@/lib/product-image-url";
+import { ManagedProductImageUnavailableError } from "@/lib/product-image-files";
 
 export type ProductActionResult =
   | { ok: true }
   | { ok: false; error: string };
 
 const productIdSchema = z.string().min(1);
+const productImageCleanupUrlsSchema = z
+  .array(z.string().refine(isManagedProductImageUrl))
+  .min(1)
+  .max(256);
 
 export async function createProductAction(
   input: CreateProductInput,
@@ -41,7 +48,14 @@ export async function createProductAction(
     return { ok: false, error: parsed.error.message };
   }
 
-  await createProductCore(prisma, parsed.data);
+  try {
+    await createProductCore(prisma, parsed.data);
+  } catch (error: unknown) {
+    if (error instanceof ManagedProductImageUnavailableError) {
+      return { ok: false, error: "Ảnh không còn khả dụng. Hãy tải ảnh lên lại." };
+    }
+    throw error;
+  }
 
   revalidatePath("/admin/products");
   return { ok: true };
@@ -66,15 +80,47 @@ export async function updateProductAction(
   }
 
   try {
-    await updateProductCore(prisma, idParsed.data, inputParsed.data);
+    const boss = await getBoss();
+    await updateProductCore(prisma, idParsed.data, inputParsed.data, {
+      enqueueDeleteProductImage: (tx, payload) =>
+        enqueueDeleteProductImage(tx, payload, boss),
+    });
   } catch (error: unknown) {
     if (error instanceof ProductBusinessError) {
       return { ok: false, error: error.message };
+    }
+    if (error instanceof ManagedProductImageUnavailableError) {
+      return { ok: false, error: "Ảnh không còn khả dụng. Hãy tải ảnh lên lại." };
     }
     throw error;
   }
 
   revalidatePath("/admin/products");
+  return { ok: true };
+}
+
+export async function enqueueProductImageCleanupAction(
+  urls: string[],
+): Promise<ProductActionResult> {
+  const session = await requireAdmin();
+  if (!can(session.user.role, "product", "update")) {
+    redirect("/");
+  }
+
+  const parsed = productImageCleanupUrlsSchema.safeParse(urls);
+  if (!parsed.success) return { ok: false, error: "Danh sách ảnh cần dọn không hợp lệ." };
+
+  const boss = await getBoss();
+  const uniqueUrls = [...new Set(parsed.data)];
+  try {
+    await prisma.$transaction(async (tx) => {
+      for (const url of uniqueUrls) {
+        await enqueueDeleteProductImage(tx, { url }, boss);
+      }
+    });
+  } catch {
+    return { ok: false, error: "Không thể lên lịch dọn ảnh. Vui lòng thử lại." };
+  }
   return { ok: true };
 }
 

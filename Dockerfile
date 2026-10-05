@@ -42,8 +42,11 @@ CMD ["node", "server.js"]
 
 FROM generated AS worker
 ENV NODE_ENV=production
+ENV UPLOAD_DIR=/data/uploads
 COPY . .
-RUN chown -R nextjs:nodejs /app
+RUN chown -R nextjs:nodejs /app \
+  && mkdir -p /data/uploads \
+  && chown nextjs:nodejs /data/uploads
 USER nextjs
 CMD ["./node_modules/.bin/tsx", "src/worker/index.ts"]
 

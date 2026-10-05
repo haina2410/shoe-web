@@ -1,4 +1,8 @@
 import "dotenv/config";
+import { randomUUID } from "node:crypto";
+import { lstat, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import type { Job, WorkOptions } from "pg-boss";
 import { testPrisma, resetDb } from "@/test/db";
@@ -10,12 +14,14 @@ import {
   QUEUE_SEND_ORDER_CONFIRMATION,
   QUEUE_SEND_PAYMENT_CONFIRMED,
   QUEUE_SEND_ZALO_ORDER_CREATED,
+  QUEUE_DELETE_PRODUCT_IMAGE,
 } from "@/jobs/queue";
 import {
   registerExpireUnpaidWorker,
   registerOrderConfirmationWorker,
   registerPaymentConfirmedWorker,
   registerZaloOrderCreatedWorker,
+  registerDeleteProductImageWorker,
   workerClientsFromEnv,
   requireAppBaseUrlForWorker,
   type WorkCapableBoss,
@@ -493,5 +499,39 @@ describe("workerClientsFromEnv", () => {
     vi.stubEnv("BOT_TOKEN", "");
 
     expect(() => workerClientsFromEnv()).toThrow(/BOT_TOKEN/);
+  });
+});
+
+describe("registerDeleteProductImageWorker", () => {
+  it("registers the image queue and handles every job in a batch", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "image-worker-"));
+    vi.stubEnv("UPLOAD_DIR", directory);
+    const folder = path.join(directory, "products");
+    await mkdir(folder);
+    const urls = [randomUUID(), randomUUID()].map(
+      (id) => `/api/uploads/products/${id}.webp`,
+    );
+    for (const url of urls) await writeFile(path.join(folder, path.basename(url)), "image");
+    try {
+      const boss = createCapturingBoss();
+      await registerDeleteProductImageWorker(boss, { db: testPrisma });
+      expect(boss.captured?.name).toBe(QUEUE_DELETE_PRODUCT_IMAGE);
+      await boss.captured?.handler(
+        urls.map((url, index) => ({
+          id: `image-job-${index}`,
+          name: QUEUE_DELETE_PRODUCT_IMAGE,
+          data: { url },
+          expireInSeconds: 900,
+          heartbeatSeconds: null,
+          signal: new AbortController().signal,
+        })),
+      );
+      for (const url of urls) {
+        await expect(lstat(path.join(folder, path.basename(url)))).rejects.toMatchObject({ code: "ENOENT" });
+      }
+    } finally {
+      vi.unstubAllEnvs();
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });

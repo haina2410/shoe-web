@@ -118,11 +118,14 @@ services:
     environment:
       <<: *runtime-environment
       BOT_TOKEN: ${BOT_TOKEN:?required}
+      UPLOAD_DIR: ${UPLOAD_DIR:-/data/uploads}
     depends_on:
       postgres:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+    volumes:
+      - uploads_data:${UPLOAD_DIR:-/data/uploads}
     init: true
     restart: unless-stopped
     stop_grace_period: 30s

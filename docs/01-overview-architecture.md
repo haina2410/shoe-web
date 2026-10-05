@@ -57,9 +57,9 @@ Dashboard vẫn yêu cầu HTTP Basic Auth vì có quyền retry và xoá job.
 
 ### 4. Worker (pg-boss)
 - Tiến trình Node riêng (`worker.ts`), cùng repo, kết nối cùng Postgres.
-- Xử lý job: gửi email (đặt hàng, đã thanh toán), đối soát, cron **hết hạn đơn chưa thanh toán**.
+- Xử lý job: gửi email (đặt hàng, đã thanh toán), đối soát, cron **hết hạn đơn chưa thanh toán**, và dọn ảnh sản phẩm không còn tham chiếu.
 - Job `send-zalo-order-created` chỉ mang `orderCode` và khoá người nhận; worker tra đơn khi gửi thông báo Zalo cho nhân viên.
-- **Enqueue job nằm trong cùng transaction** với thao tác ghi đơn hàng nên đơn và job commit hoặc rollback cùng nhau. Worker phân phối at-least-once; handler phải chịu được việc xử lý lặp (xem [04](04-payment-checkout-flow.md)).
+- Job gắn với thay đổi dữ liệu được enqueue trong cùng transaction để dữ liệu và job cùng commit hoặc rollback. Gợi ý dọn ảnh từ form được enqueue theo batch nguyên tử; worker kiểm tra lại tham chiếu trước khi xóa. Worker chia sẻ uploads volume với app và xử lý job at-least-once.
 
 ### 5. Zalo Bot API
 

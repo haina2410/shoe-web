@@ -1,4 +1,10 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { randomUUID } from "node:crypto";
+import { lstat, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { handleDeleteProductImage } from "@/jobs/handlers/delete-product-image";
+import { lockProductImageUrls, removeManagedProductImageFile } from "@/lib/product-image-files";
 import { testPrisma, resetDb } from "@/test/db";
 import {
   createProductCore,
@@ -326,6 +332,178 @@ describe("updateVariantStockCore", () => {
         select: { stock: true },
       }),
     ).resolves.toEqual({ stock: observedStock - 1 });
+  });
+});
+
+describe("managed product image references", () => {
+  let directory = "";
+  let category: Awaited<ReturnType<typeof makeCategory>>;
+
+  beforeEach(async () => {
+    await resetDb();
+    directory = await mkdtemp(path.join(tmpdir(), "product-core-images-"));
+    vi.stubEnv("UPLOAD_DIR", directory);
+    category = await makeCategory(`Images ${randomUUID()}`, randomUUID());
+  });
+
+  afterEach(async () => {
+    await rm(directory, { recursive: true, force: true });
+    vi.unstubAllEnvs();
+  });
+
+  async function imageFile(url: string) {
+    const filename = path.join(directory, "products", path.basename(url));
+    await mkdir(path.dirname(filename), { recursive: true });
+    await writeFile(filename, "image");
+  }
+
+  async function productWithImage(url: string) {
+    return createProductCore(testPrisma, {
+      ...baseCreateInput({}, category.id),
+      imageSets: [
+        { color: "Đen", position: 0, isDefault: true, images: [{ url, position: 0 }] },
+      ],
+    });
+  }
+
+  function replacementInput(
+    product: Awaited<ReturnType<typeof createProductCore>>,
+    imageSets: UpdateProductInput["imageSets"],
+  ): UpdateProductInput {
+    return {
+      product: {
+        name: product.name,
+        description: product.description ?? undefined,
+        categoryId: product.categoryId,
+        basePrice: product.basePrice,
+        status: product.status,
+      },
+      variants: product.variants.map((variant) => ({
+        id: variant.id,
+        size: variant.size,
+        color: variant.color,
+        sku: variant.sku,
+        priceOverride: variant.priceOverride,
+        stock: variant.stock,
+        expectedStock: variant.stock,
+      })),
+      imageSets,
+    };
+  }
+
+  it("rejects a new managed reference when its file is unavailable", async () => {
+    const url = `/api/uploads/products/${randomUUID()}.webp`;
+    const input: CreateProductInput = {
+      ...baseCreateInput({}, category.id),
+      imageSets: [
+        { color: "Đen", position: 0, isDefault: true, images: [{ url, position: 0 }] },
+      ],
+    };
+
+    await expect(createProductCore(testPrisma, input)).rejects.toThrow();
+    expect(await testPrisma.product.count()).toBe(0);
+  });
+
+  it("enqueues a removed managed URL inside the replacement transaction", async () => {
+    const url = `/api/uploads/products/${randomUUID()}.webp`;
+    await imageFile(url);
+    const product = await productWithImage(url);
+    const enqueued: string[] = [];
+
+    await updateProductCore(
+      testPrisma,
+      product.id,
+      replacementInput(product, []),
+      { enqueueDeleteProductImage: async (_tx, payload) => { enqueued.push(payload.url); } },
+    );
+
+    expect(enqueued).toEqual([url]);
+    expect(await testPrisma.productImage.count({ where: { url } })).toBe(0);
+  });
+
+  it("rolls the reference replacement back when cleanup enqueue fails", async () => {
+    const url = `/api/uploads/products/${randomUUID()}.webp`;
+    await imageFile(url);
+    const product = await productWithImage(url);
+
+    await expect(
+      updateProductCore(
+        testPrisma,
+        product.id,
+        replacementInput(product, []),
+        { enqueueDeleteProductImage: async () => { throw new Error("queue unavailable"); } },
+      ),
+    ).rejects.toThrow("queue unavailable");
+
+    expect(await testPrisma.productImage.count({ where: { url } })).toBe(1);
+  });
+
+  it("makes a writer fail when cleanup owns the URL lock and removes the file first", async () => {
+    const url = `/api/uploads/products/${randomUUID()}.webp`;
+    await imageFile(url);
+    let announceLock = () => {};
+    let releaseCleaner = () => {};
+    const lockHeld = new Promise<void>((resolve) => { announceLock = resolve; });
+    const cleanerRelease = new Promise<void>((resolve) => { releaseCleaner = resolve; });
+    const cleaner = testPrisma.$transaction(async (tx) => {
+      await lockProductImageUrls(tx, [url]);
+      announceLock();
+      await cleanerRelease;
+      await removeManagedProductImageFile(url);
+    });
+    await lockHeld;
+
+    let writerFinished = false;
+    const writer = productWithImage(url).finally(() => { writerFinished = true; });
+    const writerRejected = expect(writer).rejects.toThrow();
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    expect(writerFinished).toBe(false);
+    releaseCleaner();
+    await cleaner;
+
+    await writerRejected;
+    expect(await testPrisma.product.count()).toBe(0);
+  });
+
+  it("preserves the file when a reference commits before cleanup gets the URL lock", async () => {
+    const url = `/api/uploads/products/${randomUUID()}.webp`;
+    await imageFile(url);
+    let announceLock = () => {};
+    let releaseWriter = () => {};
+    const lockHeld = new Promise<void>((resolve) => { announceLock = resolve; });
+    const writerRelease = new Promise<void>((resolve) => { releaseWriter = resolve; });
+    let createdProductId = "";
+    const writer = testPrisma.$transaction(async (tx) => {
+      await lockProductImageUrls(tx, [url]);
+      announceLock();
+      const product = await tx.product.create({
+        data: {
+          name: `Shared ${randomUUID()}`,
+          slug: randomUUID(),
+          categoryId: category.id,
+          basePrice: 100,
+          imageSets: { create: { color: "Black", images: { create: { url } } } },
+        },
+      });
+      createdProductId = product.id;
+      await writerRelease;
+    });
+    await lockHeld;
+
+    let cleanupFinished = false;
+    const cleanup = handleDeleteProductImage({ db: testPrisma }, { url }).finally(() => {
+      cleanupFinished = true;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    expect(cleanupFinished).toBe(false);
+    releaseWriter();
+    await writer;
+    await cleanup;
+
+    await expect(
+      lstat(path.join(directory, "products", path.basename(url))).then((info) => info.isFile()),
+    ).resolves.toBe(true);
+    await testPrisma.product.delete({ where: { id: createdProductId } });
   });
 });
 

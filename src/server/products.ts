@@ -5,6 +5,15 @@ import type {
   CreateProductInput,
   UpdateProductInput,
 } from "@/lib/validation/product";
+import {
+  assertManagedProductImageAvailable,
+  isManagedProductImageUrl,
+  lockProductImageUrls,
+} from "@/lib/product-image-files";
+import {
+  enqueueDeleteProductImage,
+  type DeleteProductImageJob,
+} from "@/jobs/queue";
 
 /**
  * `src/server/products.ts` — hàm core THUẦN cho nghiệp vụ sản phẩm.
@@ -77,6 +86,14 @@ export async function createProductInTransaction(
   db: Prisma.TransactionClient,
   input: CreateProductInput,
 ): Promise<ProductWithVariants> {
+  const incomingImageUrls = input.imageSets.flatMap((imageSet) =>
+    imageSet.images.map((image) => image.url),
+  );
+  await lockProductImageUrls(db, incomingImageUrls);
+  for (const url of [...new Set(incomingImageUrls)].filter(isManagedProductImageUrl)) {
+    await assertManagedProductImageAvailable(url);
+  }
+
   const slug = await uniqueSlug(slugify(input.product.name), async (candidate) => {
     const existing = await db.product.findUnique({ where: { slug: candidate } });
     return existing !== null;
@@ -128,6 +145,12 @@ export async function updateProductCore(
   db: PrismaClient,
   id: string,
   input: UpdateProductInput,
+  deps: {
+    enqueueDeleteProductImage?: (
+      tx: Prisma.TransactionClient,
+      payload: DeleteProductImageJob,
+    ) => Promise<void>;
+  } = {},
 ): Promise<ProductWithVariants> {
   return db.$transaction(async (tx) => {
     await tx.product.update({
@@ -141,6 +164,19 @@ export async function updateProductCore(
         status: input.product.status,
       },
     });
+
+    const persistedImages = await tx.productImage.findMany({
+      where: { imageSet: { productId: id } },
+      select: { url: true },
+    });
+    const incomingImageUrls = input.imageSets.flatMap((imageSet) =>
+      imageSet.images.map((image) => image.url),
+    );
+    const persistedImageUrls = persistedImages.map((image) => image.url);
+    await lockProductImageUrls(tx, [...persistedImageUrls, ...incomingImageUrls]);
+    for (const url of [...new Set(incomingImageUrls)].filter(isManagedProductImageUrl)) {
+      await assertManagedProductImageAvailable(url);
+    }
 
     const existing = await tx.variant.findMany({
       where: { productId: id },
@@ -204,6 +240,15 @@ export async function updateProductCore(
           },
         },
       });
+    }
+
+    const retainedImageUrls = new Set(incomingImageUrls);
+    const removedManagedImageUrls = [
+      ...new Set(persistedImageUrls.filter(isManagedProductImageUrl)),
+    ].filter((url) => !retainedImageUrls.has(url));
+    const enqueue = deps.enqueueDeleteProductImage ?? enqueueDeleteProductImage;
+    for (const url of removedManagedImageUrls) {
+      await enqueue(tx, { url });
     }
 
     return tx.product.findUniqueOrThrow({

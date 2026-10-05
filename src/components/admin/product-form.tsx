@@ -10,7 +10,9 @@ import { productStatusValues } from "@/lib/validation/product";
 import {
   createProductAction,
   updateProductAction,
+  enqueueProductImageCleanupAction,
 } from "@/server/actions/products";
+import { isManagedProductImageUrl } from "@/lib/product-image-url";
 import type {
   CreateProductInput,
   UpdateProductInput,
@@ -104,8 +106,11 @@ export function ProductForm({
   const router = useRouter();
   const { show } = useAdminToast();
   const [isPending, startTransition] = useTransition();
+  const [isImageCleanupPending, startImageCleanupTransition] = useTransition();
   const inFlight = useRef(false);
+  const imageCleanupInFlight = useRef(false);
   const [error, setError] = useState<string | null>(null);
+  const [isRemovingImages, setIsRemovingImages] = useState(false);
 
   const [name, setName] = useState(initial?.product.name ?? "");
   const [description, setDescription] = useState(
@@ -162,7 +167,7 @@ export function ProductForm({
     (color) => !imageSets.some((imageSet) => imageSet.color === color),
   );
   const isUploading = uploadingSetKey !== null;
-  const isLocked = isPending || isUploading;
+  const isLocked = isPending || isUploading || isRemovingImages || isImageCleanupPending;
 
   function addVariantRow() {
     if (isLocked) return;
@@ -198,9 +203,52 @@ export function ProductForm({
     ]);
   }
 
+  async function requestImageRemoval(
+    urls: string[],
+    removeFromForm: () => void,
+  ) {
+    const managedUrls = [...new Set(urls.filter(isManagedProductImageUrl))];
+    if (managedUrls.length === 0) {
+      removeFromForm();
+      return;
+    }
+    if (isLocked || imageCleanupInFlight.current) return;
+
+    imageCleanupInFlight.current = true;
+    setIsRemovingImages(true);
+    setError(null);
+    try {
+      const result = await enqueueProductImageCleanupAction(managedUrls);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      removeFromForm();
+    } catch {
+      setError("Không thể lên lịch dọn ảnh. Vui lòng thử lại.");
+    } finally {
+      imageCleanupInFlight.current = false;
+      setIsRemovingImages(false);
+    }
+  }
+
   function removeImageSet(key: string) {
     if (isLocked) return;
-    setImageSets((sets) => sets.filter((imageSet) => imageSet.key !== key));
+    const imageSet = imageSets.find((candidate) => candidate.key === key);
+    if (!imageSet) return;
+    const urls = imageSet.images
+      .filter((image) =>
+        !imageSets.some(
+          (candidate) =>
+            candidate.key !== key && candidate.images.some((other) => other.url === image.url),
+        ),
+      )
+      .map((image) => image.url);
+    startImageCleanupTransition(async () => {
+      await requestImageRemoval(urls, () =>
+        setImageSets((sets) => sets.filter((candidate) => candidate.key !== key)),
+      );
+    });
   }
 
   function updateImageSetColor(key: string, color: string) {
@@ -287,21 +335,38 @@ export function ProductForm({
 
   function removeImage(setKey: string, imageKey: string) {
     if (isLocked) return;
-    setImageSets((sets) =>
-      sets.map((imageSet) =>
-        imageSet.key === setKey
-          ? {
-              ...imageSet,
-              images: imageSet.images.filter((image) => image.key !== imageKey),
-            }
-          : imageSet,
+    const image = imageSets
+      .find((imageSet) => imageSet.key === setKey)
+      ?.images.find((candidate) => candidate.key === imageKey);
+    if (!image) return;
+    const stillReferencedInForm = imageSets.some((imageSet) =>
+      imageSet.images.some(
+        (candidate) =>
+          candidate.url === image.url &&
+          (imageSet.key !== setKey || candidate.key !== imageKey),
       ),
     );
+    startImageCleanupTransition(async () => {
+      await requestImageRemoval(
+        stillReferencedInForm ? [] : [image.url],
+        () =>
+          setImageSets((sets) =>
+            sets.map((imageSet) =>
+              imageSet.key === setKey
+                ? {
+                    ...imageSet,
+                    images: imageSet.images.filter((candidate) => candidate.key !== imageKey),
+                  }
+                : imageSet,
+            ),
+          ),
+      );
+    });
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (inFlight.current || isUploading) return;
+    if (inFlight.current || isUploading || imageCleanupInFlight.current) return;
     setError(null);
 
     if (imageSets.some((imageSet) => !variantColors.includes(imageSet.color))) {

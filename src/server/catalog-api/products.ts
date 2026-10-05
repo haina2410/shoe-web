@@ -5,6 +5,7 @@ import { catalogProductSchema, type CatalogProductInput } from "./schema";
 import { catalogMutation } from "./mutations";
 import { hashSecret } from "./tokens";
 import { assertCatalogImageAvailable } from "./images";
+import { ManagedProductImageUnavailableError } from "@/lib/product-image-files";
 
 export const catalogProductInclude = {
   variants: { orderBy: { sku: "asc" as const } },
@@ -119,6 +120,13 @@ export async function createCatalogProduct(
       },
     );
   } catch (error) {
+    if (error instanceof ManagedProductImageUnavailableError) {
+      throw new CatalogApiError(
+        422,
+        "INVALID_ASSET",
+        "Image file is unavailable",
+      );
+    }
     if (typeof error === "object" && error !== null && "code" in error) {
       if (error.code === "P2002")
         throw new CatalogApiError(

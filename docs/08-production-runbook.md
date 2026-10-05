@@ -89,7 +89,10 @@ config — đó là chủ đích, gọi tên tường minh (`compose run --rm sm
 PostgreSQL publish container port `5432` duy nhất trên
 `127.0.0.1:${POSTGRES_HOST_PORT:-5432}` để truy cập qua SSH; nó không lắng nghe
 trên interface public. App chỉ bind `127.0.0.1:${APP_HOST_PORT}:3000`; database
-và upload là named volume bền vững theo project.
+và upload là named volume bền vững theo project. `app`, `worker` và
+`catalog-maintenance` cùng mount uploads volume tại `UPLOAD_DIR`; worker image
+tạo sẵn `/data/uploads` với owner UID 1001 để volume mới ghi được kể cả khi
+worker khởi động trước app.
 
 `/robots.txt` đọc `CRAWL_POLICY` lúc chạy: chỉ `allow` mới cho crawler truy cập
 toàn site; `disallow`, giá trị sai hoặc thiếu đều chặn toàn site. Response được
@@ -460,7 +463,8 @@ sudo journalctl -u cloudflared --since '30 minutes ago'
 ### Dashboard pg-boss (xem và retry job)
 
 Job nền thất bại thì `docker compose logs worker | grep "job thất bại"` cho ra
-`jobId` và `orderCode` ngay. Cần nhìn toàn bộ queue hoặc retry bằng UI thì dựng
+queue và `jobId`; email log thêm `orderCode`, còn cleanup ảnh không log URL.
+pg-boss retry lỗi filesystem theo backoff; cần nhìn toàn bộ queue hoặc retry bằng UI thì dựng
 `@pg-boss/dashboard` lên tạm:
 
 ```bash
@@ -656,6 +660,8 @@ Khi request bị timeout/`500`, đối soát bằng request ID và retry cùng t
 payload theo API reference. Log `event=catalog_api` có operation/resource ID/status/code,
 không chứa bearer/body. Không tạo key mới chỉ để vượt một kết quả không rõ.
 `410 ASSET_EXPIRED` yêu cầu upload bằng key mới. Quota storage chỉ giảm sau khi
-record được cleanup; ảnh đã gắn vẫn tính quota ngay cả khi admin bỏ ảnh khỏi
-sản phẩm. Theo dõi dung lượng uploads và database/idempotency history trong
+record được cleanup; ảnh còn được sản phẩm khác tham chiếu vẫn tính quota.
+Việc lưu form admin bỏ tham chiếu enqueue cleanup riêng và có thể reclaim asset
+đã từng gắn khi worker xác nhận không còn tham chiếu; lịch sử idempotency được
+giữ để replay trả `410 ASSET_EXPIRED`. Theo dõi dung lượng uploads và database/idempotency history trong
 backup định kỳ.

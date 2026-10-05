@@ -5,6 +5,7 @@ import {
   zaloNotificationRecipientsForEnv,
   type ZaloNotificationRecipient,
 } from "@/lib/zalo-bot";
+import { isManagedProductImageUrl } from "@/lib/product-image-url";
 
 /**
  * `src/jobs/queue.ts` — hàng đợi pg-boss phía app (chỉ ghi job). Worker xử lý
@@ -16,6 +17,7 @@ export const QUEUE_SEND_ORDER_CONFIRMATION = "send-order-confirmation";
 export const QUEUE_SEND_PAYMENT_CONFIRMED = "send-payment-confirmed";
 export const QUEUE_SEND_ZALO_ORDER_CREATED = "send-zalo-order-created";
 export const QUEUE_EXPIRE_UNPAID = "expire-unpaid";
+export const QUEUE_DELETE_PRODUCT_IMAGE = "delete-product-image";
 
 const ORDER_CODE_PATTERN = /^LEAF[A-Z0-9]{6}$/;
 
@@ -44,6 +46,12 @@ export const zaloOrderCreatedJobSchema = z.object({
 });
 
 export type ZaloOrderCreatedJob = z.infer<typeof zaloOrderCreatedJobSchema>;
+
+export const deleteProductImageJobSchema = z.object({
+  url: z.string().refine(isManagedProductImageUrl),
+}).strict();
+
+export type DeleteProductImageJob = z.infer<typeof deleteProductImageJobSchema>;
 
 /**
  * Tạo instance `PgBoss` mới (không cache). Dùng `createBoss()` khi cần một
@@ -134,6 +142,8 @@ export async function ensureQueues(boss: PgBoss): Promise<void> {
   await boss.updateQueue(QUEUE_SEND_ZALO_ORDER_CREATED, QUEUE_RETRY_OPTIONS);
   await boss.createQueue(QUEUE_EXPIRE_UNPAID, QUEUE_RETRY_OPTIONS);
   await boss.updateQueue(QUEUE_EXPIRE_UNPAID, QUEUE_RETRY_OPTIONS);
+  await boss.createQueue(QUEUE_DELETE_PRODUCT_IMAGE, QUEUE_RETRY_OPTIONS);
+  await boss.updateQueue(QUEUE_DELETE_PRODUCT_IMAGE, QUEUE_RETRY_OPTIONS);
 }
 
 /**
@@ -276,4 +286,17 @@ export async function enqueueZaloOrderCreatedNotifications(
       );
     }
   }
+}
+
+export async function enqueueDeleteProductImage(
+  tx: PrismaTransactionLike,
+  payload: DeleteProductImageJob,
+  boss?: PgBoss,
+): Promise<void> {
+  const data = deleteProductImageJobSchema.parse(payload);
+  const bossInstance = boss ?? (await getBoss());
+  const jobId = await bossInstance.send(QUEUE_DELETE_PRODUCT_IMAGE, data, {
+    db: fromPrisma(tx),
+  });
+  if (!jobId) throw new Error("Ghi job dọn ảnh sản phẩm thất bại.");
 }
