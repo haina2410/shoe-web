@@ -52,7 +52,7 @@ Dashboard vẫn yêu cầu HTTP Basic Auth vì có quyền retry và xoá job.
 
 ### 3. API routes
 - `/api/webhooks/sepay` — nhận webhook đối soát ngân hàng từ SePay/Casso.
-- `/api/admin/categories`, `/api/admin/images`, `/api/admin/products`, `/api/admin/products/validate` và `/api/admin/products/:id` — [catalog API](09-catalog-api.md) dùng bearer token riêng, không nhận cookie Better Auth. API chỉ đọc catalog, upload ảnh và tạo sản phẩm `DRAFT`; chỉnh sửa/publish vẫn qua admin.
+- `/api/admin/categories`, `/api/admin/images`, `/api/admin/products`, `/api/admin/products/validate`, `/api/admin/products/:id` và `/api/admin/products/:id/variants` — [catalog API](09-catalog-api.md) dùng bearer token riêng, không nhận cookie Better Auth. API đọc catalog, upload ảnh, tạo sản phẩm `DRAFT`, cập nhật/publish/archive sản phẩm và thêm biến thể theo scope.
 - Server Actions cho mutation (tạo đơn, cập nhật tồn kho...) thay cho nhiều REST endpoint.
 
 ### 4. Worker (pg-boss)
@@ -72,7 +72,7 @@ Dashboard vẫn yêu cầu HTTP Basic Auth vì có quyền retry và xoá job.
 | Module | Chức năng | Phụ thuộc |
 |---|---|---|
 | `catalog` | Sản phẩm, biến thể, danh mục, tồn kho | DB |
-| `catalog-api` | Bearer scope, rate/quota, validation, idempotency, audit và ảnh import | catalog, DB, sharp, uploads volume |
+| `catalog-api` | Bearer scope, rate/quota, validation, idempotency, audit và ảnh import | catalog, DB, jobs, sharp, uploads volume |
 | `cart` | Giỏ hàng phía client + tính tạm tính | — (client) |
 | `checkout` | Tạo đơn, tính phí ship, sinh VietQR | catalog, shipping, orders |
 | `orders` | Vòng đời đơn hàng, trạng thái | DB, jobs |

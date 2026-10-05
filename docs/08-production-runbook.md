@@ -623,7 +623,7 @@ Thay email bằng owner thực đang hoạt động. File mới mode `0600`, th�
 Nếu ghi file thất bại, token vừa tạo bị thu hồi. Chọn tên file mới khi cấp lại.
 Chuyển credential tới máy import qua kênh private, giữ quyền owner-only và
 không dán nội dung file vào terminal/log. `--days` nhận 1–90, mặc định 30;
-`--scopes` bỏ qua sẽ cấp cả ba scope, nên chỉ định tường minh quyền cần dùng.
+`--scopes` bỏ qua sẽ cấp cả năm scope, nên chỉ định tường minh quyền cần dùng.
 
 ```bash
 docker compose -f docker-compose.prod.yml --profile maintenance run --rm \
@@ -650,7 +650,12 @@ Lệnh trả `removed` (asset đã xóa) và `orphansRemoved` (file orphan đã 
 xóa. Chỉ asset **chưa từng gắn** đã hết hạn 24 giờ mới bị xóa file và record;
 ảnh đã gắn sản phẩm được giữ, kể cả token đã thu hồi. Phải dùng cùng
 `UPLOAD_DIR` và uploads volume của app; service maintenance đã cấu hình cả hai.
-Không có cron cleanup tích hợp. Cleanup cũng quét file `catalog-<uuid>.webp`
+Worker xử lý job `delete-product-image` do admin/PATCH loại ảnh enqueue; worker
+phải có `UPLOAD_DIR` và uploads volume giống app (Compose production đã mount).
+Job chỉ xóa file không còn product tham chiếu và xóa asset để giảm quota.
+Theo dõi queue failed và retry sau khi sửa quyền truy cập volume; update/cleanup
+job commit chung transaction. Không có cron cleanup asset chưa gắn tích hợp.
+Cleanup cũng quét file `catalog-<uuid>.webp`
 cũ hơn 24 giờ, xóa khi không còn asset hoặc product image nào tham chiếu. Prefix
 riêng giúp dọn orphan do crash mà giữ nguyên ảnh admin/session. File mới hơn
 24 giờ và file legacy không có prefix `catalog-` không nằm trong orphan sweep;
@@ -661,7 +666,7 @@ payload theo API reference. Log `event=catalog_api` có operation/resource ID/st
 không chứa bearer/body. Không tạo key mới chỉ để vượt một kết quả không rõ.
 `410 ASSET_EXPIRED` yêu cầu upload bằng key mới. Quota storage chỉ giảm sau khi
 record được cleanup; ảnh còn được sản phẩm khác tham chiếu vẫn tính quota.
-Việc lưu form admin bỏ tham chiếu enqueue cleanup riêng và có thể reclaim asset
+Việc lưu form admin hoặc PATCH bỏ tham chiếu enqueue cleanup và có thể reclaim asset
 đã từng gắn khi worker xác nhận không còn tham chiếu; lịch sử idempotency được
 giữ để replay trả `410 ASSET_EXPIRED`. Theo dõi dung lượng uploads và database/idempotency history trong
 backup định kỳ.

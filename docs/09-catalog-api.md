@@ -1,9 +1,9 @@
 # 09 — Catalog API
 
-Catalog API dành cho công cụ import tin cậy: đọc danh mục/chi tiết sản phẩm,
-upload ảnh và tạo sản phẩm **nháp**. API không cập nhật, xóa hoặc publish sản
-phẩm; owner kiểm tra và publish trong admin. API cũng không tạo danh mục, không
-nhận URL ảnh bên ngoài và không tải ảnh từ URL do client cung cấp.
+Catalog API dành cho công cụ AI/import tin cậy: đọc danh mục/chi tiết sản phẩm,
+upload ảnh, tạo sản phẩm **nháp**, cập nhật sản phẩm (gồm publish/archive) và
+thêm biến thể. API chưa có xóa sản phẩm, sửa/xóa biến thể hoặc quản lý danh mục;
+không nhận URL ảnh bên ngoài và không tải ảnh từ URL do client cung cấp.
 
 ## Xác thực và phạm vi
 
@@ -16,7 +16,7 @@ sau và được kiểm tra lại trong transaction mutation.
 CLI cấp token ngẫu nhiên, chỉ lưu SHA-256 trong database. Bearer được ghi một
 lần vào file JSON `{id, token, expiresAt}` mới, mode `0600`; file đã tồn tại bị
 từ chối, không in bearer ra stdout. `--days` nhận 1–90, mặc định 30; tên token
-sau trim dài 1–100 ký tự. Nếu bỏ `--scopes`, CLI cấp cả ba scope; chỉ định
+sau trim dài 1–100 ký tự. Nếu bỏ `--scopes`, CLI cấp cả năm scope; chỉ định
 tường minh các scopes tối thiểu cần dùng:
 
 | Scope | Quyền |
@@ -24,10 +24,14 @@ tường minh các scopes tối thiểu cần dùng:
 | `catalog:read` | Đọc danh mục và mọi sản phẩm theo ID, gồm nháp và sản phẩm do admin/token khác tạo |
 | `products:create` | Validate payload và tạo sản phẩm `DRAFT` |
 | `images:write` | Upload ảnh, nhận asset thuộc token đó |
+| `products:update` | Cập nhật field sản phẩm, publish/archive và thay bộ ảnh |
+| `variants:create` | Thêm biến thể vào sản phẩm hiện có |
 
 Hệ thống không có tenant. Quyền đọc không giới hạn theo owner/token; chỉ quyền
 tham chiếu asset trong payload bị giới hạn theo token. Không thể dùng token mới
-để tham chiếu asset của token cũ.
+để tham chiếu asset của token cũ. Token cũ không tự nhận scope mới: cấp token
+mới với `products:update`/`variants:create` nếu cần. Bỏ `imageSets` khi PATCH
+sẽ giữ nguyên ảnh hiện tại, kể cả ảnh thuộc token khác.
 
 Production bắt buộc HTTPS. App tin `X-Forwarded-Proto` do reverse proxy đặt;
 origin chỉ được bind loopback sau proxy tin cậy. Không đưa bearer vào source,
@@ -42,6 +46,8 @@ log, shell history, chat hoặc báo cáo. Vận hành container xem
 | `POST /api/admin/images` | `images:write` | Byte ảnh thô, MIME chính xác, `Idempotency-Key` bắt buộc | `201` lần đầu / `200` replay; `data: {id,url,bytes,expiresAt}`, `replayed` |
 | `POST /api/admin/products/validate` | `products:create` | JSON product payload | `200`, `data: {valid:true,product:<payload đã normalize>}` |
 | `POST /api/admin/products` | `products:create` | JSON product payload, `Idempotency-Key` bắt buộc | `201` lần đầu / `200` replay; `data` product cùng variants/imageSets/images, `replayed` |
+| `PATCH /api/admin/products/:id` | `products:update` | JSON update payload, `Idempotency-Key` bắt buộc | `200`, `data` product hiện tại cùng variants/imageSets/images, `replayed` |
+| `POST /api/admin/products/:id/variants` | `variants:create` | JSON variant payload, `Idempotency-Key` bắt buộc | `201` lần đầu / `200` replay; `data` variant mới, `replayed` |
 | `GET /api/admin/products/:id` | `catalog:read` | ID 1–100 ký tự | `200`, `data` product hiện tại cùng variants/imageSets/images |
 
 Mọi response có `requestId`, header `X-Request-Id` và `Cache-Control: no-store`.
@@ -98,7 +104,7 @@ chiếu, giữ nguyên file recent và file legacy/admin không mang prefix này
 
 ## Payload product
 
-Mọi object là strict: field lạ bị từ chối. Không gửi `id`, `slug`, URL ảnh,
+Mọi object là strict: field lạ bị từ chối. Payload **create** không gửi `id`, `slug`, URL ảnh,
 trạng thái publish hay dữ liệu cập nhật. Các số là JSON number nguyên,
 không nhận chuỗi số. Giới hạn số nguyên chung là `0..2147483647`.
 
@@ -130,21 +136,91 @@ vẫn hợp lệ dưới dạng nháp. Slug được server sinh từ tên. Khi 
 response có ID/slug và URL ảnh đã được server ánh xạ; không gửi response này
 nguyên dạng làm create payload.
 
+## Cập nhật sản phẩm và thêm biến thể
+
+`PATCH /api/admin/products/:id` nhận object strict với `product` và/hoặc
+`imageSets`. Payload rỗng hoặc `product:{}` bị từ chối. Field bỏ qua giữ nguyên;
+API không thay slug khi đổi tên, không sửa/xóa hoặc tạo lại variants.
+
+| Field cập nhật | Giới hạn / ý nghĩa |
+|---|---|
+| `product.name` | Như create; cập nhật cả tên tìm kiếm không dấu |
+| `product.description` | String tối đa 10.000 ký tự hoặc `null` để xóa mô tả |
+| `product.categoryId` | Như create; danh mục phải tồn tại |
+| `product.basePrice` | Số nguyên VND `0..2147483647` |
+| `product.status` | `DRAFT`, `ACTIVE` (publish) hoặc `ARCHIVED`; bỏ qua giữ nguyên |
+| `imageSets` | Như create; thay **toàn bộ** bộ ảnh, `[]` xóa hết ảnh; bỏ qua giữ nguyên |
+
+Màu bộ ảnh phải thuộc variant hiện có. Asset mới phải thuộc token gọi PATCH;
+không chấp nhận URL hoặc ID ảnh từ GET thay cho `assetId`. Tạo variant màu mới
+trước khi thêm bộ ảnh cho màu đó. Sản phẩm `ACTIVE` có thể không có ảnh, giống
+quy tắc admin; client nên kiểm tra sản phẩm trước khi publish.
+
+`POST /api/admin/products/:id/variants` nhận **một object variant** trực tiếp,
+không bọc trong `variants`: `{size,color,sku,stock,priceOverride?}`. Giới hạn
+field như bảng create; SKU unique toàn catalog, cặp size/màu unique trong sản
+phẩm. Tối đa 100 variants/sản phẩm khi thêm qua API. Các variants cũ giữ nguyên
+ID, stock và tham chiếu đơn hàng. Endpoint không tạo product hay bộ ảnh.
+
+```json
+{"product":{"name":"Giày mẫu mới","basePrice":490000,"status":"ACTIVE"}}
+```
+
+```json
+{"size":"41","color":"Đen","sku":"SUPPLIER-001-BLACK-41","stock":5,"priceOverride":null}
+```
+
+Gọi endpoint bằng file cục bộ (biến auth/API/ID như ví dụ phía dưới):
+
+```bash
+curl --silent --show-error --fail-with-body \
+  --header @"$private_dir/auth.header" --header 'Content-Type: application/json' \
+  --header 'Idempotency-Key: supplier-001-update-001' \
+  --data-binary @"$private_dir/product-update.json" \
+  --request PATCH "$api_base/api/admin/products/$product_id" \
+  --output "$private_dir/updated-001.json"
+
+curl --silent --show-error --fail-with-body \
+  --header @"$private_dir/auth.header" --header 'Content-Type: application/json' \
+  --header 'Idempotency-Key: supplier-001-variant-41' \
+  --data-binary @"$private_dir/variant-41.json" \
+  "$api_base/api/admin/products/$product_id/variants" \
+  --output "$private_dir/variant-created-41.json"
+```
+
+Mutation cập nhật khóa product sau khóa token. Khi thay bộ ảnh, server so URL
+cũ/mới và enqueue một job cho từng URL bị bỏ ngay trong transaction cập nhật,
+idempotency và audit. Enqueue lỗi rollback mọi thay đổi. Replay không enqueue
+lại. Worker dùng cùng uploads volume với app, chỉ xóa file local hợp lệ, kiểm
+tra lại mọi `ProductImage` trước khi xóa và giữ file còn được sản phẩm khác
+tham chiếu (kể cả ảnh vừa được gắn lại). Asset catalog được khóa theo token rồi
+URL bằng advisory lock, dùng chung quy tắc với admin để không đua với reuse;
+khi không còn tham chiếu, worker xóa file và asset record,
+thu hồi storage quota. File đã mất được coi là đã dọn; lỗi filesystem khác
+được retry theo cấu hình pg-boss. Record idempotency upload vẫn giữ nguyên;
+replay upload sau cleanup trả `410 ASSET_EXPIRED`.
+
+API chưa có: danh sách/tìm kiếm sản phẩm để tìm ID/SKU; sửa biến thể và cập
+nhật tồn kho với `expectedStock`; xóa biến thể/sản phẩm có kiểm tra tham chiếu
+đơn hàng; tạo/sửa/xóa danh mục. Đây là các phần còn thiếu nếu cần toàn quyền
+quản lý catalog qua AI. Archive đã có qua PATCH nên không cần xóa để ẩn sản phẩm.
+
 ## Idempotency và retry
 
-`Idempotency-Key` bắt buộc cho upload/create: 1–128 ký tự thuộc tập
+`Idempotency-Key` bắt buộc cho upload/create/PATCH/thêm variant: 1–128 ký tự thuộc tập
 `A-Z a-z 0-9 . _ : -`. Chọn key ổn định cho từng ảnh/sản phẩm trong batch; giữ
 manifest cục bộ gồm key, đường dẫn payload và ID resource trả về.
 
 Record được lưu bền vững theo `(token, operation, key)`, không tự hết hạn.
 Cùng key, cùng hash trả response đã lưu với `replayed=true`; cùng key nhưng
-payload khác trả `409 IDEMPOTENCY_CONFLICT`. Hash product dựa trên JSON đã
+payload khác trả `409 IDEMPOTENCY_CONFLICT`. Hash cập nhật/thêm variant gồm ID
+sản phẩm đích: không tái dùng cùng key cho sản phẩm khác trong cùng operation. Hash product dựa trên JSON đã
 parse, trim và điền default; thứ tự mảng vẫn có ý nghĩa. Hash ảnh gồm MIME và
 byte gốc: ảnh nhìn giống nhau nhưng file khác vẫn là payload khác.
 
 Dữ liệu, response idempotency và audit commit chung transaction dưới khóa token.
 Nếu timeout/mất kết nối/`500`, retry **cùng token, key và payload** trước khi tạo
-key mới. Một lần replay product trả snapshot lúc tạo; GET theo ID lấy dữ liệu
+key mới. Một lần replay mutation trả snapshot lúc commit; GET theo ID lấy dữ liệu
 hiện tại. Với lỗi rate limit, đợi `Retry-After`; hết quota sản phẩm cần operator
 xử lý, không retry liên tục. Lỗi validation trước commit không giữ key thành
 công nên có thể sửa payload rồi thử lại.
@@ -166,7 +242,7 @@ private_dir=$(mktemp -d)
 api_base=http://localhost:3000
 npm run catalog:api -- issue \
   --owner-email owner@example.com --name supplier-import \
-  --days 30 --scopes catalog:read,products:create,images:write \
+  --days 30 --scopes catalog:read,products:create,products:update,variants:create,images:write \
   --out "$private_dir/token.json"
 jq -r '"Authorization: Bearer " + .token' "$private_dir/token.json" \
   > "$private_dir/auth.header"
@@ -228,7 +304,7 @@ npm run catalog:api -- list
 npm run catalog:api -- revoke --id "$(jq -r '.id' "$private_dir/token.json")"
 ```
 
-Kiểm tra nháp trong admin trước khi publish. Lưu manifest/result cần đối soát ở
+Kiểm tra nháp trước khi publish qua admin hoặc PATCH với `products:update`. Lưu manifest/result cần đối soát ở
 nơi private; sau khi thu hồi, xóa `token.json` và `auth.header` khi không còn cần.
 Không bật shell tracing hoặc curl verbose cho workflow có bearer header.
 
@@ -248,7 +324,7 @@ Không bật shell tracing hoặc curl verbose cho workflow có bearer header.
 | `413` | `BODY_TOO_LARGE`, `IMAGE_TOO_LARGE` | Giảm byte/kích thước/pixel |
 | `413` | `STORAGE_QUOTA_EXCEEDED` | Cleanup ảnh chưa gắn hết hạn hoặc yêu cầu operator xử lý dung lượng |
 | `415` | `UNSUPPORTED_MEDIA_TYPE`, `UNSUPPORTED_ENCODING`, `INVALID_IMAGE` | Sửa MIME, bỏ encoding hoặc chuyển sang ảnh hợp lệ |
-| `422` | `VALIDATION_ERROR`, `INVALID_CATEGORY`, `INVALID_ASSET`, `INVALID_REFERENCE` | Sửa field/tham chiếu; asset phải thuộc đúng token |
+| `422` | `VALIDATION_ERROR`, `INVALID_CATEGORY`, `INVALID_ASSET`, `INVALID_REFERENCE`, `VARIANT_LIMIT` | Sửa field/tham chiếu; asset phải thuộc đúng token |
 | `429` | `RATE_LIMITED`, `PRODUCT_QUOTA` | Chờ cửa sổ rate limit hoặc xử lý quota vòng đời |
 | `500` | `INTERNAL_ERROR`, `INVALID_ASSET_PATH` | Giữ request ID, đối soát và retry cùng key; operator kiểm tra log/storage |
 

@@ -84,3 +84,52 @@ export const catalogProductSchema = z
       });
   });
 export type CatalogProductInput = z.infer<typeof catalogProductSchema>;
+
+export const catalogVariantSchema = catalogProductSchema.shape.variants.element;
+export type CatalogVariantInput = z.infer<typeof catalogVariantSchema>;
+
+export const catalogProductUpdateSchema = z
+  .strictObject({
+    product: z
+      .strictObject({
+        name: z.string().trim().min(1).max(200).optional(),
+        description: z.string().max(10000).nullable().optional(),
+        categoryId: identifier.optional(),
+        basePrice: integer.optional(),
+        status: z.enum(["DRAFT", "ACTIVE", "ARCHIVED"]).optional(),
+      })
+      .refine(
+        (value) => Object.keys(value).length > 0,
+        "Provide a product field",
+      )
+      .optional(),
+    imageSets: catalogProductSchema.shape.imageSets.unwrap().optional(),
+  })
+  .superRefine((input, ctx) => {
+    if (!input.product && input.imageSets === undefined)
+      ctx.addIssue({
+        code: "custom",
+        message: "Provide product fields or imageSets",
+      });
+    if (input.imageSets) {
+      const colors = input.imageSets.map((set) => set.color);
+      if (new Set(colors).size !== colors.length)
+        ctx.addIssue({
+          code: "custom",
+          path: ["imageSets"],
+          message: "Image set colors must be unique",
+        });
+      if (
+        input.imageSets.length &&
+        input.imageSets.filter((set) => set.isDefault).length !== 1
+      )
+        ctx.addIssue({
+          code: "custom",
+          path: ["imageSets"],
+          message: "Exactly one default image set is required",
+        });
+    }
+  });
+export type CatalogProductUpdateInput = z.infer<
+  typeof catalogProductUpdateSchema
+>;
