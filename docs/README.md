@@ -7,7 +7,7 @@ tài liệu tham chiếu bền vững về kiến trúc, nghiệp vụ, giao di�
 
 - **Browse:** danh mục + lọc (giá/size/màu), tìm kiếm theo tên, trang chi tiết sản phẩm, giỏ hàng nhiều sản phẩm.
 - **Quản lý catalog (admin):** CRUD sản phẩm/biến thể/tồn kho, upload ảnh, CRUD danh mục phẳng và xem sản phẩm theo danh mục; nhiều admin có phân quyền (RBAC).
-- **Catalog API:** bearer token có scope để đọc catalog, upload ảnh và tạo sản phẩm nháp; xác thực payload và retry idempotent, không publish qua API.
+- **Catalog API:** bearer token có scope để đọc catalog, upload ảnh, tạo nháp, cập nhật/publish/archive sản phẩm và thêm biến thể; retry idempotent và job dọn ảnh bị loại.
 - **Thanh toán:** chuyển khoản QR VietQR, đối soát tự động qua SePay/Casso + admin xác nhận tay khi cần; checkout tạo đơn; gửi email xác nhận.
 - **Mua không cần đăng nhập:** guest checkout chỉ bằng email.
 
@@ -22,7 +22,7 @@ tài liệu tham chiếu bền vững về kiến trúc, nghiệp vụ, giao di�
 - `04` và `06`: invariant nghiệp vụ thanh toán, đối soát và vận hành đơn.
 - `05` và `07`: hệ thống giao diện cùng backlog sản phẩm.
 - `08`: runbook production dành cho người vận hành.
-- `09`: hợp đồng catalog API và quy trình import bằng file cục bộ.
+- `09`: hợp đồng catalog API, cập nhật sản phẩm/biến thể và quy trình bằng file cục bộ.
 
 Tài liệu dùng tên ổn định theo chủ đề, không lưu nhật ký triển khai theo ngày.
 
@@ -38,7 +38,7 @@ Tài liệu dùng tên ổn định theo chủ đề, không lưu nhật ký tri
 | [06-admin-order-domain.md](06-admin-order-domain.md) | Vòng đời đơn, phân quyền, đối soát và hoàn tiền |
 | [07-post-day10-storefront-backlog.md](07-post-day10-storefront-backlog.md) | Backlog storefront cần dữ liệu hoặc phạm vi bổ sung |
 | [08-production-runbook.md](08-production-runbook.md) | Deploy, backup, rollback và xử lý sự cố production |
-| [09-catalog-api.md](09-catalog-api.md) | Bearer token, endpoint, payload, idempotency và import catalog |
+| [09-catalog-api.md](09-catalog-api.md) | Bearer token, endpoint, payload, idempotency, cập nhật và import catalog |
 
 ## Ngoài phạm vi demo (YAGNI)
 

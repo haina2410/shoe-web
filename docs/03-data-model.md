@@ -204,21 +204,25 @@ model ProvinceZone {
 
 User phải còn role `owner` và chưa bị ban khi sử dụng token; hết hạn/thu hồi
 không xóa sản phẩm, asset hoặc lịch sử. Scopes là `catalog:read`,
-`products:create`, `images:write`. Token mới có hạn tối đa 90 ngày. User xóa
+`products:create`, `products:update`, `variants:create`, `images:write`. Token
+mới có hạn tối đa 90 ngày. User xóa
 cascade token; token cascade request/audit nhưng asset FK chặn xóa token còn
 asset. Vận hành dùng thu hồi thay vì xóa token.
 
 Rate limit lưu trong DB là 60 request/phút/token, quota tạo sản phẩm là 10.000
 lần thành công/token trong toàn bộ vòng đời. Quota ảnh là 250 MiB/token, tính
 trên tổng byte asset record còn tồn tại. Asset chưa gắn hết hạn sau 24 giờ;
-maintenance xóa file và record. Khi admin lưu thay đổi bỏ ảnh, cleanup job xóa
+maintenance xóa file và record. Khi admin hoặc catalog PATCH lưu thay đổi bỏ
+ảnh, cleanup job xóa
 asset record và file nếu không còn product image nào tham chiếu; nếu ảnh vẫn
 được dùng ở nơi khác, asset và quota được giữ. Request idempotency history vẫn
 được giữ để replay cũ trả `410 ASSET_EXPIRED` sau khi asset được dọn.
 `attachedAt` đánh dấu asset từng được gắn, không phải số tham chiếu hiện tại;
 xóa toàn bộ sản phẩm không tự enqueue cleanup ảnh.
 
-Product API chỉ tạo `DRAFT`, dùng chung thao tác transaction của catalog admin.
+Product API tạo `DRAFT` bằng thao tác transaction của catalog admin; PATCH
+cập nhật field/status/bộ ảnh và POST variant thêm biến thể mà giữ nguyên
+variants hiện có.
 Asset phải thuộc đúng token và còn hạn hoặc đã gắn; server ánh xạ `assetId`
 thành URL trong `ProductImage`. Các product/image record giữ URL, không tạo FK
 trực tiếp tới asset. Slug do server sinh; SKU unique toàn catalog, cặp size/màu
@@ -230,7 +234,8 @@ directory rồi mới thay đổi tham chiếu hoặc xóa file. Thứ tự khó
 token trước, URL sau. Kiểm tra quyền, quota, dữ liệu catalog, đánh dấu asset đã
 gắn, response idempotency và audit commit cùng transaction.
 Hash product tính sau khi normalize/default payload; hash ảnh gồm MIME và byte
-gốc. Cùng key với hash khác trả conflict. Response đã lưu là snapshot lúc tạo;
+gốc. Cùng key với hash khác trả conflict. Hash PATCH/thêm variant gồm product
+ID đích. Response đã lưu là snapshot lúc commit;
 GET product trả trạng thái hiện tại. File upload không có transaction chung với
 DB; cleanup dọn crash-orphan có tên `catalog-<uuid>.webp` sau 24 giờ khi không
 có asset hoặc product image tham chiếu. File không có prefix này được giữ lại.

@@ -7,12 +7,14 @@ export const catalogScopes = [
   "catalog:read",
   "products:create",
   "images:write",
+  "products:update",
+  "variants:create",
 ] as const;
 export type CatalogScope = (typeof catalogScopes)[number];
 export const issueTokenSchema = z.strictObject({
   ownerId: z.string().min(1),
   name: z.string().trim().min(1).max(100),
-  scopes: z.array(z.enum(catalogScopes)).min(1).max(3),
+  scopes: z.array(z.enum(catalogScopes)).min(1).max(catalogScopes.length),
   expiresAt: z
     .date()
     .refine(

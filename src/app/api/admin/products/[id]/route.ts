@@ -1,7 +1,14 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { handleCatalogRequest } from "@/server/catalog-api/http";
-import { catalogProductInclude } from "@/server/catalog-api/products";
+import { catalogProductUpdateSchema } from "@/server/catalog-api/schema";
+import {
+  catalogProductInclude,
+  updateCatalogProduct,
+} from "@/server/catalog-api/products";
+import {
+  handleCatalogRequest,
+  readCatalogJson,
+} from "@/server/catalog-api/http";
 import { CatalogApiError } from "@/server/catalog-api/errors";
 
 export const runtime = "nodejs";
@@ -26,6 +33,34 @@ export async function GET(
       if (!data)
         throw new CatalogApiError(404, "NOT_FOUND", "Product not found");
       return { data };
+    },
+  );
+}
+
+export async function PATCH(
+  request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  return handleCatalogRequest(
+    request,
+    "products:update",
+    "products:update",
+    async (token) => {
+      const id = z
+        .string()
+        .min(1)
+        .max(100)
+        .parse((await context.params).id);
+      const input = catalogProductUpdateSchema.parse(
+        await readCatalogJson(request),
+      );
+      return updateCatalogProduct(
+        prisma,
+        token.id,
+        id,
+        request.headers.get("idempotency-key") ?? "",
+        input,
+      );
     },
   );
 }
