@@ -8,32 +8,30 @@ import { prisma } from "@/lib/prisma";
 import { listProducts } from "@/server/queries/catalog";
 import { ProductCard } from "@/components/product-card";
 
-/**
- * `/` — trang chủ storefront.
- *
- * Task 5 (Ngày 4): giữ nguyên hero (h1 chứa "leafshoes" — `e2e/home.spec.ts`
- * phụ thuộc vào điều này) và thêm khối "sản phẩm nổi bật" ngay bên dưới, lấy
- * tối đa 6 sản phẩm ACTIVE theo sort mặc định (`listProducts(prisma, {})` —
- * mới nhất trước) qua `<ProductCard>` (Task 3). Trang trở thành async Server
- * Component vì giờ có gọi DB tại request time.
- *
- * `export const dynamic = "force-dynamic"` là bắt buộc: theo
- * `node_modules/next/dist/docs/01-app/02-guides/caching-without-cache-components.md`
- * (dự án KHÔNG bật `cacheComponents`), một truy vấn Prisma thuần (không phải
- * `fetch`) KHÔNG tự khiến route dynamic — nếu không có cờ này, Next 16 sẽ
- * prerender trang chủ tại build time và "đóng băng" danh sách sản phẩm nổi
- * bật (sản phẩm admin tạo/xoá sau sẽ không bao giờ xuất hiện cho tới lần
- * build kế tiếp).
- */
+// Prisma queries alone do not prevent this route from being prerendered.
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const products = await listProducts(prisma, {});
+  const [products, setting] = await Promise.all([
+    listProducts(prisma, {}),
+    prisma.storefrontSetting.findUnique({
+      where: { id: 1 },
+      select: { heroProductId: true },
+    }),
+  ]);
   const featured = products.slice(0, 6);
+  const heroProduct =
+    products.find(
+      (product) =>
+        product.id === setting?.heroProductId && product.imageUrl !== null,
+    ) ??
+    products.find((product) => product.imageUrl) ??
+    products[0] ??
+    null;
 
   return (
     <>
-      <HeroBanner />
+      <HeroBanner product={heroProduct} />
       <CategoryPaths />
       <section
         data-testid="home-section"
@@ -41,7 +39,10 @@ export default async function HomePage() {
         className="mx-auto max-w-6xl px-4 pb-12 sm:pb-16"
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold" style={{ color: "var(--evergreen)" }}>
+          <h2
+            className="text-2xl font-bold"
+            style={{ color: "var(--evergreen)" }}
+          >
             Sản phẩm nổi bật
           </h2>
           <Link

@@ -116,12 +116,21 @@ model Product {
   status         ProductStatus     @default(DRAFT)
   imageSets      ProductImageSet[]
   variants       Variant[]
+  heroSetting    StorefrontSetting?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
   @@index([categoryId])
   @@index([status])
   @@map("product")
+}
+
+model StorefrontSetting {
+  id            Int      @id @default(1)
+  heroProductId String?  @unique
+  heroProduct   Product? @relation(fields: [heroProductId], references: [id], onDelete: SetNull)
+
+  @@map("storefront_setting")
 }
 
 model ProductImageSet {

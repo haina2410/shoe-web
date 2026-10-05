@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth-guard";
 import { prisma } from "@/lib/prisma";
+import { can } from "@/lib/rbac";
 import { AdminSection } from "@/components/admin/admin-section";
 import { AdminStatusBadge } from "@/components/admin/admin-status-badge";
+import { HomeHeroControl } from "@/components/admin/home-hero-control";
 import { ProductForm } from "@/components/admin/product-form";
 import { StockQuickEdit } from "@/components/admin/stock-quick-edit";
 
@@ -21,10 +23,10 @@ export default async function EditProductPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireAdmin();
+  const session = await requireAdmin();
   const { id } = await params;
 
-  const [product, categories] = await Promise.all([
+  const [product, categories, setting] = await Promise.all([
     prisma.product.findUnique({
       where: { id },
       include: {
@@ -38,6 +40,10 @@ export default async function EditProductPage({
       },
     }),
     prisma.category.findMany({ orderBy: { name: "asc" } }),
+    prisma.storefrontSetting.findUnique({
+      where: { id: 1 },
+      select: { heroProductId: true },
+    }),
   ]);
 
   if (!product) {
@@ -59,6 +65,19 @@ export default async function EditProductPage({
         </div>
         <p className="mt-1 text-sm text-neutral-600">{product.name}</p>
       </div>
+
+      {can(session.user.role, "product", "update") ? (
+        <AdminSection title="Banner trang chủ">
+          <HomeHeroControl
+            productId={product.id}
+            isSelected={setting?.heroProductId === product.id}
+            canSelect={
+              product.status === "ACTIVE" &&
+              product.imageSets.some((imageSet) => imageSet.images.length > 0)
+            }
+          />
+        </AdminSection>
+      ) : null}
 
       <AdminSection>
         <ProductForm

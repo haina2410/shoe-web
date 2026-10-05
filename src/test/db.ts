@@ -14,4 +14,5 @@ export async function resetDb() {
   await testPrisma.$executeRawUnsafe(
     `TRUNCATE "order_item","payment","bank_transaction","order","variant","product_image","product","category","province_zone","shipping_zone" RESTART IDENTITY CASCADE;`,
   );
+  await testPrisma.storefrontSetting.create({ data: { id: 1 } });
 }

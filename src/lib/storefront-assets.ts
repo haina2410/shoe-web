@@ -1,5 +1,3 @@
-export const HERO_IMAGE_PATH = "/brand/hero-shoe-temporary.png";
-
 export type CompanyImage = {
   src: string;
   alt: string;

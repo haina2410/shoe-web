@@ -5,7 +5,6 @@ import {
   ABOUT_COMPANY_IMAGES,
   BRAND_MARK_PATH,
   COMPANY_GALLERY_IMAGES,
-  HERO_IMAGE_PATH,
   SEEDED_PRODUCT_IMAGE_BY_SLUG,
 } from "./storefront-assets";
 
@@ -62,8 +61,6 @@ describe("storefront assets", () => {
   });
 
   it("keeps every configured storefront image in public", () => {
-    expect(existsSync(toPublicFile(HERO_IMAGE_PATH))).toBe(true);
-
     for (const imageUrl of Object.values(SEEDED_PRODUCT_IMAGE_BY_SLUG)) {
       expect(existsSync(toPublicFile(imageUrl))).toBe(true);
     }

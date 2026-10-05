@@ -8,6 +8,7 @@
 Category 1──* Product 1──* Variant
                   │
                   1──* ProductImageSet 1──* ProductImage
+StorefrontSetting 1──0..1 Product (banner trang chủ)
 Order 1──* OrderItem *──1 Variant (tham chiếu + snapshot)
 Order 1──* Payment
 Order 1──* BankTransaction
@@ -42,11 +43,18 @@ model Product {
   status      ProductStatus  @default(DRAFT)
   imageSets   ProductImageSet[]
   variants    Variant[]
+  heroSetting StorefrontSetting?
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 }
 
 enum ProductStatus { DRAFT ACTIVE ARCHIVED }
+
+model StorefrontSetting {
+  id            Int      @id @default(1)
+  heroProductId String?  @unique
+  heroProduct   Product? @relation(fields: [heroProductId], references: [id], onDelete: SetNull)
+}
 
 model ProductImageSet {
   id        String         @id @default(cuid())
@@ -151,6 +159,11 @@ model ProvinceZone {
   zone     ShippingZone @relation(fields: [zoneId], references: [id])
 }
 ```
+
+`StorefrontSetting` có một bản ghi cố định (`id = 1`). `heroProductId` là lựa
+chọn thủ công cho banner trang chủ và tự về `null` khi sản phẩm bị xóa. Trang
+chủ chỉ dùng lựa chọn đó nếu sản phẩm còn `ACTIVE` và có ảnh; nếu không, trang
+chủ chọn sản phẩm `ACTIVE` có ảnh theo thứ tự danh sách hiện tại.
 
 > **Better Auth** tự sinh bảng `user`, `session`, `account`, `verification` qua adapter Prisma. Trường `role` (OWNER/STAFF) gắn vào user theo plugin admin/access-control.
 
