@@ -1,10 +1,15 @@
 import { createHash, randomUUID } from "node:crypto";
-import { lstat, mkdir, open, opendir, unlink } from "node:fs/promises";
+import { lstat, mkdir, open, opendir } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { CatalogApiError } from "./errors";
 import { catalogMutation } from "./mutations";
+import {
+  lockProductImageUrls,
+  productImageFilePath,
+  removeManagedProductImageFile,
+} from "@/lib/product-image-files";
 
 const maxBytes = 5 * 1024 * 1024;
 const maxPixels = 16_000_000;
@@ -25,12 +30,7 @@ function imagePath(url: string) {
       "Stored image path is invalid",
     );
   }
-  return path.join(
-    process.env.UPLOAD_DIR ||
-      path.join(/* turbopackIgnore: true */ process.cwd(), "uploads"),
-    "products",
-    path.basename(url),
-  );
+  return productImageFilePath(url);
 }
 
 export async function assertCatalogImageAvailable(url: string) {
@@ -113,14 +113,6 @@ async function encodeImage(bytes: Buffer, contentType: string) {
       "INVALID_IMAGE",
       "Image could not be decoded",
     );
-  }
-}
-
-async function removeFile(filename: string) {
-  try {
-    await unlink(filename);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
 }
 
@@ -215,8 +207,12 @@ export async function uploadCatalogImage(
       await db
         .$transaction(async (tx) => {
           await tx.$queryRaw`SELECT id FROM catalog_api_token WHERE id = ${tokenId} FOR UPDATE`;
-          if (!(await tx.catalogApiAsset.findUnique({ where: { url } })))
-            await removeFile(imagePath(url));
+          await lockProductImageUrls(tx, [url]);
+          const [asset, image] = await Promise.all([
+            tx.catalogApiAsset.findUnique({ where: { url }, select: { id: true } }),
+            tx.productImage.findFirst({ where: { url }, select: { id: true } }),
+          ]);
+          if (!asset && !image) await removeManagedProductImageFile(url);
         })
         .catch(() => undefined);
     }
@@ -237,6 +233,7 @@ export async function cleanupCatalogImages(db: PrismaClient) {
         where: { id: candidate.id },
       });
       if (!asset || asset.attachedAt || asset.expiresAt > new Date()) return 0;
+      await lockProductImageUrls(tx, [asset.url]);
       if (
         await tx.productImage.findFirst({
           where: { url: asset.url },
@@ -249,7 +246,7 @@ export async function cleanupCatalogImages(db: PrismaClient) {
         });
         return 0;
       }
-      await removeFile(imagePath(asset.url));
+      await removeManagedProductImageFile(asset.url);
       await tx.catalogApiAsset.delete({ where: { id: asset.id } });
       return 1;
     });
@@ -265,6 +262,9 @@ async function cleanupOrphanFiles(db: PrismaClient) {
   );
   let entries;
   try {
+    const rootInfo = await lstat(path.dirname(directory));
+    const directoryInfo = await lstat(directory);
+    if (!rootInfo.isDirectory() || !directoryInfo.isDirectory()) return 0;
     entries = await opendir(directory);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return 0;
@@ -285,18 +285,26 @@ async function cleanupOrphanFiles(db: PrismaClient) {
       throw error;
     }
     if (!info.isFile() || info.mtimeMs >= cutoff) continue;
-    const asset = await db.catalogApiAsset.findUnique({
-      where: { url },
-      select: { id: true },
+    removed += await db.$transaction(async (tx) => {
+      await lockProductImageUrls(tx, [url]);
+      const currentInfo = await lstat(filename).catch((error: unknown) => {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+        throw error;
+      });
+      if (!currentInfo?.isFile() || currentInfo.mtimeMs >= cutoff) return 0;
+      const asset = await tx.catalogApiAsset.findUnique({
+        where: { url },
+        select: { id: true },
+      });
+      if (asset) return 0;
+      const image = await tx.productImage.findFirst({
+        where: { url },
+        select: { id: true },
+      });
+      if (image) return 0;
+      await removeManagedProductImageFile(url);
+      return 1;
     });
-    if (asset) continue;
-    const image = await db.productImage.findFirst({
-      where: { url },
-      select: { id: true },
-    });
-    if (image) continue;
-    await removeFile(filename);
-    removed += 1;
   }
   return removed;
 }

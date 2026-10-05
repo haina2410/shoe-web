@@ -210,10 +210,13 @@ asset. Vận hành dùng thu hồi thay vì xóa token.
 
 Rate limit lưu trong DB là 60 request/phút/token, quota tạo sản phẩm là 10.000
 lần thành công/token trong toàn bộ vòng đời. Quota ảnh là 250 MiB/token, tính
-trên tổng byte asset record còn tồn tại, gồm cả ảnh đã gắn sản phẩm. Asset chưa
-gắn hết hạn sau 24 giờ; cleanup xóa file và record, còn asset đã gắn được giữ
-lại. `attachedAt` đánh dấu đã từng gắn, không phải phép đếm tham chiếu hiện tại;
-API không tự thu hồi dung lượng khi admin bỏ ảnh hoặc xóa sản phẩm.
+trên tổng byte asset record còn tồn tại. Asset chưa gắn hết hạn sau 24 giờ;
+maintenance xóa file và record. Khi admin lưu thay đổi bỏ ảnh, cleanup job xóa
+asset record và file nếu không còn product image nào tham chiếu; nếu ảnh vẫn
+được dùng ở nơi khác, asset và quota được giữ. Request idempotency history vẫn
+được giữ để replay cũ trả `410 ASSET_EXPIRED` sau khi asset được dọn.
+`attachedAt` đánh dấu asset từng được gắn, không phải số tham chiếu hiện tại;
+xóa toàn bộ sản phẩm không tự enqueue cleanup ảnh.
 
 Product API chỉ tạo `DRAFT`, dùng chung thao tác transaction của catalog admin.
 Asset phải thuộc đúng token và còn hạn hoặc đã gắn; server ánh xạ `assetId`
@@ -221,8 +224,11 @@ thành URL trong `ProductImage`. Các product/image record giữ URL, không t�
 trực tiếp tới asset. Slug do server sinh; SKU unique toàn catalog, cặp size/màu
 unique trong sản phẩm và các invariant bộ ảnh vẫn áp dụng.
 
-Mutation serialize bằng khóa dòng token. Kiểm tra quyền, quota, dữ liệu catalog,
-đánh dấu asset đã gắn, response idempotency và audit commit cùng transaction.
+Mutation serialize bằng khóa dòng token. Writers và mọi đường cleanup khóa URL
+ảnh bằng advisory lock transaction-scoped, kiểm tra file regular dưới uploads
+directory rồi mới thay đổi tham chiếu hoặc xóa file. Thứ tự khóa API asset là
+token trước, URL sau. Kiểm tra quyền, quota, dữ liệu catalog, đánh dấu asset đã
+gắn, response idempotency và audit commit cùng transaction.
 Hash product tính sau khi normalize/default payload; hash ảnh gồm MIME và byte
 gốc. Cùng key với hash khác trả conflict. Response đã lưu là snapshot lúc tạo;
 GET product trả trạng thái hiện tại. File upload không có transaction chung với

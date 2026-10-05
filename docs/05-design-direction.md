@@ -118,6 +118,12 @@ thị toast live ngắn, lỗi nằm cạnh thao tác với alert/live region; c
 thay thế dữ liệu đã được làm mới từ server. Admin không optimistic-update đơn,
 payment ledger, tồn kho hoặc đối soát.
 
+Trong form sản phẩm, dấu × và thao tác xóa bộ ảnh chỉ bỏ ảnh khỏi bản nháp sau
+khi server đã enqueue gợi ý dọn ảnh. Lưu mới thay thế ProductImage và enqueue
+URL thực sự bị bỏ cùng transaction; Hủy không đổi tham chiếu đã lưu. Worker kiểm
+tra ảnh còn được sản phẩm nào dùng trước khi xóa file, nên preview biến mất sau
+khi lên lịch thành công nhưng UI không báo file đã bị xóa.
+
 Điều hướng admin giữ trạng thái active, có cuộn ngang khi hẹp và mọi thao tác
 chính cao tối thiểu 40px. Trên mobile, summary và action xếp dọc theo thứ tự
 đọc, không thu nhỏ mục tiêu chạm; bảng tiếp tục cuộn ngang. Dialog giữ focus

@@ -6,6 +6,7 @@ import {
   QUEUE_SEND_ORDER_CONFIRMATION,
   QUEUE_SEND_PAYMENT_CONFIRMED,
   QUEUE_SEND_ZALO_ORDER_CREATED,
+  QUEUE_DELETE_PRODUCT_IMAGE,
   orderConfirmationJobSchema,
   paymentConfirmedJobSchema,
   zaloOrderCreatedJobSchema,
@@ -16,6 +17,8 @@ import {
   enqueueOrderConfirmation,
   enqueuePaymentConfirmed,
   enqueueZaloOrderCreatedNotifications,
+  enqueueDeleteProductImage,
+  deleteProductImageJobSchema,
 } from "@/jobs/queue";
 
 /**
@@ -42,6 +45,30 @@ describe("expire-unpaid queue schedule", () => {
       {},
       { tz: "UTC", key: "expire-unpaid-15m" },
     );
+  });
+});
+
+describe("product image cleanup queue", () => {
+  it("accepts only managed image cleanup URLs", () => {
+    expect(deleteProductImageJobSchema.parse({
+      url: "/api/uploads/products/123e4567-e89b-12d3-a456-426614174000.webp",
+    })).toEqual({
+      url: "/api/uploads/products/123e4567-e89b-12d3-a456-426614174000.webp",
+    });
+    expect(() => deleteProductImageJobSchema.parse({ url: "/uploads/image.webp" })).toThrow();
+    expect(() => deleteProductImageJobSchema.parse({ url: "/api/uploads/products/../../secret" })).toThrow();
+    expect(QUEUE_DELETE_PRODUCT_IMAGE).toBe("delete-product-image");
+  });
+
+  it("rejects an empty pg-boss job id", async () => {
+    const boss = { send: vi.fn().mockResolvedValue(null) } as unknown as PgBoss;
+    await expect(
+      enqueueDeleteProductImage(
+        { $queryRawUnsafe: vi.fn() },
+        { url: "/api/uploads/products/123e4567-e89b-12d3-a456-426614174000.webp" },
+        boss,
+      ),
+    ).rejects.toThrow();
   });
 });
 

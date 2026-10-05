@@ -1,17 +1,26 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
+import { randomUUID } from "node:crypto";
+import { mkdir, mkdtemp, rm, writeFile, lstat } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import type { PgBoss } from "pg-boss";
 import { testPrisma } from "@/test/db";
 import { createTestBoss, resetQueues } from "@/test/boss";
+import { createProductCore, updateProductCore } from "@/server/products";
+import { handleDeleteProductImage } from "@/jobs/handlers/delete-product-image";
+import type { CreateProductInput, UpdateProductInput } from "@/lib/validation/product";
 import {
   QUEUE_EXPIRE_UNPAID,
   QUEUE_SEND_ORDER_CONFIRMATION,
   QUEUE_SEND_PAYMENT_CONFIRMED,
   QUEUE_SEND_ZALO_ORDER_CREATED,
+  QUEUE_DELETE_PRODUCT_IMAGE,
   ensureQueues,
   ensureSchedules,
   enqueueOrderConfirmation,
   enqueuePaymentConfirmed,
   enqueueZaloOrderCreatedNotifications,
+  enqueueDeleteProductImage,
 } from "@/jobs/queue";
 
 /**
@@ -172,6 +181,126 @@ describe("enqueueZaloOrderCreatedNotifications", () => {
       data: { orderCode: "LEAFZAL002" },
     });
     expect(jobs).toHaveLength(0);
+  });
+});
+
+describe("enqueueDeleteProductImage", () => {
+  const url = "/api/uploads/products/123e4567-e89b-12d3-a456-426614174000.webp";
+
+  it("commits the cleanup hint with the caller transaction", async () => {
+    await testPrisma.$transaction((tx) =>
+      enqueueDeleteProductImage(tx, { url }, boss),
+    );
+    const jobs = await boss.findJobs(QUEUE_DELETE_PRODUCT_IMAGE, { data: { url } });
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].data).toEqual({ url });
+  });
+
+  it("rolls back a cleanup hint with the caller transaction", async () => {
+    await expect(
+      testPrisma.$transaction(async (tx) => {
+        await enqueueDeleteProductImage(tx, { url }, boss);
+        throw new Error("rollback image cleanup hint");
+      }),
+    ).rejects.toThrow("rollback image cleanup hint");
+    expect(await boss.findJobs(QUEUE_DELETE_PRODUCT_IMAGE, { data: { url } })).toHaveLength(0);
+  });
+});
+
+describe("product update image cleanup pipeline", () => {
+  async function setup(urls: string[]) {
+    const directory = await mkdtemp(path.join(tmpdir(), "image-cleanup-pipeline-"));
+    vi.stubEnv("UPLOAD_DIR", directory);
+    const folder = path.join(directory, "products");
+    await mkdir(folder);
+    for (const url of urls) await writeFile(path.join(folder, path.basename(url)), "image");
+    const category = await testPrisma.category.create({
+      data: { name: `Cleanup ${randomUUID()}`, slug: randomUUID() },
+    });
+    const input: CreateProductInput = {
+      product: {
+        name: `Cleanup product ${randomUUID()}`,
+        categoryId: category.id,
+        basePrice: 100,
+        status: "DRAFT",
+      },
+      variants: [{ size: "40", color: "Black", sku: `CLEAN-${randomUUID()}`, stock: 2 }],
+      imageSets: [{
+        color: "Black",
+        position: 0,
+        isDefault: true,
+        images: urls.map((url, position) => ({ url, position })),
+      }],
+    };
+    const product = await createProductCore(testPrisma, input);
+    const update: UpdateProductInput = {
+      product: { ...input.product },
+      variants: product.variants.map((variant) => ({
+        id: variant.id,
+        size: variant.size,
+        color: variant.color,
+        sku: variant.sku,
+        stock: variant.stock,
+        expectedStock: variant.stock,
+        priceOverride: variant.priceOverride,
+      })),
+      imageSets: [],
+    };
+    return { directory, categoryId: category.id, productId: product.id, update };
+  }
+
+  async function cleanupFixture(fixture: Awaited<ReturnType<typeof setup>>) {
+    await testPrisma.product.deleteMany({ where: { id: fixture.productId } });
+    await testPrisma.category.deleteMany({ where: { id: fixture.categoryId } });
+    await rm(fixture.directory, { recursive: true, force: true });
+    vi.unstubAllEnvs();
+  }
+
+  it("commits removed-image jobs with product updates and deletes files asynchronously", async () => {
+    const urls = [
+      `/api/uploads/products/${randomUUID()}.webp`,
+      `/api/uploads/products/${randomUUID()}.jpg`,
+    ];
+    const fixture = await setup(urls);
+    try {
+      await updateProductCore(testPrisma, fixture.productId, fixture.update, {
+        enqueueDeleteProductImage: (tx, payload) => enqueueDeleteProductImage(tx, payload, boss),
+      });
+      for (const url of urls) {
+        const jobs = await boss.findJobs(QUEUE_DELETE_PRODUCT_IMAGE, { data: { url } });
+        expect(jobs).toHaveLength(1);
+        await handleDeleteProductImage({ db: testPrisma }, jobs[0].data);
+        await expect(lstat(path.join(fixture.directory, "products", path.basename(url)))).rejects.toMatchObject({ code: "ENOENT" });
+      }
+    } finally {
+      await cleanupFixture(fixture);
+    }
+  });
+
+  it("rolls back all jobs and image references if a batch enqueue fails", async () => {
+    const urls = [
+      `/api/uploads/products/${randomUUID()}.webp`,
+      `/api/uploads/products/${randomUUID()}.jpg`,
+    ];
+    const fixture = await setup(urls);
+    let calls = 0;
+    try {
+      await expect(
+        updateProductCore(testPrisma, fixture.productId, fixture.update, {
+          enqueueDeleteProductImage: async (tx, payload) => {
+            calls += 1;
+            if (calls === 2) throw new Error("second enqueue failed");
+            await enqueueDeleteProductImage(tx, payload, boss);
+          },
+        }),
+      ).rejects.toThrow("second enqueue failed");
+      expect(await testPrisma.productImage.count({ where: { url: { in: urls } } })).toBe(2);
+      for (const url of urls) {
+        expect(await boss.findJobs(QUEUE_DELETE_PRODUCT_IMAGE, { data: { url } })).toHaveLength(0);
+      }
+    } finally {
+      await cleanupFixture(fixture);
+    }
   });
 });
 

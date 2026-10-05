@@ -12,6 +12,10 @@ const {
   deleteProductCoreMock,
   updateVariantStockCoreMock,
   ProductBusinessErrorMock,
+  prismaTransactionMock,
+  prismaMock,
+  getBossMock,
+  enqueueDeleteProductImageMock,
 } = vi.hoisted(() => ({
   requireAdminMock: vi.fn(),
   redirectMock: vi.fn((path: string) => {
@@ -24,6 +28,10 @@ const {
   updateProductCoreMock: vi.fn(),
   deleteProductCoreMock: vi.fn(),
   updateVariantStockCoreMock: vi.fn(),
+  prismaTransactionMock: vi.fn(async (callback: (tx: unknown) => unknown) => callback({})),
+  prismaMock: {} as Record<string, unknown>,
+  getBossMock: vi.fn().mockResolvedValue({}),
+  enqueueDeleteProductImageMock: vi.fn().mockResolvedValue(undefined),
   ProductBusinessErrorMock: class ProductBusinessError extends Error {
     constructor(public readonly code: string) {
       super(
@@ -37,6 +45,7 @@ const {
     }
   },
 }));
+Object.defineProperty(prismaMock, "$transaction", { value: prismaTransactionMock });
 
 vi.mock("@/lib/auth-guard", () => ({
   requireAdmin: requireAdminMock,
@@ -59,7 +68,12 @@ vi.mock("@/server/products", () => ({
 }));
 
 vi.mock("@/lib/prisma", () => ({
-  prisma: {},
+  prisma: prismaMock,
+}));
+
+vi.mock("@/jobs/queue", () => ({
+  getBoss: getBossMock,
+  enqueueDeleteProductImage: enqueueDeleteProductImageMock,
 }));
 
 // Import SAU khi mock đã đăng ký (vi.mock được hoist lên đầu file bởi vitest).
@@ -68,6 +82,7 @@ import {
   updateProductAction,
   deleteProductAction,
   updateVariantStockAction,
+  enqueueProductImageCleanupAction,
 } from "@/server/actions/products";
 import { ProductBusinessError } from "@/server/products";
 import type { CreateProductInput } from "@/lib/validation/product";
@@ -95,6 +110,9 @@ const validCreateInput: CreateProductInput = {
 describe("product actions — authz (role staff bị chặn)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    prismaTransactionMock.mockImplementation(async (callback: (tx: unknown) => unknown) => callback({}));
+    getBossMock.mockResolvedValue({});
+    enqueueDeleteProductImageMock.mockResolvedValue(undefined);
   });
 
   it("createProductAction: staff bị chặn — redirect('/') và KHÔNG gọi createProductCore", async () => {
@@ -170,6 +188,7 @@ describe("product actions — authz (role staff bị chặn)", () => {
       {},
       "prod-1",
       validCreateInput,
+      expect.objectContaining({ enqueueDeleteProductImage: expect.any(Function) }),
     );
     expect(revalidatePathMock).toHaveBeenCalledWith("/admin/products");
     expect(redirectMock).not.toHaveBeenCalled();
@@ -226,6 +245,33 @@ describe("product actions — authz (role staff bị chặn)", () => {
     expect(updateVariantStockCoreMock).toHaveBeenCalledWith({}, "v1", 8, 10);
     expect(revalidatePathMock).toHaveBeenCalledWith("/admin/products");
     expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it("cleanup action rejects unauthorized and invalid URL batches without enqueue", async () => {
+    requireAdminMock.mockResolvedValue(sessionWithRole("staff"));
+    await expect(enqueueProductImageCleanupAction([
+      "/api/uploads/products/123e4567-e89b-12d3-a456-426614174000.webp",
+    ])).rejects.toThrow("REDIRECT:/");
+    expect(getBossMock).not.toHaveBeenCalled();
+    expect(prismaTransactionMock).not.toHaveBeenCalled();
+
+    requireAdminMock.mockResolvedValue(sessionWithRole("owner"));
+    await expect(enqueueProductImageCleanupAction(["https://cdn.example/image.webp"])).resolves.toMatchObject({ ok: false });
+    expect(prismaTransactionMock).not.toHaveBeenCalled();
+    expect(enqueueDeleteProductImageMock).not.toHaveBeenCalled();
+  });
+
+  it("cleanup action warms the queue and enqueues a deduplicated batch atomically", async () => {
+    requireAdminMock.mockResolvedValue(sessionWithRole("owner"));
+    const first = "/api/uploads/products/123e4567-e89b-12d3-a456-426614174000.webp";
+    const second = "/api/uploads/products/223e4567-e89b-12d3-a456-426614174000.jpg";
+
+    await expect(enqueueProductImageCleanupAction([first, second, first])).resolves.toEqual({ ok: true });
+
+    expect(getBossMock).toHaveBeenCalledTimes(1);
+    expect(prismaTransactionMock).toHaveBeenCalledTimes(1);
+    expect(enqueueDeleteProductImageMock).toHaveBeenNthCalledWith(1, {}, { url: first }, {});
+    expect(enqueueDeleteProductImageMock).toHaveBeenNthCalledWith(2, {}, { url: second }, {});
   });
 
   it("createProductAction: input không hợp lệ (zod) → trả {ok:false} và KHÔNG ghi DB, KHÔNG redirect", async () => {

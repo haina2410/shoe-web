@@ -10,11 +10,13 @@ import userEvent from "@testing-library/user-event";
 const {
   createProductActionMock,
   updateProductActionMock,
+  enqueueProductImageCleanupActionMock,
   pushMock,
   showToastMock,
 } = vi.hoisted(() => ({
   createProductActionMock: vi.fn(),
   updateProductActionMock: vi.fn(),
+  enqueueProductImageCleanupActionMock: vi.fn(),
   pushMock: vi.fn(),
   showToastMock: vi.fn(),
 }));
@@ -22,6 +24,7 @@ const {
 vi.mock("@/server/actions/products", () => ({
   createProductAction: createProductActionMock,
   updateProductAction: updateProductActionMock,
+  enqueueProductImageCleanupAction: enqueueProductImageCleanupActionMock,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -75,6 +78,7 @@ describe("ProductForm — biến thể inline", () => {
       ok: false,
       error: "test stop",
     });
+    enqueueProductImageCleanupActionMock.mockResolvedValue({ ok: true });
   });
 
   afterEach(() => {
@@ -240,6 +244,93 @@ describe("ProductForm — biến thể inline", () => {
         }),
       );
     });
+  });
+
+  it("schedules a managed image cleanup before removing its preview", async () => {
+    const user = userEvent.setup();
+    const url = "/api/uploads/products/123e4567-e89b-12d3-a456-426614174000.webp";
+    render(
+      <ProductForm
+        mode="edit"
+        productId="product-1"
+        categories={categories}
+        initial={{
+          ...editInitial,
+          imageSets: [{ color: "Đen", position: 0, isDefault: true, images: [{ url, position: 0 }] }],
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Xoá ảnh" }));
+
+    await waitFor(() => expect(enqueueProductImageCleanupActionMock).toHaveBeenCalledWith([url]));
+    expect(document.querySelector("img")).not.toBeInTheDocument();
+  });
+
+  it("keeps the preview and offers a retry when cleanup enqueue fails", async () => {
+    enqueueProductImageCleanupActionMock.mockResolvedValue({ ok: false, error: "queue unavailable" });
+    const user = userEvent.setup();
+    const url = "/api/uploads/products/123e4567-e89b-12d3-a456-426614174000.webp";
+    render(
+      <ProductForm
+        mode="edit"
+        productId="product-1"
+        categories={categories}
+        initial={{
+          ...editInitial,
+          imageSets: [{ color: "Đen", position: 0, isDefault: true, images: [{ url, position: 0 }] }],
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Xoá ảnh" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("queue unavailable");
+    expect(document.querySelector("img")).toHaveAttribute("src", url);
+  });
+
+  it("schedules all managed images in a set as one batch", async () => {
+    const user = userEvent.setup();
+    const urls = [
+      "/api/uploads/products/123e4567-e89b-12d3-a456-426614174000.webp",
+      "/api/uploads/products/223e4567-e89b-12d3-a456-426614174000.jpg",
+    ];
+    render(
+      <ProductForm
+        mode="edit"
+        productId="product-1"
+        categories={categories}
+        initial={{
+          ...editInitial,
+          imageSets: [{ color: "Đen", position: 0, isDefault: true, images: urls.map((url, position) => ({ url, position })) }],
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Xoá bộ ảnh" }));
+
+    await waitFor(() => expect(enqueueProductImageCleanupActionMock).toHaveBeenCalledWith(urls));
+    expect(screen.queryByTestId("image-set-panel")).not.toBeInTheDocument();
+  });
+
+  it("removes public assets from the form without requesting disk cleanup", async () => {
+    const user = userEvent.setup();
+    render(
+      <ProductForm
+        mode="edit"
+        productId="product-1"
+        categories={categories}
+        initial={{
+          ...editInitial,
+          imageSets: [{ color: "Đen", position: 0, isDefault: true, images: [{ url: "/company/shoe.webp", position: 0 }] }],
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Xoá ảnh" }));
+
+    expect(enqueueProductImageCleanupActionMock).not.toHaveBeenCalled();
+    expect(document.querySelector("img")).not.toBeInTheDocument();
   });
 
   it("locks submitted fields and competing controls while a save is pending", async () => {
