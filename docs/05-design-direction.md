@@ -40,8 +40,11 @@ Nguyên tắc: nền paper + chữ ink chiếm ~90% diện tích; evergreen làm
   ảnh. Thumbnail là nút có trạng thái chọn và thao tác được bằng bàn phím.
 
 Trang chủ theo cấu trúc curated storefront: navbar có tìm kiếm, liên kết “Tra
-cứu đơn hàng” và số lượng giỏ, hero sản phẩm tĩnh, ba lối vào danh mục, sản phẩm
+cứu đơn hàng” và số lượng giỏ, hero dẫn tới sản phẩm ACTIVE đã chọn trong trang
+sửa sản phẩm ở admin (nếu có ảnh), hoặc tự chọn sản phẩm ACTIVE có ảnh. Ảnh và
+CTA cùng mở trang chi tiết. Sau hero là ba lối vào danh mục, sản phẩm
 mới, trust strip và footer doanh nghiệp. Footer cũng có liên kết “Tra cứu đơn hàng”.
+Khi chưa có sản phẩm ACTIVE, hero chỉ dẫn tới danh mục sản phẩm.
 Logo Bộ Công Thương nằm dưới thông tin doanh nghiệp trong footer, dùng ảnh từ
 `fileserver.online.gov.vn`, cao 44px và giữ nguyên tỷ lệ. Logo dẫn đến trang xác
 nhận trên `online.gov.vn` trong tab mới, có nhãn thay thế và viền focus bàn phím.
@@ -123,6 +126,11 @@ khi server đã enqueue gợi ý dọn ảnh. Lưu mới thay thế ProductImage
 URL thực sự bị bỏ cùng transaction; Hủy không đổi tham chiếu đã lưu. Worker kiểm
 tra ảnh còn được sản phẩm nào dùng trước khi xóa file, nên preview biến mất sau
 khi lên lịch thành công nhưng UI không báo file đã bị xóa.
+
+Trang sửa sản phẩm cho owner chọn hoặc bỏ chọn sản phẩm làm banner trang chủ.
+Chỉ sản phẩm đang bán có ảnh mới được chọn; khi bỏ chọn, trang chủ trở về lựa
+chọn tự động. Nếu sản phẩm đã chọn bị ẩn hoặc mất ảnh, trang chủ tạm dùng lựa
+chọn tự động đến khi sản phẩm đủ điều kiện trở lại.
 
 Điều hướng admin giữ trạng thái active, có cuộn ngang khi hẹp và mọi thao tác
 chính cao tối thiểu 40px. Trên mobile, summary và action xếp dọc theo thứ tự
