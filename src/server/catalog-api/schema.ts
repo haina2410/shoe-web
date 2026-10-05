@@ -133,3 +133,34 @@ export const catalogProductUpdateSchema = z
 export type CatalogProductUpdateInput = z.infer<
   typeof catalogProductUpdateSchema
 >;
+
+export const catalogVariantUpdateSchema = catalogVariantSchema
+  .partial()
+  .extend({ expectedStock: integer.optional() })
+  .superRefine((input, ctx) => {
+    if (!Object.keys(input).some((key) => key !== "expectedStock"))
+      ctx.addIssue({ code: "custom", message: "Provide a variant field" });
+    if ((input.stock === undefined) !== (input.expectedStock === undefined))
+      ctx.addIssue({
+        code: "custom",
+        path: ["expectedStock"],
+        message: "stock and expectedStock must be provided together",
+      });
+  });
+export type CatalogVariantUpdateInput = z.infer<
+  typeof catalogVariantUpdateSchema
+>;
+
+export const catalogCategorySchema = z.strictObject({
+  name: z.string().trim().min(1).max(80),
+});
+export type CatalogCategoryInput = z.infer<typeof catalogCategorySchema>;
+
+export const catalogProductQuerySchema = z.strictObject({
+  cursor: identifier.optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  q: z.string().trim().min(1).max(200).optional(),
+  sku: identifier.optional(),
+  categoryId: identifier.optional(),
+  status: z.enum(["DRAFT", "ACTIVE", "ARCHIVED"]).optional(),
+});

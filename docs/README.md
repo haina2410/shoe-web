@@ -38,7 +38,7 @@ Tài liệu dùng tên ổn định theo chủ đề, không lưu nhật ký tri
 | [06-admin-order-domain.md](06-admin-order-domain.md) | Vòng đời đơn, phân quyền, đối soát và hoàn tiền |
 | [07-post-day10-storefront-backlog.md](07-post-day10-storefront-backlog.md) | Backlog storefront cần dữ liệu hoặc phạm vi bổ sung |
 | [08-production-runbook.md](08-production-runbook.md) | Deploy, backup, rollback và xử lý sự cố production |
-| [09-catalog-api.md](09-catalog-api.md) | Bearer token, endpoint, payload, idempotency, cập nhật và import catalog |
+| [09-catalog-api.md](09-catalog-api.md) | Bearer token, endpoint, payload, idempotency, tìm kiếm/import và CRUD sản phẩm/biến thể/danh mục |
 
 ## Ngoài phạm vi demo (YAGNI)
 

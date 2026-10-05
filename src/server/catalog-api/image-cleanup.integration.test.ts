@@ -18,7 +18,12 @@ import { ensureQueues, QUEUE_DELETE_PRODUCT_IMAGE } from "@/jobs/queue";
 import { registerDeleteProductImageWorker } from "@/worker/index";
 import { handleDeleteProductImage } from "@/jobs/handlers/delete-product-image";
 import { issueCatalogToken, revokeCatalogToken } from "./tokens";
-import { updateCatalogProduct, createCatalogVariant } from "./products";
+import {
+  updateCatalogProduct,
+  createCatalogVariant,
+  deleteCatalogProduct,
+} from "./products";
+import { updateCatalogVariant, deleteCatalogVariant } from "./variants";
 
 let boss: PgBoss;
 let directory: string;
@@ -59,7 +64,13 @@ beforeEach(async () => {
     await issueCatalogToken(db, {
       ownerId: owner.id,
       name: "cleanup",
-      scopes: ["products:update", "variants:create"],
+      scopes: [
+        "products:update",
+        "variants:create",
+        "variants:update",
+        "variants:delete",
+        "products:delete",
+      ],
       expiresAt: new Date(Date.now() + 3600000),
     })
   ).id;
@@ -296,4 +307,194 @@ it("rechecks revoked credentials inside both mutation transactions", async () =>
     (await db.product.findUniqueOrThrow({ where: { id: productId } })).name,
   ).toBe("Shoe");
   expect(await db.variant.count({ where: { productId } })).toBe(1);
+});
+
+async function whiteVariant() {
+  return db.variant.create({
+    data: {
+      productId,
+      color: "White",
+      size: "39",
+      sku: "CLEANUP-39",
+      stock: 3,
+    },
+  });
+}
+
+it("removes the last variant of a color, repairs the default image set, and queues cleanup once", async () => {
+  await whiteVariant();
+  const remainingSet = await db.productImageSet.create({
+    data: {
+      productId,
+      color: "White",
+      isDefault: false,
+      position: 1,
+      images: { create: { url: "/retained.webp" } },
+    },
+  });
+  const variant = await db.variant.findFirstOrThrow({
+    where: { productId, color: "Black" },
+  });
+  await deleteCatalogVariant(
+    db,
+    tokenId,
+    productId,
+    variant.id,
+    "delete-color",
+  );
+  await deleteCatalogVariant(
+    db,
+    tokenId,
+    productId,
+    variant.id,
+    "delete-color",
+  );
+  expect(await db.productImageSet.findMany({ where: { productId } })).toEqual([
+    { ...remainingSet, isDefault: true },
+  ]);
+  const jobs = await boss.findJobs<{ url: string }>(
+    QUEUE_DELETE_PRODUCT_IMAGE,
+    {},
+  );
+  expect(jobs).toHaveLength(1);
+  expect(jobs[0].data).toEqual({ url });
+  await handleDeleteProductImage({ db }, jobs[0].data);
+  await expect(access(filename)).rejects.toMatchObject({ code: "ENOENT" });
+  expect(
+    await db.catalogApiAsset.findUnique({ where: { id: assetId } }),
+  ).toBeNull();
+});
+
+it("prunes old color images on a color update but retains images while another variant uses the color", async () => {
+  const another = await db.variant.create({
+    data: {
+      productId,
+      color: "Black",
+      size: "40",
+      sku: "CLEANUP-40",
+      stock: 1,
+    },
+  });
+  const original = await db.variant.findFirstOrThrow({
+    where: { productId, size: "38" },
+  });
+  await updateCatalogVariant(db, tokenId, productId, original.id, "color-one", {
+    color: "White",
+  });
+  expect(await db.productImage.count()).toBe(1);
+  expect(await boss.findJobs(QUEUE_DELETE_PRODUCT_IMAGE, {})).toHaveLength(0);
+  await updateCatalogVariant(db, tokenId, productId, another.id, "color-last", {
+    color: "White",
+  });
+  await updateCatalogVariant(db, tokenId, productId, another.id, "color-last", {
+    color: "White",
+  });
+  expect(await db.productImageSet.count()).toBe(0);
+  expect(await boss.findJobs(QUEUE_DELETE_PRODUCT_IMAGE, {})).toHaveLength(1);
+  await handleDeleteProductImage({ db }, { url });
+  await expect(access(filename)).rejects.toMatchObject({ code: "ENOENT" });
+});
+
+it("retains the image set when deleting one of several variants with the same color", async () => {
+  await db.variant.create({
+    data: {
+      productId,
+      color: "Black",
+      size: "40",
+      sku: "CLEANUP-40",
+      stock: 1,
+    },
+  });
+  const original = await db.variant.findFirstOrThrow({
+    where: { productId, size: "38" },
+  });
+  await deleteCatalogVariant(db, tokenId, productId, original.id, "keep-color");
+  expect(await db.productImage.count()).toBe(1);
+  expect(await boss.findJobs(QUEUE_DELETE_PRODUCT_IMAGE, {})).toHaveLength(0);
+  await expect(access(filename)).resolves.toBeUndefined();
+});
+
+it("queues deduplicated product deletion cleanup and keeps shared files until their last reference is removed", async () => {
+  const set = await db.productImageSet.findFirstOrThrow({
+    where: { productId },
+  });
+  await db.productImage.create({
+    data: { imageSetId: set.id, url, position: 1 },
+  });
+  const original = await db.product.findUniqueOrThrow({
+    where: { id: productId },
+  });
+  const other = await db.product.create({
+    data: {
+      name: "Shared",
+      slug: "shared",
+      categoryId: original.categoryId,
+      basePrice: 100000,
+      imageSets: {
+        create: {
+          color: "Black",
+          isDefault: true,
+          images: { create: { url } },
+        },
+      },
+    },
+  });
+  await deleteCatalogProduct(db, tokenId, productId, "delete-product");
+  await deleteCatalogProduct(db, tokenId, productId, "delete-product");
+  expect(await boss.findJobs(QUEUE_DELETE_PRODUCT_IMAGE, {})).toHaveLength(1);
+  await handleDeleteProductImage({ db }, { url });
+  await expect(access(filename)).resolves.toBeUndefined();
+  expect(
+    await db.catalogApiAsset.findUnique({ where: { id: assetId } }),
+  ).not.toBeNull();
+  await deleteCatalogProduct(db, tokenId, other.id, "delete-other");
+  expect(await boss.findJobs(QUEUE_DELETE_PRODUCT_IMAGE, {})).toHaveLength(2);
+  await handleDeleteProductImage({ db }, { url });
+  await expect(access(filename)).rejects.toMatchObject({ code: "ENOENT" });
+  expect(
+    await db.catalogApiAsset.findUnique({ where: { id: assetId } }),
+  ).toBeNull();
+});
+
+it("rolls back variant mutations and product deletion when image cleanup cannot be enqueued", async () => {
+  await whiteVariant();
+  const original = await db.variant.findFirstOrThrow({
+    where: { productId, color: "Black" },
+  });
+  await boss.deleteQueue(QUEUE_DELETE_PRODUCT_IMAGE);
+  try {
+    for (const mutate of [
+      () =>
+        updateCatalogVariant(
+          db,
+          tokenId,
+          productId,
+          original.id,
+          "fail-update",
+          { color: "White", stock: 8, expectedStock: 5 },
+        ),
+      () =>
+        deleteCatalogVariant(
+          db,
+          tokenId,
+          productId,
+          original.id,
+          "fail-variant",
+        ),
+      () => deleteCatalogProduct(db, tokenId, productId, "fail-product"),
+    ]) {
+      await expect(mutate()).rejects.toThrow();
+      expect(await db.product.count()).toBe(1);
+      expect(
+        await db.variant.findUniqueOrThrow({ where: { id: original.id } }),
+      ).toEqual(original);
+      expect(await db.variant.count()).toBe(2);
+      expect(await db.productImage.count()).toBe(1);
+      expect(await db.catalogApiRequest.count({ where: { tokenId } })).toBe(0);
+      expect(await db.catalogApiAudit.count({ where: { tokenId } })).toBe(0);
+    }
+    await expect(access(filename)).resolves.toBeUndefined();
+  } finally {
+    await ensureQueues(boss);
+  }
 });

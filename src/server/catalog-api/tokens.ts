@@ -9,6 +9,12 @@ export const catalogScopes = [
   "images:write",
   "products:update",
   "variants:create",
+  "variants:update",
+  "variants:delete",
+  "products:delete",
+  "categories:create",
+  "categories:update",
+  "categories:delete",
 ] as const;
 export type CatalogScope = (typeof catalogScopes)[number];
 export const issueTokenSchema = z.strictObject({

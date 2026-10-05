@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { createProductInTransaction } from "@/server/products";
+import { catalogWriteError, lockCatalogProduct } from "./writes";
 import { normalizeText } from "@/lib/normalize";
 import { enqueueDeleteProductImage } from "@/jobs/queue";
 import {
@@ -164,38 +165,6 @@ async function resolveCatalogImageSets(
   }));
 }
 
-function catalogWriteError(error: unknown): never {
-  if (error instanceof ManagedProductImageUnavailableError)
-    throw new CatalogApiError(
-      422,
-      "INVALID_ASSET",
-      "Image file is unavailable",
-    );
-  if (typeof error === "object" && error !== null && "code" in error) {
-    if (error.code === "P2002")
-      throw new CatalogApiError(
-        409,
-        "CATALOG_CONFLICT",
-        "A SKU or size/color combination already exists",
-      );
-    if (error.code === "P2003")
-      throw new CatalogApiError(
-        422,
-        "INVALID_REFERENCE",
-        "A referenced catalog record no longer exists",
-      );
-  }
-  throw error;
-}
-
-async function lockCatalogProduct(tx: Prisma.TransactionClient, id: string) {
-  const rows = await tx.$queryRaw<
-    Array<{ id: string }>
-  >`SELECT id FROM product WHERE id = ${id} FOR UPDATE`;
-  if (!rows.length)
-    throw new CatalogApiError(404, "NOT_FOUND", "Product not found");
-}
-
 export async function updateCatalogProduct(
   db: PrismaClient,
   tokenId: string,
@@ -342,6 +311,56 @@ export async function createCatalogVariant(
       },
     );
   } catch (error) {
+    catalogWriteError(error);
+  }
+}
+
+export async function deleteCatalogProduct(
+  db: PrismaClient,
+  tokenId: string,
+  id: string,
+  key: string,
+) {
+  try {
+    return await catalogMutation(
+      db,
+      tokenId,
+      "products:delete",
+      key,
+      hashSecret(JSON.stringify({ id })),
+      async (tx) => {
+        await lockCatalogProduct(tx, id);
+        if (await tx.orderItem.count({ where: { variant: { productId: id } } }))
+          throw new CatalogApiError(
+            409,
+            "PRODUCT_IN_USE",
+            "Product is referenced by an order; archive it instead",
+          );
+        const images = await tx.productImage.findMany({
+          where: { imageSet: { productId: id } },
+          select: { url: true },
+        });
+        const urls = [...new Set(images.map((image) => image.url))].filter(
+          isManagedProductImageUrl,
+        );
+        await lockProductImageUrls(tx, urls);
+        await tx.product.delete({ where: { id } });
+        for (const url of urls) await enqueueDeleteProductImage(tx, { url });
+        return { id, deleted: true };
+      },
+    );
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "P2003"
+    )
+      throw new CatalogApiError(
+        409,
+        "PRODUCT_IN_USE",
+        "Product is referenced by an order; archive it instead",
+      );
     catalogWriteError(error);
   }
 }

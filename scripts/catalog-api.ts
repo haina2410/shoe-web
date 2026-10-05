@@ -26,7 +26,7 @@ async function main() {
   const [command] = positionals;
   if (values.help) {
     console.log(
-      "catalog:api issue --owner-email EMAIL --name NAME --out PRIVATE_FILE [--days 30] [--scopes catalog:read,products:create,products:update,variants:create,images:write]\ncatalog:api list\ncatalog:api revoke --id ID\ncatalog:api cleanup-images",
+      `catalog:api issue --owner-email EMAIL --name NAME --out PRIVATE_FILE [--days 30] [--scopes ${catalogScopes.join(",")}]\ncatalog:api list\ncatalog:api revoke --id ID\ncatalog:api cleanup-images`,
     );
     return;
   }
