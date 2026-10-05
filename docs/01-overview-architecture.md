@@ -52,7 +52,7 @@ Dashboard vẫn yêu cầu HTTP Basic Auth vì có quyền retry và xoá job.
 
 ### 3. API routes
 - `/api/webhooks/sepay` — nhận webhook đối soát ngân hàng từ SePay/Casso.
-- `/api/admin/categories`, `/api/admin/images`, `/api/admin/products`, `/api/admin/products/validate`, `/api/admin/products/:id` và `/api/admin/products/:id/variants` — [catalog API](09-catalog-api.md) dùng bearer token riêng, không nhận cookie Better Auth. API đọc catalog, upload ảnh, tạo sản phẩm `DRAFT`, cập nhật/publish/archive sản phẩm và thêm biến thể theo scope.
+- `/api/admin/categories`, `/api/admin/images`, `/api/admin/products`, `/api/admin/products/validate`, `/api/admin/products/:id`, `/api/admin/products/:id/variants`, `/api/admin/products/:id/variants/:variantId` và `/api/admin/categories/:id` — [catalog API](09-catalog-api.md) dùng bearer token riêng, không nhận cookie Better Auth. API đọc/tìm kiếm catalog, upload ảnh, tạo sản phẩm `DRAFT`, cập nhật/publish/archive/xóa sản phẩm, tạo/sửa/xóa biến thể và quản lý danh mục phẳng theo scope.
 - Server Actions cho mutation (tạo đơn, cập nhật tồn kho...) thay cho nhiều REST endpoint.
 
 ### 4. Worker (pg-boss)
@@ -90,11 +90,16 @@ Biến môi trường chính: `APP_ENV`, `DATABASE_URL`, `POSTGRES_HOST_PORT`, `
 
 `src/server/catalog-api` xác thực token gắn với một user còn role `owner`,
 chưa bị ban. Token không tạo tenant: scope `catalog:read` đọc được mọi sản phẩm
-bằng ID, kể cả sản phẩm không do token đó tạo. Asset upload thuộc riêng token;
+bằng ID hoặc search có cursor, kể cả sản phẩm không do token đó tạo. Asset
+upload thuộc riêng token;
 API chỉ nhận `assetId` và tự ánh xạ sang URL đã lưu.
 
 Mutation khóa dòng token trong PostgreSQL, kiểm tra lại quyền rồi commit dữ
-liệu, response idempotency và audit trong cùng transaction. Việc ghi file nằm
+liệu, response idempotency và audit trong cùng transaction. Stock PATCH dùng
+`expectedStock`; DELETE bảo vệ tham chiếu đơn hàng và danh mục đang dùng. Khi
+gỡ ảnh qua PATCH, sửa/xóa variant hoặc DELETE product, cleanup được enqueue
+cùng transaction và worker kiểm tra lại mọi tham chiếu trước khi xóa file.
+Việc ghi file nằm
 ngoài tính nguyên tử của PostgreSQL; lỗi thông thường dọn file chưa commit,
 nhưng crash có thể để lại file không có asset record. File API có prefix
 `catalog-`; cleanup chỉ dọn orphan thuộc prefix này sau 24 giờ và khi không còn

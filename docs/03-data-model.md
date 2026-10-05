@@ -204,8 +204,9 @@ model ProvinceZone {
 
 User phải còn role `owner` và chưa bị ban khi sử dụng token; hết hạn/thu hồi
 không xóa sản phẩm, asset hoặc lịch sử. Scopes là `catalog:read`,
-`products:create`, `products:update`, `variants:create`, `images:write`. Token
-mới có hạn tối đa 90 ngày. User xóa
+`products:create`, `products:update`, `products:delete`, `variants:create`,
+`variants:update`, `variants:delete`, `categories:create`, `categories:update`,
+`categories:delete`, `images:write`. Token mới có hạn tối đa 90 ngày. User xóa
 cascade token; token cascade request/audit nhưng asset FK chặn xóa token còn
 asset. Vận hành dùng thu hồi thay vì xóa token.
 
@@ -218,11 +219,17 @@ asset record và file nếu không còn product image nào tham chiếu; nếu �
 được dùng ở nơi khác, asset và quota được giữ. Request idempotency history vẫn
 được giữ để replay cũ trả `410 ASSET_EXPIRED` sau khi asset được dọn.
 `attachedAt` đánh dấu asset từng được gắn, không phải số tham chiếu hiện tại;
-xóa toàn bộ sản phẩm không tự enqueue cleanup ảnh.
+DELETE product qua catalog API enqueue cleanup cho toàn bộ ảnh local hợp lệ;
+đường xóa qua admin form hiện không enqueue cleanup ảnh.
 
 Product API tạo `DRAFT` bằng thao tác transaction của catalog admin; PATCH
 cập nhật field/status/bộ ảnh và POST variant thêm biến thể mà giữ nguyên
-variants hiện có.
+variants hiện có. PATCH variant giữ field bỏ qua; stock phải gửi kèm
+`expectedStock`, so sánh atomically trong DB để tránh ghi đè stock do thanh toán
+đổi. DELETE variant chặn variant cuối hoặc variant được đơn hàng tham chiếu;
+DELETE product chặn mọi tham chiếu đơn hàng. Đổi/xóa variant cuối của một màu
+gỡ bộ ảnh màu đó, chọn lại default nếu cần và enqueue cleanup cùng transaction.
+Category API tạo danh mục phẳng, PATCH giữ slug, DELETE chặn products/children.
 Asset phải thuộc đúng token và còn hạn hoặc đã gắn; server ánh xạ `assetId`
 thành URL trong `ProductImage`. Các product/image record giữ URL, không tạo FK
 trực tiếp tới asset. Slug do server sinh; SKU unique toàn catalog, cặp size/màu
@@ -234,8 +241,9 @@ directory rồi mới thay đổi tham chiếu hoặc xóa file. Thứ tự khó
 token trước, URL sau. Kiểm tra quyền, quota, dữ liệu catalog, đánh dấu asset đã
 gắn, response idempotency và audit commit cùng transaction.
 Hash product tính sau khi normalize/default payload; hash ảnh gồm MIME và byte
-gốc. Cùng key với hash khác trả conflict. Hash PATCH/thêm variant gồm product
-ID đích. Response đã lưu là snapshot lúc commit;
+gốc. Cùng key với hash khác trả conflict. Hash mutation gồm resource ID đích,
+với variant gồm cả product ID và variant ID; delete replay trả snapshot sau khi
+resource đã bị xóa. Response đã lưu là snapshot lúc commit;
 GET product trả trạng thái hiện tại. File upload không có transaction chung với
 DB; cleanup dọn crash-orphan có tên `catalog-<uuid>.webp` sau 24 giờ khi không
 có asset hoặc product image tham chiếu. File không có prefix này được giữ lại.

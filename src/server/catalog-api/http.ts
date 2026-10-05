@@ -82,6 +82,15 @@ export async function readCatalogJson(request: Request): Promise<unknown> {
   }
 }
 
+export async function requireEmptyCatalogBody(request: Request) {
+  if ((await readBoundedBody(request, 256 * 1024)).length)
+    throw new CatalogApiError(
+      400,
+      "INVALID_BODY",
+      "DELETE requests must not include a body",
+    );
+}
+
 type ApiResult = {
   data: unknown;
   status?: number;

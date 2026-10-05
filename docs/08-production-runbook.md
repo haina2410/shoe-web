@@ -623,7 +623,7 @@ Thay email bằng owner thực đang hoạt động. File mới mode `0600`, th�
 Nếu ghi file thất bại, token vừa tạo bị thu hồi. Chọn tên file mới khi cấp lại.
 Chuyển credential tới máy import qua kênh private, giữ quyền owner-only và
 không dán nội dung file vào terminal/log. `--days` nhận 1–90, mặc định 30;
-`--scopes` bỏ qua sẽ cấp cả năm scope, nên chỉ định tường minh quyền cần dùng.
+`--scopes` bỏ qua sẽ cấp toàn bộ scope, nên chỉ định tường minh quyền cần dùng.
 
 ```bash
 docker compose -f docker-compose.prod.yml --profile maintenance run --rm \

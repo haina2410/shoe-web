@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { handleCatalogRequest } from "@/server/catalog-api/http";
+import { createCatalogCategory } from "@/server/catalog-api/categories";
+import { catalogCategorySchema } from "@/server/catalog-api/schema";
+import {
+  handleCatalogRequest,
+  readCatalogJson,
+} from "@/server/catalog-api/http";
 
 export const runtime = "nodejs";
 const paginationSchema = z.object({
@@ -27,6 +32,24 @@ export async function GET(request: Request) {
         data,
         nextCursor: records.length > limit ? data[data.length - 1].id : null,
       };
+    },
+  );
+}
+
+export async function POST(request: Request) {
+  return handleCatalogRequest(
+    request,
+    "categories:create",
+    "categories:create",
+    async (token) => {
+      const input = catalogCategorySchema.parse(await readCatalogJson(request));
+      const result = await createCatalogCategory(
+        prisma,
+        token.id,
+        request.headers.get("idempotency-key") ?? "",
+        input,
+      );
+      return { ...result, status: result.replayed ? 200 : 201 };
     },
   );
 }

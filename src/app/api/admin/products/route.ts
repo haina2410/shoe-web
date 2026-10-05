@@ -1,3 +1,4 @@
+import { listCatalogProducts } from "@/server/catalog-api/queries";
 import { prisma } from "@/lib/prisma";
 import {
   handleCatalogRequest,
@@ -22,5 +23,18 @@ export async function POST(request: Request) {
       );
       return { ...result, status: result.replayed ? 200 : 201 };
     },
+  );
+}
+
+export async function GET(request: Request) {
+  return handleCatalogRequest(
+    request,
+    "catalog:read",
+    "products:list",
+    async () =>
+      listCatalogProducts(
+        prisma,
+        Object.fromEntries(new URL(request.url).searchParams),
+      ),
   );
 }
