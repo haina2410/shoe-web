@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -34,6 +34,66 @@ const imageSets: ProductImageSetView[] = [
 ];
 
 describe("ProductGallery", () => {
+  it.each([
+    [1232, 1125, "1.0951111111111111"],
+    [800, 1200, "0.6666666666666666"],
+    [1600, 900, "1.7777777777777777"],
+  ])("uses the loaded image ratio for %i × %i images", (width, height, ratio) => {
+    render(
+      <ProductGallery
+        productName="Giày thử"
+        imageSets={imageSets}
+        selectedColor={null}
+      />,
+    );
+
+    const image = screen.getByRole("img", { name: "Giày thử - Đen" });
+    Object.defineProperties(image, {
+      naturalWidth: { value: width },
+      naturalHeight: { value: height },
+    });
+    fireEvent.load(image);
+
+    expect(image.parentElement).toHaveStyle({ aspectRatio: ratio });
+  });
+
+  it("keeps each photo's ratio when switching thumbnails", async () => {
+    const user = userEvent.setup();
+    render(
+      <ProductGallery
+        productName="Giày thử"
+        imageSets={imageSets}
+        selectedColor={null}
+      />,
+    );
+
+    const firstImage = screen.getByRole("img", { name: "Giày thử - Đen" });
+    Object.defineProperties(firstImage, {
+      naturalWidth: { value: 1200, configurable: true },
+      naturalHeight: { value: 800, configurable: true },
+    });
+    fireEvent.load(firstImage);
+
+    await user.click(
+      screen.getAllByRole("button", { name: "Xem ảnh 2 của màu Đen" })[0],
+    );
+
+    const secondImage = screen.getByRole("img", { name: "Giày thử - Đen" });
+    Object.defineProperties(secondImage, {
+      naturalWidth: { value: 800, configurable: true },
+      naturalHeight: { value: 1000, configurable: true },
+    });
+    fireEvent.load(secondImage);
+    expect(secondImage.parentElement).toHaveStyle({ aspectRatio: "0.8" });
+
+    await user.click(
+      screen.getAllByRole("button", { name: "Xem ảnh 1 của màu Đen" })[0],
+    );
+    expect(
+      screen.getByRole("img", { name: "Giày thử - Đen" }).parentElement,
+    ).toHaveStyle({ aspectRatio: "1.5" });
+  });
+
   it("hiển thị bộ mặc định trước khi chọn màu", () => {
     render(
       <ProductGallery
