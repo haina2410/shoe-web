@@ -65,6 +65,14 @@ banner “Không tìm thấy đơn hàng”, để không tiết lộ mã nào �
 
 ## Trang nội dung công khai
 
+Nút “Liên hệ” cố định ở góc phải dưới trên các trang công khai, có khoảng cách
+an toàn với mép màn hình mobile và không xuất hiện trong admin. Nút mở popover
+gồm liên kết gọi điện từ số trong `STORE_INFO` và Facebook fanpage
+`https://www.facebook.com/leafshoesvietnam/` trong tab mới. Popover đóng khi bấm
+ra ngoài, nhấn Escape, bấm nút đóng, chọn liên kết hoặc chuyển trang. Người dùng
+bàn phím được đưa focus vào lựa chọn đầu tiên khi mở và trả về nút khi đóng
+bằng Escape. Các mục tiêu chạm cao tối thiểu 44px.
+
 Footer công khai chín trang chính sách dưới `/chinh-sach/[slug]`, phủ đủ danh
 mục tài liệu bắt buộc của Bộ Công Thương cho website thương mại điện tử:
 
