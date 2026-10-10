@@ -8,10 +8,21 @@ vi.mock("next/font/google", () => ({
 vi.mock("@/components/cart-hydrator", () => ({ CartHydrator: () => null }));
 vi.mock("@/components/site-header", () => ({ SiteHeader: () => <header /> }));
 vi.mock("@/components/site-footer", () => ({ SiteFooter: () => <footer /> }));
+vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
 
 const { default: RootLayout } = await import("./layout");
 
 describe("RootLayout", () => {
+  it("provides quick contact from the shared storefront layout", () => {
+    const rootLayout = RootLayout({ children: <h1>Nội dung</h1> });
+    render(rootLayout.props.children.props.children);
+
+    expect(screen.getByRole("button", { name: "Liên hệ" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+  });
+
   it("cung cấp liên kết bỏ qua điều hướng đến vùng nội dung chính ổn định", () => {
     const rootLayout = RootLayout({ children: <h1>Nội dung</h1> });
     const body = rootLayout.props.children;

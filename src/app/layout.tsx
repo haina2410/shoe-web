@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteTopBar } from "@/components/site-top-bar";
 import { CartHydrator } from "@/components/cart-hydrator";
+import { ContactBubble } from "@/components/contact-bubble";
 
 const beVietnam = Be_Vietnam_Pro({
   subsets: ["latin", "vietnamese"],
@@ -35,6 +36,7 @@ export default function RootLayout({
           {children}
         </main>
         <SiteFooter />
+        <ContactBubble />
       </body>
     </html>
   );
