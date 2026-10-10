@@ -43,6 +43,7 @@ export function ProductGallery({
   selectedColor: string | null;
 }) {
   const activeSet = selectImageSet(imageSets, selectedColor);
+  const [imageRatios, setImageRatios] = useState<Record<string, number>>({});
   const [selection, setSelection] = useState<{
     imageSetId: string;
     imageId: string;
@@ -84,7 +85,7 @@ export function ProductGallery({
               fill
               sizes="64px"
               unoptimized={shouldSkipOptimization(image.url)}
-              className="object-cover"
+              className="object-contain"
             />
           </button>
         ))}
@@ -97,17 +98,30 @@ export function ProductGallery({
       <div className="lg:grid lg:grid-cols-[5rem_minmax(0,1fr)] lg:gap-4">
         {thumbnails("hidden max-h-[min(46rem,70vh)] flex-col gap-3 overflow-y-auto pr-1 lg:flex")}
         <div
-          className="relative aspect-square w-full overflow-hidden rounded-2xl"
-          style={{ backgroundColor: "var(--sage)" }}
+          className="relative w-full self-start overflow-hidden rounded-2xl"
+          style={{
+            backgroundColor: "var(--sage)",
+            aspectRatio: selectedImage ? imageRatios[selectedImage.url] ?? 1 : 1,
+          }}
         >
           {selectedImage && activeSet ? (
             <Image
+              key={selectedImage.id}
               src={selectedImage.url}
               alt={`${productName} - ${activeSet.color}`}
               fill
               sizes="(max-width: 1023px) 100vw, 50vw"
               unoptimized={shouldSkipOptimization(selectedImage.url)}
-              className="object-cover"
+              className="object-contain"
+              onLoad={(event) => {
+                const { naturalWidth, naturalHeight } = event.currentTarget;
+                if (naturalWidth > 0 && naturalHeight > 0) {
+                  setImageRatios((ratios) => ({
+                    ...ratios,
+                    [selectedImage.url]: naturalWidth / naturalHeight,
+                  }));
+                }
+              }}
             />
           ) : (
             <div

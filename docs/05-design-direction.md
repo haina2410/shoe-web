@@ -37,7 +37,10 @@ Nguyên tắc: nền paper + chữ ink chiếm ~90% diện tích; evergreen làm
   bộ mặc định; sau khi chọn, gallery dùng bộ cùng màu và fallback về bộ mặc
   định, rồi bộ đầu tiên. Đổi bộ luôn trở về ảnh đầu của bộ. Desktop đặt thumbnail
   theo cột bên trái ảnh chính; mobile đặt thumbnail trong hàng cuộn ngang dưới
-  ảnh. Thumbnail là nút có trạng thái chọn và thao tác được bằng bàn phím.
+  ảnh. Ảnh chính giữ nguyên tỷ lệ gốc sau khi tải, khung tự đổi chiều cao theo
+  từng ảnh thay vì cố định hình vuông. Thumbnail hiển thị toàn bộ ảnh trong
+  khung vuông, không cắt nội dung; là nút có trạng thái chọn và thao tác được
+  bằng bàn phím.
 
 Trang chủ theo cấu trúc curated storefront: navbar có tìm kiếm, liên kết “Tra
 cứu đơn hàng” và số lượng giỏ, hero dẫn tới sản phẩm ACTIVE đã chọn trong trang
