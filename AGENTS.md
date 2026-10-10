@@ -4,6 +4,13 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
+## GitHub account
+
+Use the `gh` CLI as `haina2410` for this repository. Before GitHub operations,
+run `gh auth switch --hostname github.com --user haina2410` and verify the
+account with `gh api user --jq .login`. Do not use the company account
+`NamDinhAscenda` for this repository.
+
 ### Comments
 
 **Default to ZERO comments.** New or changed code should usually ship comment-free — clear names and short methods carry the explanation. A comment is an exception you justify, not a default you add.
