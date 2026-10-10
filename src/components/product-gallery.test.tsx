@@ -4,8 +4,14 @@ import { createElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("next/image", () => ({
-  default: (props: React.ImgHTMLAttributes<HTMLImageElement>) =>
-    createElement("img", props),
+  default: ({
+    src,
+    alt,
+    sizes,
+    className,
+    onLoad,
+  }: React.ImgHTMLAttributes<HTMLImageElement>) =>
+    createElement("img", { src, alt, sizes, className, onLoad }),
 }));
 
 import { ProductGallery, type ProductImageSetView } from "./product-gallery";
@@ -38,29 +44,34 @@ describe("ProductGallery", () => {
     [1232, 1125, "1.0951111111111111"],
     [800, 1200, "0.6666666666666666"],
     [1600, 900, "1.7777777777777777"],
-  ])("uses the loaded image ratio for %i × %i images", (width, height, ratio) => {
-    render(
-      <ProductGallery
-        productName="Giày thử"
-        imageSets={imageSets}
-        selectedColor={null}
-      />,
-    );
+  ])(
+    "uses the loaded image ratio for %i × %i images",
+    (width, height, ratio) => {
+      render(
+        <ProductGallery
+          onColorChange={vi.fn()}
+          productName="Giày thử"
+          imageSets={imageSets}
+          selectedColor={null}
+        />,
+      );
 
-    const image = screen.getByRole("img", { name: "Giày thử - Đen" });
-    Object.defineProperties(image, {
-      naturalWidth: { value: width },
-      naturalHeight: { value: height },
-    });
-    fireEvent.load(image);
+      const image = screen.getByRole("img", { name: "Giày thử - Đen" });
+      Object.defineProperties(image, {
+        naturalWidth: { value: width },
+        naturalHeight: { value: height },
+      });
+      fireEvent.load(image);
 
-    expect(image.parentElement).toHaveStyle({ aspectRatio: ratio });
-  });
+      expect(image.parentElement).toHaveStyle({ aspectRatio: ratio });
+    },
+  );
 
   it("keeps each photo's ratio when switching thumbnails", async () => {
     const user = userEvent.setup();
     render(
       <ProductGallery
+        onColorChange={vi.fn()}
         productName="Giày thử"
         imageSets={imageSets}
         selectedColor={null}
@@ -97,6 +108,7 @@ describe("ProductGallery", () => {
   it("hiển thị bộ mặc định trước khi chọn màu", () => {
     render(
       <ProductGallery
+        onColorChange={vi.fn()}
         productName="Giày thử"
         imageSets={imageSets}
         selectedColor={null}
@@ -112,19 +124,20 @@ describe("ProductGallery", () => {
   it("hiển thị bộ trùng màu và fallback về mặc định nếu thiếu", () => {
     const { rerender } = render(
       <ProductGallery
+        onColorChange={vi.fn()}
         productName="Giày thử"
         imageSets={imageSets}
         selectedColor="Trắng"
       />,
     );
 
-    expect(screen.getByRole("img", { name: "Giày thử - Trắng" })).toHaveAttribute(
-      "src",
-      "/white-1.webp",
-    );
+    expect(
+      screen.getByRole("img", { name: "Giày thử - Trắng" }),
+    ).toHaveAttribute("src", "/white-1.webp");
 
     rerender(
       <ProductGallery
+        onColorChange={vi.fn()}
         productName="Giày thử"
         imageSets={imageSets}
         selectedColor="Xanh"
@@ -141,6 +154,7 @@ describe("ProductGallery", () => {
     const user = userEvent.setup();
     const { rerender } = render(
       <ProductGallery
+        onColorChange={vi.fn()}
         productName="Giày thử"
         imageSets={imageSets}
         selectedColor="Đen"
@@ -157,16 +171,16 @@ describe("ProductGallery", () => {
 
     rerender(
       <ProductGallery
+        onColorChange={vi.fn()}
         productName="Giày thử"
         imageSets={imageSets}
         selectedColor="Trắng"
       />,
     );
 
-    expect(screen.getByRole("img", { name: "Giày thử - Trắng" })).toHaveAttribute(
-      "src",
-      "/white-1.webp",
-    );
+    expect(
+      screen.getByRole("img", { name: "Giày thử - Trắng" }),
+    ).toHaveAttribute("src", "/white-1.webp");
     expect(
       screen.getAllByRole("button", { name: "Xem ảnh 1 của màu Trắng" })[0],
     ).toHaveAttribute("aria-pressed", "true");
@@ -175,6 +189,7 @@ describe("ProductGallery", () => {
   it("hiển thị fallback ổn định khi không có bộ ảnh", () => {
     render(
       <ProductGallery
+        onColorChange={vi.fn()}
         productName="Giày thử"
         imageSets={[]}
         selectedColor={null}

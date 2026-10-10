@@ -3,18 +3,18 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const addItem = vi.fn();
-
 vi.mock("next/image", () => ({
-  default: (props: React.ImgHTMLAttributes<HTMLImageElement>) =>
-    createElement("img", props),
+  default: ({
+    src,
+    alt,
+    sizes,
+    className,
+    onLoad,
+  }: React.ImgHTMLAttributes<HTMLImageElement>) =>
+    createElement("img", { src, alt, sizes, className, onLoad }),
 }));
 
-vi.mock("@/lib/cart", () => ({
-  useCart: (selector: (state: { addItem: typeof addItem }) => unknown) =>
-    selector({ addItem }),
-}));
-
+import { useCart } from "@/lib/cart";
 import { ProductDetailExperience } from "./product-detail-experience";
 
 const product = {
@@ -78,7 +78,7 @@ const product = {
 };
 
 beforeEach(() => {
-  addItem.mockClear();
+  useCart.getState().clear();
 });
 
 describe("ProductDetailExperience", () => {
@@ -99,9 +99,9 @@ describe("ProductDetailExperience", () => {
     expect(addButton).toBeEnabled();
     await user.click(addButton);
 
-    expect(addItem).toHaveBeenCalledWith(
+    expect(useCart.getState().items).toEqual([
       expect.objectContaining({ variantId: "black-variant" }),
-    );
+    ]);
   });
 
   it("bỏ qua variant hết hàng khi chọn sẵn", () => {
@@ -135,23 +135,21 @@ describe("ProductDetailExperience", () => {
 
     await user.click(screen.getByRole("radio", { name: "39" }));
     await user.click(screen.getByRole("radio", { name: "Trắng" }));
-    expect(screen.getByRole("img", { name: "Giày thử - Trắng" })).toHaveAttribute(
-      "src",
-      "/white-1.webp",
-    );
+    expect(
+      screen.getByRole("img", { name: "Giày thử - Trắng" }),
+    ).toHaveAttribute("src", "/white-1.webp");
 
     await user.click(
       screen.getAllByRole("button", { name: "Xem ảnh 2 của màu Trắng" })[0],
     );
-    expect(screen.getByRole("img", { name: "Giày thử - Trắng" })).toHaveAttribute(
-      "src",
-      "/white-2.webp",
-    );
+    expect(
+      screen.getByRole("img", { name: "Giày thử - Trắng" }),
+    ).toHaveAttribute("src", "/white-2.webp");
     await user.click(screen.getByRole("button", { name: "Thêm vào giỏ" }));
 
-    expect(addItem).toHaveBeenCalledWith(
+    expect(useCart.getState().items).toEqual([
       expect.objectContaining({ color: "Trắng", imageUrl: "/white-1.webp" }),
-    );
+    ]);
   });
 
   it("fallback về bộ mặc định khi màu không có bộ ảnh", async () => {
@@ -166,8 +164,143 @@ describe("ProductDetailExperience", () => {
     );
     await user.click(screen.getByRole("button", { name: "Thêm vào giỏ" }));
 
-    expect(addItem).toHaveBeenCalledWith(
+    expect(useCart.getState().items).toEqual([
       expect.objectContaining({ color: "Xanh", imageUrl: "/black-1.webp" }),
-    );
+    ]);
   });
+
+  it("hiện toàn bộ ảnh của mọi màu dù đã chọn màu", () => {
+    render(<ProductDetailExperience product={product} />);
+
+    for (const color of ["Đen", "Trắng"]) {
+      for (const index of [1, 2]) {
+        expect(
+          screen.getAllByRole("button", {
+            name: `Xem ảnh ${index} của màu ${color}`,
+          }),
+        ).toHaveLength(2);
+      }
+    }
+  });
+
+  it.each([0, 1])(
+    "bấm thumbnail trong dải %i chọn đúng ảnh, màu và biến thể giỏ",
+    async (strip) => {
+      const user = userEvent.setup();
+      render(
+        <ProductDetailExperience
+          product={{
+            ...product,
+            variants: [
+              ...product.variants,
+              { ...product.variants[0], id: "black-40", size: "40" },
+              {
+                ...product.variants[1],
+                id: "white-40",
+                size: "40",
+                stock: 7,
+                priceOverride: 750000,
+              },
+            ],
+          }}
+        />,
+      );
+
+      await user.click(screen.getByRole("radio", { name: "40" }));
+
+      await user.click(
+        screen.getAllByRole("button", { name: "Xem ảnh 2 của màu Trắng" })[
+          strip
+        ],
+      );
+
+      expect(
+        screen.getByRole("img", { name: "Giày thử - Trắng" }),
+      ).toHaveAttribute("src", "/white-2.webp");
+      expect(screen.getByRole("radio", { name: "Trắng" })).toHaveAttribute(
+        "aria-checked",
+        "true",
+      );
+      expect(screen.getByRole("radio", { name: "Đen" })).toHaveAttribute(
+        "aria-checked",
+        "false",
+      );
+      expect(screen.getByRole("radio", { name: "40" })).toHaveAttribute(
+        "aria-checked",
+        "true",
+      );
+      expect(screen.getByText("750.000 ₫")).toBeInTheDocument();
+      expect(screen.getByText("Còn 7 sản phẩm")).toBeInTheDocument();
+      expect(
+        screen.getAllByRole("button", { name: "Xem ảnh 2 của màu Trắng" })[
+          strip
+        ],
+      ).toHaveAttribute("aria-pressed", "true");
+
+      await user.click(screen.getByRole("button", { name: "Thêm vào giỏ" }));
+      expect(useCart.getState().items).toEqual([
+        expect.objectContaining({
+          variantId: "white-40",
+          color: "Trắng",
+          size: "40",
+          unitPrice: 750000,
+          imageUrl: "/white-1.webp",
+        }),
+      ]);
+
+      await user.click(
+        screen.getAllByRole("button", { name: "Xem ảnh 2 của màu Đen" })[strip],
+      );
+      expect(
+        screen.getByRole("img", { name: "Giày thử - Đen" }),
+      ).toHaveAttribute("src", "/black-2.webp");
+      expect(screen.getByRole("radio", { name: "Đen" })).toHaveAttribute(
+        "aria-checked",
+        "true",
+      );
+      expect(
+        screen.queryByRole("link", { name: /xem giỏ hàng/i }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it.each([
+    { stock: 0, size: "39", status: "Hết hàng" },
+    { stock: 3, size: "40", status: "Không có lựa chọn này" },
+  ])(
+    "chọn ảnh vẫn xem được khi tổ hợp màu và size báo '$status'",
+    async ({ stock, size, status }) => {
+      const user = userEvent.setup();
+      render(
+        <ProductDetailExperience
+          product={{
+            ...product,
+            variants: product.variants.map((variant) =>
+              variant.color === "Trắng" ? { ...variant, stock, size } : variant,
+            ),
+          }}
+        />,
+      );
+
+      await user.click(
+        screen.getAllByRole("button", { name: "Xem ảnh 2 của màu Trắng" })[0],
+      );
+      expect(
+        screen.getByRole("img", { name: "Giày thử - Trắng" }),
+      ).toHaveAttribute("src", "/white-2.webp");
+      expect(screen.getByRole("radio", { name: "Trắng" })).toHaveAttribute(
+        "aria-checked",
+        "true",
+      );
+      expect(screen.getByRole("radio", { name: "39" })).toHaveAttribute(
+        "aria-checked",
+        "true",
+      );
+      expect(screen.getByText(status)).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Thêm vào giỏ" }),
+      ).toBeDisabled();
+      expect(useCart.getState().items).toEqual([]);
+    },
+  );
 });
