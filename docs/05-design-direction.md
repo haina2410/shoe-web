@@ -28,6 +28,8 @@ Nguyên tắc: nền paper + chữ ink chiếm ~90% diện tích; evergreen làm
 ## Layout
 
 - Nav tối giản dính trên: logo trái, danh mục giữa/phải, giỏ hàng góc phải. Nền paper, kẻ hairline dưới.
+- Thanh liên hệ trên cùng hiển thị địa chỉ, số điện thoại có thể bấm để gọi và
+  liên kết “Facebook fanpage” mở trang leafshoes Việt Nam trong tab mới.
 - **Hero product-forward:** mở đầu bằng **ảnh sản phẩm lớn** (không phải "số to + nhãn nhỏ"), tiêu đề ngắn + 1 CTA.
 - Lưới sản phẩm như gallery, nhiều khoảng trắng, card viền hairline (không đổ bóng nặng).
 - Card sản phẩm tự ôm nội dung thay vì kéo cao theo hàng, hiển thị tối đa bốn ảnh
@@ -35,7 +37,10 @@ Nguyên tắc: nền paper + chữ ink chiếm ~90% diện tích; evergreen làm
 - Trang chi tiết: ảnh lớn bên trái, chọn size/màu + tồn kho + nút thêm giỏ bên
   phải. Mỗi màu có thể có một bộ ảnh riêng. Trước khi chọn màu, gallery dùng
   bộ mặc định; sau khi chọn, gallery dùng bộ cùng màu và fallback về bộ mặc
-  định, rồi bộ đầu tiên. Đổi bộ luôn trở về ảnh đầu của bộ. Desktop đặt thumbnail
+  định, rồi bộ đầu tiên. Thumbnail luôn liệt kê tất cả ảnh của mọi màu. Bấm
+  thumbnail mở đúng ảnh đó và chọn màu tương ứng, giữ nguyên size đã chọn;
+  giá, tồn kho và biến thể thêm vào giỏ cập nhật theo màu và size này. Chọn màu
+  trong bộ chọn chuyển ảnh chính sang bộ cùng màu. Desktop đặt thumbnail
   theo cột bên trái ảnh chính; mobile đặt thumbnail trong hàng cuộn ngang dưới
   ảnh. Ảnh chính giữ nguyên tỷ lệ gốc sau khi tải, khung tự đổi chiều cao theo
   từng ảnh thay vì cố định hình vuông. Thumbnail hiển thị toàn bộ ảnh trong

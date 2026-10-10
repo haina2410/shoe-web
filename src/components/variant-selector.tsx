@@ -44,7 +44,7 @@ export function VariantSelector({
   );
 
   const [selectedSize, setSelectedSize] = useState<string | null>(defaultSize);
-  const [justAdded, setJustAdded] = useState(false);
+  const [addedVariantId, setAddedVariantId] = useState<string | null>(null);
 
   const matchedVariant =
     selectedSize && selectedColor
@@ -77,7 +77,7 @@ export function VariantSelector({
               aria-checked={selectedSize === size}
               onClick={() => {
                 setSelectedSize(size);
-                setJustAdded(false);
+                setAddedVariantId(null);
               }}
               className="rounded-md border px-3 py-1.5 text-sm"
               style={{
@@ -104,7 +104,7 @@ export function VariantSelector({
               aria-checked={selectedColor === color}
               onClick={() => {
                 onColorChange(color);
-                setJustAdded(false);
+                setAddedVariantId(null);
               }}
               className="rounded-md border px-3 py-1.5 text-sm"
               style={{
@@ -147,12 +147,12 @@ export function VariantSelector({
               unitPrice: effectivePrice,
               imageUrl,
             });
-            setJustAdded(true);
+            setAddedVariantId(matchedVariant.id);
           }}
         >
           Thêm vào giỏ
         </Button>
-        {justAdded && (
+        {addedVariantId != null && addedVariantId === matchedVariant?.id && (
           <Link
             href="/cart"
             className="text-xs font-medium underline"

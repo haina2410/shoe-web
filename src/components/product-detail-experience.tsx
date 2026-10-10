@@ -41,6 +41,7 @@ export function ProductDetailExperience({
         productName={product.name}
         imageSets={product.imageSets}
         selectedColor={selectedColor}
+        onColorChange={setSelectedColor}
       />
 
       <div
