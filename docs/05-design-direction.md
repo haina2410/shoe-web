@@ -28,6 +28,8 @@ Nguyên tắc: nền paper + chữ ink chiếm ~90% diện tích; evergreen làm
 ## Layout
 
 - Nav tối giản dính trên: logo trái, danh mục giữa/phải, giỏ hàng góc phải. Nền paper, kẻ hairline dưới.
+- Thanh liên hệ trên cùng hiển thị địa chỉ, số điện thoại có thể bấm để gọi và
+  liên kết “Facebook fanpage” mở trang leafshoes Việt Nam trong tab mới.
 - **Hero product-forward:** mở đầu bằng **ảnh sản phẩm lớn** (không phải "số to + nhãn nhỏ"), tiêu đề ngắn + 1 CTA.
 - Lưới sản phẩm như gallery, nhiều khoảng trắng, card viền hairline (không đổ bóng nặng).
 - Card sản phẩm tự ôm nội dung thay vì kéo cao theo hàng, hiển thị tối đa bốn ảnh

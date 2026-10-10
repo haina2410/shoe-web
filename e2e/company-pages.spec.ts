@@ -109,7 +109,7 @@ test("chân trang dẫn tới chính sách đổi trả", async ({ page }) => {
   ).toBeVisible();
 });
 
-test("thanh liên hệ trên cùng cho gọi và gửi thư ngay", async ({ page }) => {
+test("thanh liên hệ trên cùng cho gọi và mở fanpage", async ({ page }) => {
   await page.goto("/");
 
   const topBar = page.getByTestId("site-top-bar");
@@ -117,10 +117,13 @@ test("thanh liên hệ trên cùng cho gọi và gửi thư ngay", async ({ page
     "href",
     /^tel:\d+$/,
   );
-  await expect(topBar.getByRole("link", { name: /@/ })).toHaveAttribute(
+  const fanpage = topBar.getByRole("link", { name: "Facebook fanpage" });
+  await expect(fanpage).toHaveAttribute(
     "href",
-    /^mailto:.+@.+$/,
+    "https://www.facebook.com/leafshoesvietnam/",
   );
+  await expect(fanpage).toHaveAttribute("target", "_blank");
+  await expect(fanpage).toHaveAttribute("rel", "noopener noreferrer");
 });
 
 test("slug chính sách không tồn tại trả về trang 404", async ({ page }) => {

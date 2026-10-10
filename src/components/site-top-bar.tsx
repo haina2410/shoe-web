@@ -1,13 +1,5 @@
 import { STORE_INFO } from "@/lib/storefront-content";
 
-/**
- * Thanh liên hệ trên cùng: địa chỉ, điện thoại và email của cửa hàng.
- *
- * Mục đích là để khách gọi hoặc gửi thư ngay từ bất kỳ trang nào mà không phải
- * cuộn xuống chân trang. Điện thoại và email là link `tel:`/`mailto:` nên bấm
- * trên mobile là gọi/soạn thư được luôn. Địa chỉ dài nên chỉ hiện từ `sm` trở
- * lên, tránh chiếm hai dòng trên điện thoại.
- */
 export function SiteTopBar() {
   return (
     <div
@@ -27,9 +19,11 @@ export function SiteTopBar() {
           </a>
           <a
             className="inline-flex min-h-11 items-center underline-offset-4 hover:underline"
-            href={`mailto:${STORE_INFO.email}`}
+            href={STORE_INFO.facebookUrl}
+            target="_blank"
+            rel="noopener noreferrer"
           >
-            {STORE_INFO.email}
+            Facebook fanpage
           </a>
         </div>
       </div>
